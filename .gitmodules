@@ -1,0 +1,6 @@
+[submodule "carmen-cache-sys/carmen-cache"]
+	path = carmen-cache-sys/carmen-cache
+	url = https://github.com/mapbox/carmen-cache.git
+[submodule "carmen-cache-sys/protozero"]
+	path = carmen-cache-sys/protozero
+	url = https://github.com/mapbox/protozero.git
