@@ -6,10 +6,10 @@ pub struct GridKey {
     pub lang_set: u128
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, PartialOrd, PartialEq)]
 pub struct GridEntry {
     // these will be truncated to 4 bits apiece
-    pub relev: u8,
+    pub relev: f32,
     pub score: u8,
     pub x: u16,
     pub y: u16,

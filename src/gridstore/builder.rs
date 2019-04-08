@@ -14,8 +14,18 @@ pub struct GridStoreBuilder {
     data: BTreeMap<GridKey, BuilderEntry>
 }
 
+#[inline]
+fn relev_float_to_int(relev: f32) -> u8 {
+    match relev {
+        0.4 => 0,
+        0.6 => 1,
+        0.8 => 2,
+        _ => 3
+    }
+}
+
 fn extend_entries(builder_entry: &mut BuilderEntry, values: &[GridEntry]) -> () {
-    for (rs, values) in &values.into_iter().group_by(|value| (value.relev << 4) | value.score) {
+    for (rs, values) in &values.into_iter().group_by(|value| (relev_float_to_int(value.relev) << 4) | value.score) {
         let rs_entry = builder_entry
             .entry(rs)
             .or_insert_with(|| BTreeMap::new());
@@ -76,4 +86,38 @@ impl GridStoreBuilder {
         }
         Ok(())
     }
+}
+
+#[test]
+fn basic_test() {
+    let mut builder = GridStoreBuilder::new("whatever.rocksdb").unwrap();
+    // memcache._set('1', [
+    builder.insert(&GridKey { phrase_id: 1, lang_set: 1 }, &vec![
+        GridEntry {
+            id: 2,
+            x: 2,
+            y: 2,
+            relev: 0.8,
+            score: 3,
+            source_phrase_hash: 0
+        },
+        GridEntry {
+            id: 3,
+            x: 3,
+            y: 3,
+            relev: 1.,
+            score: 1,
+            source_phrase_hash: 1
+        },
+        GridEntry {
+            id: 1,
+            x: 1,
+            y: 1,
+            relev: 1.,
+            score: 7,
+            source_phrase_hash: 2
+        }
+    ]);
+
+    builder.finish().unwrap();
 }
