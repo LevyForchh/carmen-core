@@ -5,14 +5,9 @@ use itertools::Itertools;
 use morton::interleave_morton;
 
 use crate::gridstore::common::*;
+use crate::gridstore::gridstore_generated::*;
 
-#[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
-struct RelevScore {
-    relev: u8,
-    score: u8
-}
-
-type BuilderEntry = BTreeMap<RelevScore, BTreeMap<u32, Vec<u32>>>;
+type BuilderEntry = BTreeMap<u8, BTreeMap<u32, Vec<u32>>>;
 
 pub struct GridStoreBuilder {
     filename: String,
@@ -20,7 +15,7 @@ pub struct GridStoreBuilder {
 }
 
 fn extend_entries(builder_entry: &mut BuilderEntry, values: &[GridEntry]) -> () {
-    for (rs, values) in &values.into_iter().group_by(|value| RelevScore { relev: value.relev, score: value.score }) {
+    for (rs, values) in &values.into_iter().group_by(|value| (value.relev << 4) | value.score) {
         let rs_entry = builder_entry
             .entry(rs)
             .or_insert_with(|| BTreeMap::new());
@@ -51,6 +46,34 @@ impl GridStoreBuilder {
     pub fn append(&mut self, key: &GridKey, values: &[GridEntry]) -> Result<(), Box<dyn Error>> {
         let mut to_append = self.data.entry(key.to_owned()).or_insert_with(|| BuilderEntry::new());
         extend_entries(&mut to_append, values);
+        Ok(())
+    }
+
+    pub fn finish(mut self) -> Result<(), Box<Error>> {
+        for (grid_key, value) in self.data.iter_mut() {
+            let mut fb_builder = flatbuffers::FlatBufferBuilder::new();
+            let mut rses: Vec<_> = Vec::new();
+            for (rs, coord_group) in value.iter_mut() {
+                let mut coords: Vec<_> = Vec::new();
+                for (coord, ids) in coord_group.iter_mut() {
+                    // reverse sort
+                    ids.sort_by(|a, b| b.cmp(a));
+                    ids.dedup();
+
+                    let fb_ids = fb_builder.create_vector(&ids);
+                    let fb_coord = Coord::create(&mut fb_builder, &CoordArgs{coord: *coord, ids: Some(fb_ids)});
+                    coords.push(fb_coord);
+                }
+                let fb_coords = fb_builder.create_vector(&coords);
+                let fb_rs = RelevScore::create(&mut fb_builder, &RelevScoreArgs{relev_score: *rs, coords: Some(fb_coords)});
+                rses.push(fb_rs);
+            }
+            let fb_rses = fb_builder.create_vector(&rses);
+            let record = PhraseRecord::create(&mut fb_builder, &PhraseRecordArgs{relev_scores: Some(fb_rses)});
+            fb_builder.finish(record, None);
+
+            println!("{:?}", fb_builder.finished_data());
+        }
         Ok(())
     }
 }
