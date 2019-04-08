@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
- use std::error::Error;
+use std::error::Error;
+use std::path::{ Path, PathBuf };
 
 use itertools::Itertools;
 use morton::interleave_morton;
@@ -10,7 +11,7 @@ use crate::gridstore::gridstore_generated::*;
 type BuilderEntry = BTreeMap<u8, BTreeMap<u32, Vec<u32>>>;
 
 pub struct GridStoreBuilder {
-    filename: String,
+    path: PathBuf,
     data: BTreeMap<GridKey, BuilderEntry>
 }
 
@@ -42,8 +43,8 @@ fn extend_entries(builder_entry: &mut BuilderEntry, values: &[GridEntry]) -> () 
 }
 
 impl GridStoreBuilder {
-    pub fn new(filename: &str) -> Result<GridStoreBuilder, Box<dyn Error>> {
-        Ok(GridStoreBuilder { filename: filename.to_owned(), data: BTreeMap::new() })
+    pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn Error>> {
+        Ok(GridStoreBuilder { path: path.as_ref().to_owned(), data: BTreeMap::new() })
     }
 
     pub fn insert(&mut self, key: &GridKey, values: &[GridEntry]) -> Result<(), Box<dyn Error>> {
@@ -88,10 +89,13 @@ impl GridStoreBuilder {
     }
 }
 
+#[cfg(test)] use tempfile;
+
 #[test]
 fn basic_test() {
-    let mut builder = GridStoreBuilder::new("whatever.rocksdb").unwrap();
-    // memcache._set('1', [
+    let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
+    let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
+
     builder.insert(&GridKey { phrase_id: 1, lang_set: 1 }, &vec![
         GridEntry {
             id: 2,

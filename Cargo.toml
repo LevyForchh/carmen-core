@@ -10,3 +10,6 @@ morton = { git = "https://github.com/apendleton/morton.git", rev = "d892e8f2759a
 itertools = "0.8"
 flatbuffers = "0.5"
 rocksdb = "0.12"
+
+[dev-dependencies]
+tempfile = "3.0"
