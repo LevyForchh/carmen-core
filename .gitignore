@@ -1,3 +1,9 @@
 **/target
 **/*.rs.bk
 Cargo.lock
+node_modules
+node-src/node_modules
+node-src/native/target
+node-src/native/index.node
+node-src/native/artifacts.json
+rust-src/target

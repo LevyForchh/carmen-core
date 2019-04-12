@@ -1,0 +1,14 @@
+{
+  "name": "node-src",
+  "version": "0.1.0",
+  "description": "node bindings for carmen-core",
+  "main": "lib/index.js",
+  "author": "Aarthy Chandrasekhar <kcaarthy@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "neon-cli": "^0.2.0"
+  },
+  "scripts": {
+    "install": "neon build"
+  }
+}
