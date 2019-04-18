@@ -1,0 +1,17 @@
+[package]
+name = "node-carmen-core"
+version = "0.1.0"
+authors = ["Aarthy Chandrasekhar <kcaarthy@gmail.com>"]
+license = "MIT"
+build = "build.rs"
+exclude = ["artifacts.json", "index.node"]
+
+[lib]
+name = "node_carmen_core"
+crate-type = ["dylib"]
+
+[build-dependencies]
+neon-build = "0.2.0"
+
+[dependencies]
+neon = "0.2.0"
