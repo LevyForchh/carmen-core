@@ -9,7 +9,8 @@
   },
   "author": "Aarthy Chandrasekhar <kcaarthy@gmail.com>",
   "license": "MIT",
-  "dependencies": {
+  "dependencies": {},
+  "devDependencies": {
     "neon-cli": "^0.2.0"
   },
   "scripts": {
