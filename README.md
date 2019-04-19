@@ -1,5 +1,6 @@
 ## carmen-core
 Carmen-core is a backend storage for carmen written in rust.
+NOTE: The node support is work-in-progress, currently you can't require this module in your project.
 
 ## Development
 

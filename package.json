@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "node bindings for carmen-core",
   "main": "index.js",
+  "engines": {
+    "node": ">= 10"
+  },
   "repository": {
     "type": "git",
     "url": "carmen-core"
