@@ -172,6 +172,26 @@ impl GridStore {
     pub fn get_matching(
         &self,
         match_key: &MatchKey,
+        match_opts: &MatchOpts
+    ) -> Result<Box<dyn Iterator<Item = MatchEntry>>, Box<Error>> {
+        match match_opts {
+            MatchOpts { bbox: None, .. } => {
+                Ok(Box::new(self.global_get_matching(match_key)?))
+            },
+            MatchOpts { bbox: Some(bbox), .. } => {
+                let bbox: [u16; 4] = bbox.clone();
+                let out = self.global_get_matching(match_key)?.filter(move |entry| {
+                    entry.grid_entry.x >= bbox[0] && entry.grid_entry.x <= bbox[2] &&
+                    entry.grid_entry.y >= bbox[1] && entry.grid_entry.y <= bbox[3]
+                });
+                Ok(Box::new(out))
+            },
+        }
+    }
+
+    fn global_get_matching(
+        &self,
+        match_key: &MatchKey
     ) -> Result<impl Iterator<Item = MatchEntry>, Box<Error>> {
         let mut db_key: Vec<u8> = Vec::new();
         match_key.write_start_to(0, &mut db_key)?;

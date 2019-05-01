@@ -138,7 +138,7 @@ fn matching_test() {
     let reader = GridStore::new(directory.path()).unwrap();
 
     let search_key = MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 2 }, lang_set: 1 };
-    let records: Vec<_> = reader.get_matching(&search_key).unwrap().collect();
+    let records: Vec<_> = reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
     assert_eq!(
         records,
         [
@@ -154,7 +154,7 @@ fn matching_test() {
     );
 
     let search_key = MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 };
-    let records: Vec<_> = reader.get_matching(&search_key).unwrap().collect();
+    let records: Vec<_> = reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
     assert_eq!(
         records,
         [
@@ -174,7 +174,7 @@ fn matching_test() {
     );
 
     let search_key = MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 0 };
-    let records: Vec<_> = reader.get_matching(&search_key).unwrap().collect();
+    let records: Vec<_> = reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
     assert_eq!(
         records,
         [
@@ -194,7 +194,7 @@ fn matching_test() {
     );
 
     let search_key = MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 2 };
-    let records: Vec<_> = reader.get_matching(&search_key).unwrap().collect();
+    let records: Vec<_> = reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
     assert_eq!(
         records,
         [
@@ -214,7 +214,7 @@ fn matching_test() {
     );
 
     let search_key = MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 3 };
-    let records: Vec<_> = reader.get_matching(&search_key).unwrap().collect();
+    let records: Vec<_> = reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
     assert_eq!(
         records,
         [
@@ -234,10 +234,22 @@ fn matching_test() {
     );
 
     let search_key = MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 1 }, lang_set: 1 };
-    let records: Vec<_> = reader.get_matching(&search_key).unwrap().collect();
+    let records: Vec<_> = reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
     assert_eq!(records, []);
 
     let search_key = MatchKey { match_phrase: MatchPhrase::Range { start: 3, end: 4 }, lang_set: 1 };
-    let records: Vec<_> = reader.get_matching(&search_key).unwrap().collect();
+    let records: Vec<_> = reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
     assert_eq!(records, []);
+
+    let search_key = MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 };
+    let records: Vec<_> = reader.get_matching(&search_key, &MatchOpts { bbox: Some([26, 0, 41, 2]), proximity: None }).unwrap().collect();
+    assert_eq!(
+        records,
+        [
+            MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 41, y: 1, id: 23, source_phrase_hash: 0 }, matches_language: true },
+            MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 41, y: 1, id: 21, source_phrase_hash: 0 }, matches_language: true },
+            MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 1, x: 40, y: 1, id: 20, source_phrase_hash: 0 }, matches_language: true },
+            MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 26, y: 1, id: 14, source_phrase_hash: 0 }, matches_language: false }
+        ]
+    );
 }
