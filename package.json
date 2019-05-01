@@ -14,10 +14,13 @@
   "license": "MIT",
   "dependencies": {},
   "devDependencies": {
-    "neon-cli": "^0.2.0"
+    "codecov": "^3.3.0",
+    "neon-cli": "^0.2.0",
+    "nyc": "^14.0.0"
   },
   "scripts": {
     "install": "neon build",
-    "test": "node -e \"require('.')\""
+    "test": "node -e \"require('.')\"",
+    "coverage": "nyc node -e \"require('.')\" && nyc report --reporter=text-lcov > coverage.lcov && codecov"
   }
 }
