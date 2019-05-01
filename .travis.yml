@@ -1,5 +1,20 @@
 matrix:
+  allow_failures:
+    - rust: nightly
+
   include:
+    - language: rust
+      sudo: required
+      dist: xenial
+      cache: cargo
+      rust: stable
+
+      script:
+      - cargo clean
+      - cargo fmt --all -- --check
+      - cargo build
+      - cargo test
+
     - language: rust
       sudo: required
       dist: xenial
@@ -8,17 +23,10 @@ matrix:
               packages:
                   - libssl-dev
       cache: cargo
-      rust:
-        - stable
-        - nightly
-      matrix:
-        allow_failures:
-          - rust: nightly
+      rust: nightly
 
       before_cache: |
-        if [[ "$TRAVIS_RUST_VERSION" == nightly ]]; then
-          RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin -f
-        fi
+        RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin -f
 
       script:
       - cargo clean
@@ -27,17 +35,18 @@ matrix:
       - cargo test
 
       after_success: |
-        if [[ "$TRAVIS_RUST_VERSION" == nightly ]]; then
-          # Uncomment the following line for coveralls.io
-          # cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
+        # Uncomment the following line for coveralls.io
+        # cargo tarpaulin --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
 
-          # Uncomment the following two lines create and upload a report for codecov.io
-          # cargo tarpaulin --out Xml
-          # bash <(curl -s https://codecov.io/bash)
-        fi
+        # Uncomment the following two lines create and upload a report for codecov.io
+        # cargo tarpaulin --out Xml
+        # bash <(curl -s https://codecov.io/bash)
 
     - language: node_js
       sudo: false
+      os: linux
+      env: BUILDTYPE=release
+      node_js: 10
 
       install:
         - node -v
@@ -53,13 +62,23 @@ matrix:
       script:
         - yarn test
 
-      matrix:
-        include:
-          - os: linux
-            env: BUILDTYPE=release
-            node_js: 10
+    - language: node_js
+      sudo: false
+      os: osx
+      osx_image: xcode9.2
+      env: BUILDTYPE=release
+      node_js: 10
 
-          - os: osx
-            osx_image: xcode9.2
-            env: BUILDTYPE=release
-            node_js: 10
+      install:
+        - node -v
+        - which node
+        - curl https://sh.rustup.rs -sSf > /tmp/rustup.sh
+        - sh /tmp/rustup.sh -y
+        - export PATH="$HOME/.cargo/bin:$PATH"
+        - source "$HOME/.cargo/env"
+        - yarn install --ignore-scripts
+        - neon clean
+        - neon build $([ "${BUILDTYPE}" == 'debug' ] && echo "" || echo "--release")
+
+      script:
+        - yarn test
