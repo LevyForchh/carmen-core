@@ -14,7 +14,7 @@ matrix:
       before_script:
       - rustup component add rustfmt
 
-      before_cache: |
+      before_cache:
       - cargo install cargo-kcov -f
 
       script:
