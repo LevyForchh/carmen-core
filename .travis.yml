@@ -1,7 +1,4 @@
 matrix:
-  allow_failures:
-    - rust: nightly
-
   include:
     - language: rust
       sudo: required
@@ -9,8 +6,16 @@ matrix:
       cache: cargo
       rust: stable
 
+      before_install:
+      - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+      - sudo apt-get update -q
+      - sudo apt-get install kcov
+
       before_script:
       - rustup component add rustfmt
+
+      before_cache: |
+      - cargo install cargo-kcov -f
 
       script:
       - cargo clean
@@ -18,26 +23,8 @@ matrix:
       - cargo build
       - cargo test
 
-    - language: rust
-      sudo: required
-      dist: xenial
-      addons:
-          apt:
-              packages:
-                  - libssl-dev
-      cache: cargo
-      rust: nightly
-
-      before_cache: |
-        RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin -f
-
-      script:
-      - cargo clean
-      - cargo build
-      - cargo test
-
       after_success: |
-        cargo tarpaulin --out Xml
+        cargo kcov
         bash <(curl -s https://codecov.io/bash)
 
     - language: node_js
