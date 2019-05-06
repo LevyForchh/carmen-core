@@ -4,3 +4,6 @@ node_modules
 native/target
 native/index.node
 native/artifacts.json
+yarn-error.log
+.nyc_output/
+coverage.lcov
