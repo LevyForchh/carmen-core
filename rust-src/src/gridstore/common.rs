@@ -78,15 +78,22 @@ impl MatchKey {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
+pub struct Proximity {
+    pub point: [u16; 2],
+    pub radius: f64,
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub struct MatchOpts {
     pub bbox: Option<[u16; 4]>,
-    pub proximity: Option<[u16; 2]>
+    pub proximity: Option<Proximity>,
+    pub zoom: u16,
 }
 
 impl Default for MatchOpts {
     fn default() -> Self {
-        MatchOpts { bbox: None, proximity: None }
+        MatchOpts { bbox: None, proximity: None, radius: None, zoom: 16 }
     }
 }
 
@@ -95,6 +102,9 @@ impl Default for MatchOpts {
 // the phrase ID is assumed to be language, and it might be up to 128 bits long, but we'll strip
 // leading (in a big-endian sense/most-significant sense) zero bytes for compactness
 pub const MAX_KEY_LENGTH: usize = 1 + (32 / 8) + (128 / 8);
+
+// The max number of contexts to return from Coalesce
+pub const MAX_CONTEXTS: usize = 40;
 
 #[derive(Serialize, Deserialize, Debug, PartialOrd, PartialEq)]
 pub struct GridEntry {
@@ -112,6 +122,24 @@ pub struct GridEntry {
 pub struct MatchEntry {
     pub grid_entry: GridEntry,
     pub matches_language: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialOrd, PartialEq)]
+pub struct CoalesceEntry {
+    pub grid_entry: GridEntry,
+    pub matches_language: bool,
+    pub idx: u16,
+    pub tmp_id: u32,
+    pub mask: u32,
+    pub distance: f64,
+    pub scoredist: f64,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialOrd, PartialEq)]
+pub struct CoalesceContext {
+    pub mask: u32,
+    pub relev: f32,
+    pub entries: Vec<CoalesceEntry>,
 }
 
 #[inline]

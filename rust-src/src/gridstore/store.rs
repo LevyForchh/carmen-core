@@ -1,18 +1,19 @@
+use std::cmp::Ordering;
+use std::collections::BTreeMap;
 use std::error::Error;
 use std::path::Path;
-use std::collections::BTreeMap;
-use std::cmp::Ordering;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 use flatbuffers;
-use morton::deinterleave_morton;
-use rocksdb::{Direction, IteratorMode, DB};
-use ordered_float::OrderedFloat;
 use itertools::Itertools;
+use morton::deinterleave_morton;
+use ordered_float::OrderedFloat;
+use rocksdb::{Direction, IteratorMode, DB};
 
 use crate::gridstore::common::*;
 use crate::gridstore::gridstore_generated::*;
 
+#[derive(Debug)]
 pub struct GridStore {
     db: DB,
 }
@@ -41,10 +42,13 @@ fn get_vector<'a, T: 'a>(
 // takes ownership, and eagerly collects each group into a vector as it goes. So it's still
 // lazy-ish (in the sense that it doesn't advance beyond the current group), but more eager than
 // the itertools version
-fn somewhat_eager_groupby<T: Iterator, F, K>(mut it: T, key: F) -> impl Iterator<Item=(K, Vec<T::Item>)>
+fn somewhat_eager_groupby<T: Iterator, F, K>(
+    mut it: T,
+    key: F,
+) -> impl Iterator<Item = (K, Vec<T::Item>)>
 where
     K: Sized + Copy + PartialEq,
-    F: Fn(&T::Item) -> K
+    F: Fn(&T::Item) -> K,
 {
     let mut curr_key: Option<K> = None;
     let mut running_group: Vec<T::Item> = Vec::new();
@@ -63,7 +67,7 @@ where
                     None => {
                         curr_key = Some(k);
                         running_group.push(val);
-                    },
+                    }
                     Some(o) => {
                         if *o != k {
                             let mut out_vec = Vec::new();
@@ -98,13 +102,31 @@ where
 
 #[test]
 fn eager_test() {
-    let a = vec![1,1,1,2,3,4,4,4,7,7,8];
+    let a = vec![1, 1, 1, 2, 3, 4, 4, 4, 7, 7, 8];
     let b: Vec<_> = somewhat_eager_groupby(a.into_iter(), |x| *x).collect();
-    assert_eq!(b, vec![(1, vec![1, 1, 1]), (2, vec![2]), (3, vec![3]), (4, vec![4, 4, 4]), (7, vec![7, 7]), (8, vec![8])]);
+    assert_eq!(
+        b,
+        vec![
+            (1, vec![1, 1, 1]),
+            (2, vec![2]),
+            (3, vec![3]),
+            (4, vec![4, 4, 4]),
+            (7, vec![7, 7]),
+            (8, vec![8])
+        ]
+    );
 
-    let a = vec![(1,'a'),(1,'b'),(2,'b'),(3,'z'),(4,'a'),(4,'a')];
+    let a = vec![(1, 'a'), (1, 'b'), (2, 'b'), (3, 'z'), (4, 'a'), (4, 'a')];
     let b: Vec<_> = somewhat_eager_groupby(a.into_iter(), |x| (*x).0).collect();
-    assert_eq!(b, vec![(1, vec![(1, 'a'), (1, 'b')]), (2, vec![(2, 'b')]), (3, vec![(3, 'z')]), (4, vec![(4, 'a'), (4, 'a')])]);
+    assert_eq!(
+        b,
+        vec![
+            (1, vec![(1, 'a'), (1, 'b')]),
+            (2, vec![(2, 'b')]),
+            (3, vec![(3, 'z')]),
+            (4, vec![(4, 'a'), (4, 'a')])
+        ]
+    );
 }
 
 impl GridStore {
@@ -172,26 +194,26 @@ impl GridStore {
     pub fn get_matching(
         &self,
         match_key: &MatchKey,
-        match_opts: &MatchOpts
+        match_opts: &MatchOpts,
     ) -> Result<Box<dyn Iterator<Item = MatchEntry>>, Box<Error>> {
         match match_opts {
-            MatchOpts { bbox: None, .. } => {
-                Ok(Box::new(self.global_get_matching(match_key)?))
-            },
+            MatchOpts { bbox: None, .. } => Ok(Box::new(self.global_get_matching(match_key)?)),
             MatchOpts { bbox: Some(bbox), .. } => {
                 let bbox: [u16; 4] = bbox.clone();
                 let out = self.global_get_matching(match_key)?.filter(move |entry| {
-                    entry.grid_entry.x >= bbox[0] && entry.grid_entry.x <= bbox[2] &&
-                    entry.grid_entry.y >= bbox[1] && entry.grid_entry.y <= bbox[3]
+                    entry.grid_entry.x >= bbox[0]
+                        && entry.grid_entry.x <= bbox[2]
+                        && entry.grid_entry.y >= bbox[1]
+                        && entry.grid_entry.y <= bbox[3]
                 });
                 Ok(Box::new(out))
-            },
+            }
         }
     }
 
     fn global_get_matching(
         &self,
-        match_key: &MatchKey
+        match_key: &MatchKey,
     ) -> Result<impl Iterator<Item = MatchEntry>, Box<Error>> {
         let mut db_key: Vec<u8> = Vec::new();
         match_key.write_start_to(0, &mut db_key)?;
@@ -229,7 +251,8 @@ impl GridStore {
                     record_ref.1,
                     &record._tab,
                     PhraseRecord::VT_RELEV_SCORES,
-                ).unwrap();
+                )
+                .unwrap();
 
                 for rs_obj in rs_vec {
                     let relev_score = rs_obj.relev_score();
@@ -241,8 +264,8 @@ impl GridStore {
                         get_vector::<Coord>(record_ref.1, &rs_obj._tab, RelevScore::VT_COORDS)
                             .unwrap();
 
-                    let slot = coords_for_rs.entry((OrderedFloat(relev), score))
-                        .or_insert_with(|| vec![]);
+                    let slot =
+                        coords_for_rs.entry((OrderedFloat(relev), score)).or_insert_with(|| vec![]);
                     slot.push(coords.into_iter());
                 }
             }
@@ -254,47 +277,50 @@ impl GridStore {
                 let _ref_set = &ref_set;
                 let relev = relev.into_inner();
                 // for each relev/score, lazily k-way-merge the child entities by z-order curve value
-                let merged = coord_sets.into_iter()
+                let merged = coord_sets
+                    .into_iter()
                     .kmerge_by(|a, b| a.coord().cmp(&b.coord()) == Ordering::Greater)
                     .map(|coords_obj| (coords_obj.coord(), coords_obj));
 
                 // group together entries from different keys that have the same z-order coordinate
-                somewhat_eager_groupby(merged, |a| (*a).0).flat_map(move |(coord, coords_obj_group)| {
-                    let (x, y) = deinterleave_morton(coord);
+                somewhat_eager_groupby(merged, |a| (*a).0).flat_map(
+                    move |(coord, coords_obj_group)| {
+                        let (x, y) = deinterleave_morton(coord);
 
-                    // get all the feature IDs from all the entries with the same XY, and eagerly
-                    // combine them and sort descending if necessary (if there's only one entry,
-                    // it's already sorted)
-                    let all_ids: Vec<u32> = match coords_obj_group.len() {
-                        0 => Vec::new(),
-                        1 => coords_obj_group[0].1.ids().unwrap().iter().collect(),
-                        _ => {
-                            let mut ids = Vec::new();
-                            for (_, coords_obj) in coords_obj_group {
-                                ids.extend(coords_obj.ids().unwrap().iter());
+                        // get all the feature IDs from all the entries with the same XY, and eagerly
+                        // combine them and sort descending if necessary (if there's only one entry,
+                        // it's already sorted)
+                        let all_ids: Vec<u32> = match coords_obj_group.len() {
+                            0 => Vec::new(),
+                            1 => coords_obj_group[0].1.ids().unwrap().iter().collect(),
+                            _ => {
+                                let mut ids = Vec::new();
+                                for (_, coords_obj) in coords_obj_group {
+                                    ids.extend(coords_obj.ids().unwrap().iter());
+                                }
+                                ids.sort_by(|a, b| b.cmp(a));
+                                ids.dedup();
+                                ids
                             }
-                            ids.sort_by(|a, b| b.cmp(a));
-                            ids.dedup();
-                            ids
-                        }
-                    };
+                        };
 
-                    all_ids.into_iter().map(move |id_comp| {
-                        let id = id_comp >> 8;
-                        let source_phrase_hash = (id_comp & 255) as u8;
-                        MatchEntry {
-                            grid_entry: GridEntry {
-                                relev,
-                                score,
-                                x,
-                                y,
-                                id,
-                                source_phrase_hash,
-                            },
-                            matches_language: matches_language,
-                        }
-                    })
-                })
+                        all_ids.into_iter().map(move |id_comp| {
+                            let id = id_comp >> 8;
+                            let source_phrase_hash = (id_comp & 255) as u8;
+                            MatchEntry {
+                                grid_entry: GridEntry {
+                                    relev,
+                                    score,
+                                    x,
+                                    y,
+                                    id,
+                                    source_phrase_hash,
+                                },
+                                matches_language: matches_language,
+                            }
+                        })
+                    },
+                )
             })
         });
         Ok(out)
