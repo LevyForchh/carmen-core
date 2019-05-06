@@ -78,6 +78,18 @@ impl MatchKey {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct MatchOpts {
+    pub bbox: Option<[u16; 4]>,
+    pub proximity: Option<[u16; 2]>
+}
+
+impl Default for MatchOpts {
+    fn default() -> Self {
+        MatchOpts { bbox: None, proximity: None }
+    }
+}
+
 // keys consist of a marker byte indicating type (regular entry, prefix cache, etc.) followed by
 // a 32-bit phrase ID followed by a variable-length set of bytes for language -- everything after
 // the phrase ID is assumed to be language, and it might be up to 128 bits long, but we'll strip
