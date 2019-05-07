@@ -4,7 +4,7 @@ use std::path::Path;
 use byteorder::{LittleEndian, ReadBytesExt};
 use flatbuffers;
 use morton::deinterleave_morton;
-use rocksdb::{Direction, IteratorMode, DB, Options};
+use rocksdb::{Direction, IteratorMode, Options, DB};
 
 use crate::gridstore::common::*;
 use crate::gridstore::gridstore_generated::*;
