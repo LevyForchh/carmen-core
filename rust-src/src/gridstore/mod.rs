@@ -115,12 +115,13 @@ fn matching_test() {
         GridKey { phrase_id: 1, lang_set: 1 },
         GridKey { phrase_id: 1, lang_set: 2 },
         GridKey { phrase_id: 2, lang_set: 1 },
-        GridKey { phrase_id: 1, lang_set: 1 }
+        GridKey { phrase_id: 1, lang_set: 1 },
     ];
 
     let mut i = 0;
     for key in keys {
         for _j in 0..2 {
+            #[cfg_attr(rustfmt, rustfmt::skip)]
             let entries = vec![
                 GridEntry { id: i, x: (2 * i) as u16, y: 1, relev: 1., score: 1, source_phrase_hash: 0 },
                 GridEntry { id: i + 1, x: ((2 * i) + 1) as u16, y: 1, relev: 1., score: 7, source_phrase_hash: 0 },
@@ -137,8 +138,11 @@ fn matching_test() {
 
     let reader = GridStore::new(directory.path()).unwrap();
 
-    let search_key = MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 2 }, lang_set: 1 };
-    let records: Vec<_> = reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
+    let search_key =
+        MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 2 }, lang_set: 1 };
+    let records: Vec<_> =
+        reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
+    #[cfg_attr(rustfmt, rustfmt::skip)]
     assert_eq!(
         records,
         [
@@ -153,8 +157,11 @@ fn matching_test() {
         ]
     );
 
-    let search_key = MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 };
-    let records: Vec<_> = reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
+    let search_key =
+        MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 };
+    let records: Vec<_> =
+        reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
+    #[cfg_attr(rustfmt, rustfmt::skip)]
     assert_eq!(
         records,
         [
@@ -173,8 +180,11 @@ fn matching_test() {
         ]
     );
 
-    let search_key = MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 0 };
-    let records: Vec<_> = reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
+    let search_key =
+        MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 0 };
+    let records: Vec<_> =
+        reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
+    #[cfg_attr(rustfmt, rustfmt::skip)]
     assert_eq!(
         records,
         [
@@ -193,8 +203,11 @@ fn matching_test() {
         ]
     );
 
-    let search_key = MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 2 };
-    let records: Vec<_> = reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
+    let search_key =
+        MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 2 };
+    let records: Vec<_> =
+        reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
+    #[cfg_attr(rustfmt, rustfmt::skip)]
     assert_eq!(
         records,
         [
@@ -213,8 +226,11 @@ fn matching_test() {
         ]
     );
 
-    let search_key = MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 3 };
-    let records: Vec<_> = reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
+    let search_key =
+        MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 3 };
+    let records: Vec<_> =
+        reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
+    #[cfg_attr(rustfmt, rustfmt::skip)]
     assert_eq!(
         records,
         [
@@ -233,16 +249,25 @@ fn matching_test() {
         ]
     );
 
-    let search_key = MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 1 }, lang_set: 1 };
-    let records: Vec<_> = reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
+    let search_key =
+        MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 1 }, lang_set: 1 };
+    let records: Vec<_> =
+        reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
     assert_eq!(records, []);
 
-    let search_key = MatchKey { match_phrase: MatchPhrase::Range { start: 3, end: 4 }, lang_set: 1 };
-    let records: Vec<_> = reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
+    let search_key =
+        MatchKey { match_phrase: MatchPhrase::Range { start: 3, end: 4 }, lang_set: 1 };
+    let records: Vec<_> =
+        reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
     assert_eq!(records, []);
 
-    let search_key = MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 };
-    let records: Vec<_> = reader.get_matching(&search_key, &MatchOpts { bbox: Some([26, 0, 41, 2]), proximity: None }).unwrap().collect();
+    let search_key =
+        MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 };
+    let records: Vec<_> = reader
+        .get_matching(&search_key, &MatchOpts { bbox: Some([26, 0, 41, 2]), proximity: None })
+        .unwrap()
+        .collect();
+    #[cfg_attr(rustfmt, rustfmt::skip)]
     assert_eq!(
         records,
         [

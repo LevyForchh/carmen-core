@@ -81,7 +81,7 @@ impl MatchKey {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct MatchOpts {
     pub bbox: Option<[u16; 4]>,
-    pub proximity: Option<[u16; 2]>
+    pub proximity: Option<[u16; 2]>,
 }
 
 impl Default for MatchOpts {
