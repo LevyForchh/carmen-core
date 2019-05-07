@@ -142,9 +142,9 @@ fn matching_test() {
         MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 2 }, lang_set: 1 };
     let records: Vec<_> =
         reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
+    #[cfg_attr(rustfmt, rustfmt::skip)]
     assert_eq!(
         records,
-        #[cfg_attr(rustfmt, rustfmt::skip)]
         [
             MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 58, y: 1, id: 30, source_phrase_hash: 0 }, matches_language: true },
             MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 57, y: 1, id: 31, source_phrase_hash: 0 }, matches_language: true },
@@ -161,9 +161,9 @@ fn matching_test() {
         MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 };
     let records: Vec<_> =
         reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
+    #[cfg_attr(rustfmt, rustfmt::skip)]
     assert_eq!(
         records,
-        #[cfg_attr(rustfmt, rustfmt::skip)]
         [
             MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 58, y: 1, id: 30, source_phrase_hash: 0 }, matches_language: true },
             MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 57, y: 1, id: 31, source_phrase_hash: 0 }, matches_language: true },
@@ -184,9 +184,9 @@ fn matching_test() {
         MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 0 };
     let records: Vec<_> =
         reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
+    #[cfg_attr(rustfmt, rustfmt::skip)]
     assert_eq!(
         records,
-        #[cfg_attr(rustfmt, rustfmt::skip)]
         [
             MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 58, y: 1, id: 30, source_phrase_hash: 0 }, matches_language: false },
             MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 57, y: 1, id: 31, source_phrase_hash: 0 }, matches_language: false },
@@ -207,9 +207,9 @@ fn matching_test() {
         MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 2 };
     let records: Vec<_> =
         reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
+    #[cfg_attr(rustfmt, rustfmt::skip)]
     assert_eq!(
         records,
-        #[cfg_attr(rustfmt, rustfmt::skip)]
         [
             MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 26, y: 1, id: 14, source_phrase_hash: 0 }, matches_language: true },
             MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 25, y: 1, id: 15, source_phrase_hash: 0 }, matches_language: true },
@@ -230,9 +230,9 @@ fn matching_test() {
         MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 3 };
     let records: Vec<_> =
         reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
+    #[cfg_attr(rustfmt, rustfmt::skip)]
     assert_eq!(
         records,
-        #[cfg_attr(rustfmt, rustfmt::skip)]
         [
             MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 58, y: 1, id: 30, source_phrase_hash: 0 }, matches_language: true },
             MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 57, y: 1, id: 31, source_phrase_hash: 0 }, matches_language: true },
@@ -267,9 +267,9 @@ fn matching_test() {
         .get_matching(&search_key, &MatchOpts { bbox: Some([26, 0, 41, 2]), proximity: None })
         .unwrap()
         .collect();
+    #[cfg_attr(rustfmt, rustfmt::skip)]
     assert_eq!(
         records,
-        #[cfg_attr(rustfmt, rustfmt::skip)]
         [
             MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 41, y: 1, id: 23, source_phrase_hash: 0 }, matches_language: true },
             MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 41, y: 1, id: 21, source_phrase_hash: 0 }, matches_language: true },
