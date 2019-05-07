@@ -16,6 +16,7 @@ itertools = "0.8"
 # using this fork until https://github.com/google/flatbuffers/pull/5166 lands
 flatbuffers = { git = "https://github.com/TethysSvensson/flatbuffers.git", rev = "c330fcc941aacbe23e076589c5afbdb6504ceba6" }
 byteorder = "1.3"
+ordered-float = "1.0"
 
 [dev-dependencies]
 tempfile = "3.0"
