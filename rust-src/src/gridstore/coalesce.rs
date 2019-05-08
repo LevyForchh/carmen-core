@@ -1,9 +1,9 @@
 use std::cmp::Reverse;
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 
-use ordered_float::OrderedFloat;
 use itertools::Itertools;
+use ordered_float::OrderedFloat;
 
 use crate::gridstore::common::*;
 use crate::gridstore::store::GridStore;
@@ -52,8 +52,8 @@ pub fn coalesce(
 fn grid_to_coalesce_entry(
     grid: &MatchEntry,
     subquery: &PhrasematchSubquery,
-    match_opts: &MatchOpts) -> CoalesceEntry {
-
+    match_opts: &MatchOpts,
+) -> CoalesceEntry {
     debug_assert!(match_opts.zoom == subquery.zoom);
 
     // Calculate distance, scoredist, and language-adjusted relevance
@@ -181,13 +181,17 @@ fn coalesce_multi(
     let mut max_relev: f32 = 0.;
 
     for (i, subquery) in stack.iter().enumerate() {
-        let compatible_zooms: Vec<u16> = stack.iter().filter_map(|subquery_b| {
-            if subquery.idx == subquery_b.idx || subquery.zoom < subquery_b.zoom {
-                None
-            } else {
-                Some(subquery_b.zoom)
-            }
-        }).dedup().collect();
+        let compatible_zooms: Vec<u16> = stack
+            .iter()
+            .filter_map(|subquery_b| {
+                if subquery.idx == subquery_b.idx || subquery.zoom < subquery_b.zoom {
+                    None
+                } else {
+                    Some(subquery_b.zoom)
+                }
+            })
+            .dedup()
+            .collect();
 
         // TODO: normalize options by zoom
         // maybe could look like: match_opts.convert_to_zoom(subquery.zoom)
@@ -208,7 +212,7 @@ fn coalesce_multi(
                 let other_zxy = (
                     *other_zoom,
                     entries[0].grid_entry.x / scale_factor,
-                    entries[0].grid_entry.y / scale_factor
+                    entries[0].grid_entry.y / scale_factor,
                 );
 
                 if let Some(already_coalesced) = coalesced.get(&other_zxy) {
@@ -218,7 +222,9 @@ fn coalesce_multi(
                         for parent_entry in &parent_context.entries {
                             // this cover is functionally identical with previous and
                             // is more relevant, replace the previous.
-                            if parent_entry.mask == prev_mask && parent_entry.grid_entry.relev > prev_relev {
+                            if parent_entry.mask == prev_mask
+                                && parent_entry.grid_entry.relev > prev_relev
+                            {
                                 entries.pop();
                                 entries.push(parent_entry.clone());
 
@@ -240,7 +246,9 @@ fn coalesce_multi(
                     }
                 }
             }
-            if context_relev > max_relev { max_relev = context_relev; }
+            if context_relev > max_relev {
+                max_relev = context_relev;
+            }
 
             if i == (stack.len() - 1) {
                 if entries.len() == 1 {
@@ -252,21 +260,24 @@ fn coalesce_multi(
                 }
 
                 if max_relev - context_relev < 0.25 {
-                    contexts.push(CoalesceContext { entries, mask: context_mask, relev: context_relev });
+                    contexts.push(CoalesceContext {
+                        entries,
+                        mask: context_mask,
+                        relev: context_relev,
+                    });
                 }
             } else if i == 0 || entries.len() > 1 {
                 if let Some(already_coalesced) = coalesced.get_mut(&zxy) {
                     already_coalesced.push(CoalesceContext {
                         entries,
                         mask: context_mask,
-                        relev: context_relev
+                        relev: context_relev,
                     });
                 } else {
-                    coalesced.insert(zxy, vec![CoalesceContext {
-                        entries,
-                        mask: context_mask,
-                        relev: context_relev
-                    }]);
+                    coalesced.insert(
+                        zxy,
+                        vec![CoalesceContext { entries, mask: context_mask, relev: context_relev }],
+                    );
                 }
             }
         }
