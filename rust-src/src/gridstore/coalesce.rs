@@ -24,13 +24,14 @@ pub fn coalesce(
     let contexts = if stack.len() > 1 {
         coalesce_single(&stack[0], match_opts)?
     } else {
-        coalesce_multi(stack, match_opts)?
+        //coalesce_multi(stack, match_opts)?
+        Vec::new()
     };
 
-    let out = Vec::with_capacity(MAX_CONTEXTS);
+    let mut out = Vec::with_capacity(MAX_CONTEXTS);
     if !contexts.is_empty() {
         let relev_max = contexts[0].relev;
-        let sets: HashSet<u64> = HashSet::new();
+        let mut sets: HashSet<u64> = HashSet::new();
         for context in contexts {
             if out.len() >= MAX_CONTEXTS {
                 break;
@@ -39,7 +40,7 @@ pub fn coalesce(
             if relev_max - context.relev >= 0.25 {
                 break;
             }
-            let inserted = sets.insert(context.entries[0].tmp_id);
+            let inserted = sets.insert(context.entries[0].tmp_id.into());
             if inserted {
                 out.push(context);
             }
