@@ -1,5 +1,8 @@
+use std::cmp::Reverse;
 use std::collections::HashSet;
 use std::error::Error;
+
+use ordered_float::OrderedFloat;
 
 use crate::gridstore::common::*;
 use crate::gridstore::store::GridStore;
@@ -50,12 +53,14 @@ fn coalesce_single(
     match_opts: &MatchOpts,
 ) -> Result<Vec<CoalesceContext>, Box<Error>> {
     let grids = subquery.store.get_matching(&subquery.match_key, match_opts)?;
-
+    let mut contexts: Vec<CoalesceContext> = Vec::new();
+    let mut max_relev: f32 = 0.;
     let mut last_id: u32 = 0;
-    let mut last_relev: u32 = 0;
+    let mut last_relev: f32 = 0.;
     let mut last_scoredist: f64 = 0.;
     let mut last_distance: f64 = 0.;
     let mut min_scoredist = std::f64::MAX;
+    let mut feature_count: usize = 0;
 
     for grid in grids {
         // Calculate distance, scoredist, and language-adjusted relevance
@@ -92,11 +97,63 @@ fn coalesce_single(
             distance: distance,
             scoredist: scoredist,
         };
+
+        // If it's the same feature as the last one, but a lower scoredist don't add it
+        if last_id == coalesce_entry.grid_entry.id && coalesce_entry.scoredist <= last_scoredist {
+            continue;
+        }
+
+        if feature_count > MAX_CONTEXTS {
+            if coalesce_entry.scoredist < min_scoredist {
+                continue;
+            } else if coalesce_entry.grid_entry.relev < last_relev {
+                // Grids should be sorted by relevance coming out of get_matching,
+                // so if it's lower than the last relevance, stop
+                break;
+            }
+        }
+
+        if max_relev - coalesce_entry.grid_entry.relev >= 0.25 {
+            break;
+        }
+        if coalesce_entry.grid_entry.relev > max_relev {
+            max_relev = coalesce_entry.grid_entry.relev;
+        }
+        // For coalesce single, there is only one coalesce entry per context
+        contexts.push(CoalesceContext {
+            mask: coalesce_entry.mask,
+            relev: coalesce_entry.grid_entry.relev,
+            entries: vec![coalesce_entry.clone()],
+        });
+
+        if last_id != coalesce_entry.grid_entry.id {
+            feature_count += 1;
+        }
+        if match_opts.proximity.is_none() && feature_count > MAX_CONTEXTS {
+            break;
+        }
+        if coalesce_entry.scoredist < min_scoredist {
+            min_scoredist = coalesce_entry.scoredist;
+        }
+        last_id = coalesce_entry.grid_entry.id;
+        last_relev = coalesce_entry.grid_entry.relev;
+        last_scoredist = coalesce_entry.scoredist;
+        last_distance = coalesce_entry.distance;
     }
 
-    // Language penalty for features outside the proximity radius
+    contexts.sort_by_key(|context| {
+        (
+            Reverse(OrderedFloat(context.relev)),
+            Reverse(OrderedFloat(context.entries[0].scoredist)),
+            context.entries[0].grid_entry.id,
+            context.entries[0].grid_entry.x,
+            context.entries[0].grid_entry.y,
+        )
+    });
 
-    Ok(Vec::new())
+    contexts.dedup_by_key(|context| context.entries[0].grid_entry.id);
+    contexts.truncate(MAX_CONTEXTS);
+    Ok(contexts)
 }
 
 fn tile_dist(proximity_x: u16, proximity_y: u16, grid_x: u16, grid_y: u16) -> f64 {

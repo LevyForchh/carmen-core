@@ -106,7 +106,7 @@ pub const MAX_KEY_LENGTH: usize = 1 + (32 / 8) + (128 / 8);
 // The max number of contexts to return from Coalesce
 pub const MAX_CONTEXTS: usize = 40;
 
-#[derive(Serialize, Deserialize, Debug, PartialOrd, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialOrd, PartialEq, Clone)]
 pub struct GridEntry {
     // these will be truncated to 4 bits apiece
     pub relev: f32,
@@ -124,7 +124,7 @@ pub struct MatchEntry {
     pub matches_language: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialOrd, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialOrd, PartialEq, Clone)]
 pub struct CoalesceEntry {
     pub grid_entry: GridEntry,
     pub matches_language: bool,
