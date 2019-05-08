@@ -8,7 +8,7 @@ use flatbuffers;
 use itertools::Itertools;
 use morton::deinterleave_morton;
 use ordered_float::OrderedFloat;
-use rocksdb::{Direction, IteratorMode, DB};
+use rocksdb::{Direction, IteratorMode, Options, DB};
 
 use crate::gridstore::common::*;
 use crate::gridstore::gridstore_generated::*;
@@ -132,7 +132,9 @@ fn eager_test() {
 impl GridStore {
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn Error>> {
         let path = path.as_ref().to_owned();
-        let db = DB::open_default(&path)?;
+        let mut opts = Options::default();
+        opts.set_read_only(true);
+        let db = DB::open(&opts, &path)?;
         Ok(GridStore { db })
     }
 
