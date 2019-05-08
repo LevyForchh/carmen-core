@@ -93,7 +93,7 @@ pub struct MatchOpts {
 
 impl Default for MatchOpts {
     fn default() -> Self {
-        MatchOpts { bbox: None, proximity: None, radius: None, zoom: 16 }
+        MatchOpts { bbox: None, proximity: None, zoom: 16 }
     }
 }
 
