@@ -5,6 +5,7 @@ mod gridstore_generated;
 mod store;
 
 pub use builder::*;
+pub use coalesce::coalesce;
 pub use common::*;
 pub use store::*;
 
