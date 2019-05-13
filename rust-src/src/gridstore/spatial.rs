@@ -1,5 +1,6 @@
 use crate::gridstore::gridstore_generated::*;
 use flatbuffers;
+use itertools::Itertools;
 use morton::{deinterleave_morton, interleave_morton};
 use std::cmp::Ordering::{Equal, Greater, Less};
 
@@ -53,6 +54,33 @@ pub fn bbox_filter<'a>(
         }
         None
     }))
+}
+
+pub fn proximity_filter<'a>(
+    coords: flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Coord<'a>>>,
+    proximity: (u16, u16),
+) -> Option<impl Iterator<Item = Coord<'a>>> {
+    let prox_pt = interleave_morton(proximity.0, proximity.1) as i64;
+    let len = coords.len() as u32;
+    if len == 0 {
+        return None;
+    }
+
+    let prox_mid = match coord_binary_search(&coords, prox_pt as u32, 0) {
+        Ok(v) => v,
+        Err(_) => return None,
+    };
+
+    let getter = move |i| coords.get(i as usize);
+    let head = Box::new((0..prox_mid).rev().map(getter)) as Box<Iterator<Item = Coord>>;
+    let tail = Box::new((prox_mid..len).map(getter)) as Box<Iterator<Item = Coord>>;
+    let coord_sets = vec![head, tail].into_iter().kmerge_by(move |a, b| {
+        let d1 = (a.coord() as i64 - prox_pt) as i64;
+        let d2 = (b.coord() as i64 - prox_pt) as i64;
+        d1.abs().cmp(&d2.abs()) == Less
+    });
+
+    Some(coord_sets)
 }
 
 /// Binary search this FlatBuffers Coord Vector
@@ -191,6 +219,55 @@ mod test {
         let coords = rs.coords().unwrap();
         let result = bbox_filter(coords, [3, 1, 4, 2]).unwrap().collect::<Vec<Coord>>();
         assert_eq!(result.len(), 0, "result is on the z-order curve but not in the bbox");
+    }
+
+    #[test]
+    fn proximity_search() {
+        let buffer = flatbuffer_generator((1..10).rev()); // [9,8,7,6,5,4,3,2,1]
+        let rs = flatbuffers::get_root::<RelevScore>(&buffer);
+        let coords = rs.coords().unwrap();
+
+        let result =
+            proximity_filter(coords, (3, 0)).unwrap().map(|x| x.coord()).collect::<Vec<u32>>();
+        assert_eq!(
+            vec![5, 4, 6, 7, 3, 2, 8, 9, 1],
+            result,
+            "proximity point is in the middle of the result set - 5"
+        );
+
+        let result =
+            proximity_filter(coords, (0, 3)).unwrap().map(|x| x.coord()).collect::<Vec<u32>>();
+        assert_eq!(
+            vec![9, 8, 7, 6, 5, 4, 3, 2, 1],
+            result,
+            "proximity point is greater than the result set - 10"
+        );
+
+        let result =
+            proximity_filter(coords, (1, 0)).unwrap().map(|x| x.coord()).collect::<Vec<u32>>();
+        assert_eq!(
+            vec![1, 2, 3, 4, 5, 6, 7, 8, 9],
+            result,
+            "proximity point is lesser than the result set - 1"
+        );
+
+        let empty: Vec<u32> = vec![];
+        let buffer = flatbuffer_generator(empty.into_iter());
+        let rs = flatbuffers::get_root::<RelevScore>(&buffer);
+        let coords = rs.coords().unwrap();
+        assert_eq!(proximity_filter(coords, (3, 0)).is_none(), true);
+
+        let sparse: Vec<u32> = vec![24, 21, 13, 8, 7, 6, 1]; // 1 and 13 are the same distance from 7
+        let buffer = flatbuffer_generator(sparse.into_iter());
+        let rs = flatbuffers::get_root::<RelevScore>(&buffer);
+        let coords = rs.coords().unwrap();
+        let result =
+            proximity_filter(coords, (3, 1)).unwrap().map(|x| x.coord()).collect::<Vec<u32>>();
+        assert_eq!(
+            vec![7, 6, 8, 13, 1, 21, 24],
+            result,
+            "sparse result set sorted by z-order in the middle of the result set"
+        );
     }
 
     #[test]
