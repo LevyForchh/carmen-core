@@ -68,11 +68,11 @@ pub fn bbox_filter<'a>(
     }))
 }
 
-pub fn proximity_filter<'a>(
+pub fn proximity<'a>(
     coords: flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Coord<'a>>>,
-    proximity: (u16, u16),
+    proximity: [u16; 2],
 ) -> Option<impl Iterator<Item = Coord<'a>>> {
-    let prox_pt = interleave_morton(proximity.0, proximity.1) as i64;
+    let prox_pt = interleave_morton(proximity[0], proximity[1]) as i64;
     let len = coords.len() as u32;
     if len == 0 {
         return None;
@@ -98,10 +98,10 @@ pub fn proximity_filter<'a>(
 pub fn bbox_proximity_filter<'a>(
     coords: flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Coord<'a>>>,
     bbox: [u16; 4],
-    proximity: (u16, u16),
+    proximity: [u16; 2],
 ) -> Option<impl Iterator<Item = Coord<'a>>> {
     let range = bbox_range(coords, bbox)?;
-    let prox_pt = interleave_morton(proximity.0, proximity.1) as i64;
+    let prox_pt = interleave_morton(proximity[0], proximity[1]) as i64;
     if coords.len() == 0 {
         return None;
     }
@@ -266,24 +266,21 @@ mod test {
         let rs = flatbuffers::get_root::<RelevScore>(&buffer);
         let coords = rs.coords().unwrap();
 
-        let result =
-            proximity_filter(coords, (3, 0)).unwrap().map(|x| x.coord()).collect::<Vec<u32>>();
+        let result = proximity(coords, [3, 0]).unwrap().map(|x| x.coord()).collect::<Vec<u32>>();
         assert_eq!(
             vec![5, 4, 6, 7, 3, 2, 8, 9, 1],
             result,
             "proximity point is in the middle of the result set - 5"
         );
 
-        let result =
-            proximity_filter(coords, (0, 3)).unwrap().map(|x| x.coord()).collect::<Vec<u32>>();
+        let result = proximity(coords, [0, 3]).unwrap().map(|x| x.coord()).collect::<Vec<u32>>();
         assert_eq!(
             vec![9, 8, 7, 6, 5, 4, 3, 2, 1],
             result,
             "proximity point is greater than the result set - 10"
         );
 
-        let result =
-            proximity_filter(coords, (1, 0)).unwrap().map(|x| x.coord()).collect::<Vec<u32>>();
+        let result = proximity(coords, [1, 0]).unwrap().map(|x| x.coord()).collect::<Vec<u32>>();
         assert_eq!(
             vec![1, 2, 3, 4, 5, 6, 7, 8, 9],
             result,
@@ -294,14 +291,13 @@ mod test {
         let buffer = flatbuffer_generator(empty.into_iter());
         let rs = flatbuffers::get_root::<RelevScore>(&buffer);
         let coords = rs.coords().unwrap();
-        assert_eq!(proximity_filter(coords, (3, 0)).is_none(), true);
+        assert_eq!(proximity(coords, [3, 0]).is_none(), true);
 
         let sparse: Vec<u32> = vec![24, 21, 13, 8, 7, 6, 1]; // 1 and 13 are the same distance from 7
         let buffer = flatbuffer_generator(sparse.into_iter());
         let rs = flatbuffers::get_root::<RelevScore>(&buffer);
         let coords = rs.coords().unwrap();
-        let result =
-            proximity_filter(coords, (3, 1)).unwrap().map(|x| x.coord()).collect::<Vec<u32>>();
+        let result = proximity(coords, [3, 1]).unwrap().map(|x| x.coord()).collect::<Vec<u32>>();
         assert_eq!(
             vec![7, 6, 8, 13, 1, 21, 24],
             result,
@@ -315,7 +311,7 @@ mod test {
         let rs = flatbuffers::get_root::<RelevScore>(&buffer);
         let coords = rs.coords().unwrap();
         // bbox is from 1-7; proximity is 4
-        let result = bbox_proximity_filter(coords, [1, 0, 3, 1], (2, 0))
+        let result = bbox_proximity_filter(coords, [1, 0, 3, 1], [2, 0])
             .unwrap()
             .map(|x| x.coord())
             .collect::<Vec<u32>>();
