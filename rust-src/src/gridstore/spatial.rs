@@ -4,11 +4,10 @@ use itertools::Itertools;
 use morton::{deinterleave_morton, interleave_morton};
 use std::cmp::Ordering::{Equal, Greater, Less};
 
-/// Generate an Iterator for a bounding box over a Coord Vector
+/// Generate a tuple of the (min, max) range of the Coord Vector that overlaps with the bounding box
 ///
-/// Returns [`Some(Iterator<>`] if the Coord Vector morton order range overlaps with the bouding box,
-/// [`None`] otherwise. May return an Iterator that yields no results if the morton order overlaps
-/// but the actual elements are not in the bounding box.
+/// Returns (Some(min,max)) if the Coord Vector morton order range overlaps with the bounding box,
+/// [`None`] if the Coord Vector morton order range does not overlaps with the bounding box
 pub fn bbox_range<'a>(
     coords: flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Coord<'a>>>,
     bbox: [u16; 4],
@@ -48,6 +47,11 @@ pub fn bbox_range<'a>(
     Some((start, end))
 }
 
+/// Generate an Iterator for a bounding box over a Coord Vector
+///
+/// Returns [`Some(Iterator<>`] if the Coord Vector morton order range overlaps with the bounding box,
+/// [`None`] otherwise. May return an Iterator that yields no results if the morton order overlaps
+/// but the actual elements are not in the bounding box.
 pub fn bbox_filter<'a>(
     coords: flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Coord<'a>>>,
     bbox: [u16; 4],
@@ -68,6 +72,10 @@ pub fn bbox_filter<'a>(
     }))
 }
 
+/// Generate an Iterator over a Coord Vector given a proximity point
+///
+/// Returns [`Some(Iterator<>`] which is a Coord Vector morton order range that overlaps with a bounding box and is ordered by the z-order distance from the proximity point
+/// [`None`] if the bounding box does not overlap with the morton order range
 pub fn proximity<'a>(
     coords: flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Coord<'a>>>,
     proximity: [u16; 2],
@@ -95,6 +103,10 @@ pub fn proximity<'a>(
     Some(coord_sets)
 }
 
+/// Generate an Iterator for a bounding box and proximity point over a Coord Vector
+///
+/// Returns [`Some(Iterator<>`] which is a Coord Vector morton order range ordered by the z-order distance from the proximity point
+/// [`None`] if the Coord Vector is empty
 pub fn bbox_proximity_filter<'a>(
     coords: flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Coord<'a>>>,
     bbox: [u16; 4],
@@ -293,7 +305,7 @@ mod test {
         let coords = rs.coords().unwrap();
         assert_eq!(proximity(coords, [3, 0]).is_none(), true);
 
-        let sparse: Vec<u32> = vec![24, 21, 13, 8, 7, 6, 1]; // 1 and 13 are the same distance from 7
+        let sparse: Vec<u32> = vec![24, 21, 13, 8, 7, 6, 1]; // 1 and 13 are at the same distance from 7
         let buffer = flatbuffer_generator(sparse.into_iter());
         let rs = flatbuffers::get_root::<RelevScore>(&buffer);
         let coords = rs.coords().unwrap();
@@ -319,6 +331,50 @@ mod test {
             vec![4, 3, 5, 6, 2, 1, 7],
             result,
             "bbox within the range of coordinates; proximity point within the result set"
+        );
+
+        assert_eq!(
+            bbox_proximity_filter(coords, [6, 4, 7, 5], [2, 0]).is_none(),
+            true,
+            "bbox outside list of coordinates; proximity within the result set"
+        );
+
+        let result = bbox_proximity_filter(coords, [1, 0, 3, 1], [0, 0])
+            .unwrap()
+            .map(|x| x.coord())
+            .collect::<Vec<u32>>();
+        assert_eq!(
+            vec![1, 2, 3, 4, 5, 6, 7],
+            result,
+            "bbox within the range of coordinates; proximity point outside the result set"
+        );
+
+        let buffer = flatbuffer_generator((2..5).rev()); // [4,3,2]
+        let rs = flatbuffers::get_root::<RelevScore>(&buffer);
+        let coords = rs.coords().unwrap();
+        let result = bbox_proximity_filter(coords, [1, 1, 3, 1], [0, 0]) // bbox is 3-7; proximity is 0
+            .unwrap()
+            .map(|x| x.coord())
+            .collect::<Vec<u32>>();
+        assert_eq!(
+            vec![3, 4],
+            result,
+            "bbox starts in between the list of coordinates and ends after; proximity point outside the result set"
+        );
+
+        let sparse: Vec<u32> = vec![24, 21, 13, 8, 7, 6, 1];
+        let buffer = flatbuffer_generator(sparse.into_iter());
+        let rs = flatbuffers::get_root::<RelevScore>(&buffer);
+        let coords = rs.coords().unwrap();
+        // bbox is 7-23; proximity is 7
+        let result = bbox_proximity_filter(coords, [3, 1, 7, 1], [3, 1])
+            .unwrap()
+            .map(|x| x.coord())
+            .collect::<Vec<u32>>();
+        assert_eq!(
+            vec![7, 8, 13, 21],
+            result,
+            "bbox within sparse result set; proximity within result set"
         );
     }
 
