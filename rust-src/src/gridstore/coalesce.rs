@@ -65,12 +65,13 @@ fn grid_to_coalesce_entry(
             let distance =
                 tile_dist(proximity_x, proximity_y, grid.grid_entry.x, grid.grid_entry.y);
             let scoredist = scoredist(match_opts.zoom, distance, grid.grid_entry.score, radius);
-            // TODO: don't do language penalty if feature is inside proximity/scaled radius
-            let relev = if !grid.matches_language || distance > proximity_radius(match_opts.zoom, radius) {
-                grid.grid_entry.relev * 0.96
-            } else {
-                grid.grid_entry.relev
-            };
+            // Don't do language penalty if feature is inside proximity/scaled radius
+            let relev =
+                if !grid.matches_language || distance > proximity_radius(match_opts.zoom, radius) {
+                    grid.grid_entry.relev * 0.96
+                } else {
+                    grid.grid_entry.relev
+                };
             (distance, scoredist, relev)
         }
         None => {
@@ -316,9 +317,21 @@ fn tile_dist(proximity_x: u16, proximity_y: u16, grid_x: u16, grid_y: u16) -> f6
 
 #[test]
 fn tile_dist_test() {
-    assert_eq!(tile_dist(1, 1, 1, 1), 0., "Grid with the same x and y as as the proximity x and y should have tile_dist 0");
-    assert_eq!(tile_dist(1, 1, 1, 0), 1., "Grid one tile away from proximity tile should have tile_dist 1");
-    assert_eq!(tile_dist(1, 1, 0, 0), 1.4142135623730951, "Grid diagonal from proximity tile should have tile_dist between 0 and 1 ");
+    assert_eq!(
+        tile_dist(1, 1, 1, 1),
+        0.,
+        "Grid with the same x and y as as the proximity x and y should have tile_dist 0"
+    );
+    assert_eq!(
+        tile_dist(1, 1, 1, 0),
+        1.,
+        "Grid one tile away from proximity tile should have tile_dist 1"
+    );
+    assert_eq!(
+        tile_dist(1, 1, 0, 0),
+        1.4142135623730951,
+        "Grid diagonal from proximity tile should have tile_dist between 0 and 1 "
+    );
 }
 
 /// Returns the number of tiles per mile for a given zoom level
@@ -350,17 +363,24 @@ const fn tiles_per_mile_by_zoom(zoom: u16) -> f64 {
         0.5333333333333333,
         0.8,
         1.2000000000000002,
-        1.8000000000000003
+        1.8000000000000003,
     ];
     TILES_PER_MILE_BY_ZOOM[zoom as usize]
 }
 
-
 #[test]
 fn tiles_per_mile_by_zoom_test() {
     assert_eq!(tiles_per_mile_by_zoom(14), 0.8, "Tiles per mile for zoom 14 should be 0.8");
-    assert_eq!(tiles_per_mile_by_zoom(16), 1.8000000000000003, "Tiles per mile should work for up to zoom 16");
-    assert_eq!(tiles_per_mile_by_zoom(6), 0.031214753848498707, "Tiles per mile should work for down to zoom 6");
+    assert_eq!(
+        tiles_per_mile_by_zoom(16),
+        1.8000000000000003,
+        "Tiles per mile should work for up to zoom 16"
+    );
+    assert_eq!(
+        tiles_per_mile_by_zoom(6),
+        0.031214753848498707,
+        "Tiles per mile should work for down to zoom 6"
+    );
 }
 
 /// Convert proximity radius from miles into scaled number of tiles
@@ -379,7 +399,11 @@ fn proximity_radius_test() {
         320.,
         "Proximity radius in tiles for zoom 14, radius 400 is as expected"
     );
-    assert_eq!(proximity_radius(16, 400.), 720.0000000000001, "proximity_radius should work for zoom 14");
+    assert_eq!(
+        proximity_radius(16, 400.),
+        720.0000000000001,
+        "proximity_radius should work for zoom 14"
+    );
     assert_eq!(proximity_radius(6, 0.), 0., "proximity_radius for a radius of 0 should be 0");
     // TODO: test proximity radius 0
     // TODO: test zoom > 14?
@@ -387,7 +411,6 @@ fn proximity_radius_test() {
 
 // We don't know the scale of the axis we're modeling, but it doesn't really
 // matter as we just need internal consistency.
-// TODO: Define this as a top-level constant, outside the functiohn
 const E_POW: [f64; 8] = [
     1.,
     2.718281828459045,
@@ -398,7 +421,6 @@ const E_POW: [f64; 8] = [
     403.4287934927351,
     1096.6331584284585,
 ];
-
 
 fn scoredist(mut zoom: u16, mut distance: f64, mut score: u8, radius: f64) -> f64 {
     if zoom < 6 {
@@ -421,8 +443,6 @@ fn scoredist(mut zoom: u16, mut distance: f64, mut score: u8, radius: f64) -> f6
     }
     ((6. * E_POW[score as usize] / E_POW[7]) + 1.) / dist_ratio
 }
-
-
 
 #[test]
 fn scoredist_test() {

@@ -97,6 +97,192 @@ impl Default for MatchOpts {
     }
 }
 
+impl MatchOpts {
+    fn adjust_to_zoom(&self, target_z: u16) -> MatchOpts {
+        let z_diff = target_z as i16 - self.zoom as i16;
+        if z_diff == 0 {
+            self.clone()
+        } else {
+            let mut adjusted_match_opts = MatchOpts { zoom: target_z, ..MatchOpts::default() };
+            if let Some(orig_proximity) = &self.proximity {
+                if z_diff < 0 {
+                    // If this is a zoom out, just divide by 2 for every level of zooming out
+                    let zoom_levels = z_diff.abs();
+                    adjusted_match_opts.proximity = Some(Proximity {
+                        // Shifting to the right by a number is the same as dividing by 2 that number of times
+                        point: [
+                            orig_proximity.point[0] >> zoom_levels,
+                            orig_proximity.point[1] >> zoom_levels,
+                        ],
+                        radius: orig_proximity.radius,
+                    });
+                } else {
+                    // If this is a zoom in, choose the closest to the middle of the possible tiles at the higher zoom level
+                    // The scale of the coordinates for zooming in is 2^(difference in zs)
+                    let scale_multiplier = 1 << z_diff;
+                    // Pick a coordinate halfway between the possible higher zoom tiles, subtracting one to pick the one on the top left of the four middle tiles for consistency
+                    let midpoint_coord_adjuster = scale_multiplier / 2 - 1;
+                    let adjusted_coords: Vec<u16> = orig_proximity
+                        .point
+                        .iter()
+                        .map(|coord| coord * scale_multiplier + midpoint_coord_adjuster)
+                        .collect();
+                    adjusted_match_opts.proximity = Some(Proximity {
+                        point: [adjusted_coords[0], adjusted_coords[1]],
+                        radius: orig_proximity.radius,
+                    });
+                }
+            }
+            if let Some(orig_bbox) = &self.bbox {
+                let [mut min_x, mut min_y, mut max_x, mut max_y] = orig_bbox;
+                if z_diff < 0 {
+                    let zoom_levels = z_diff.abs();
+                    // TODO: is it more performant to just do these 4 calculations, or to turn it into an iter, then map, then collect, then access items in the vector?
+                    // If this is a zoom out, just divide each coordinate by 2^(positive zoom diff). This is the same as shifting bits to the right.
+                    min_x = min_x >> zoom_levels;
+                    min_y = min_y >> zoom_levels;
+                    max_x = max_x >> zoom_levels;
+                    max_y = max_y >> zoom_levels;
+                    adjusted_match_opts.bbox = Some([min_x, min_y, max_x, max_y]);
+                } else {
+                    // If this is a zoom in
+                    let scale_multiplier = 1 << z_diff;
+                    // Scale the top left (min x and y) tile coordinates by 2^(zoom diff).
+                    min_x = min_x * scale_multiplier;
+                    min_y = min_y * scale_multiplier;
+                    // Scale the bottom right (max x and y) tile coordinates by 2^(zoom diff), and add the new number of tiles (-1) to get the outer edge of possible tiles
+                    max_x = max_x * scale_multiplier + scale_multiplier - 1;
+                    max_y = max_y * scale_multiplier + scale_multiplier - 1;
+                    adjusted_match_opts.bbox = Some([min_x, min_y, max_x, max_y]);
+                }
+            }
+            adjusted_match_opts.clone()
+            // TODO: error handling?
+        }
+    }
+}
+
+#[test]
+fn adjust_to_zoom_test_proximity() {
+    let match_opts1 = MatchOpts {
+        proximity: Some(Proximity { point: [2, 28], radius: 400. }),
+        zoom: 14,
+        ..MatchOpts::default()
+    };
+    let adjusted_match_opts1 = match_opts1.adjust_to_zoom(6);
+    assert_eq!(adjusted_match_opts1.zoom, 6, "Adjusted MatchOpts should have target zoom as zoom");
+    assert_eq!(adjusted_match_opts1.proximity.unwrap().point, [0, 0], "should be 0,0");
+
+    let match_opts2 = MatchOpts {
+        proximity: Some(Proximity { point: [11, 25], radius: 400. }),
+        zoom: 6,
+        ..MatchOpts::default()
+    };
+    let adjusted_match_opts2 = match_opts2.adjust_to_zoom(8);
+    assert_eq!(adjusted_match_opts2.zoom, 8, "Adjusted MatchOpts should have target zoom as zoom");
+    assert_eq!(adjusted_match_opts2.proximity.unwrap().point, [45, 101], "Should be 45, 101");
+
+    let match_opts3 = MatchOpts {
+        proximity: Some(Proximity { point: [6, 6], radius: 400. }),
+        zoom: 4,
+        ..MatchOpts::default()
+    };
+    // TODO: a function taht takes an original, new zoom, and expected zxy and generates these?
+    // TODO: remove some of the tests for the radius and that the new zoom is as expected?
+    let same_zoom = match_opts3.adjust_to_zoom(4);
+    assert_eq!(same_zoom, match_opts3, "If the zoom is the same as the original, adjusted MatchOpts should be a clone of the original");
+    let zoomed_out_1z = match_opts3.adjust_to_zoom(3);
+    let proximity_out_1z = zoomed_out_1z.proximity.unwrap();
+    assert_eq!(proximity_out_1z.point, [3, 3], "4/6/6 zoomed out to zoom 3 should be 3/3/3");
+    assert_eq!(proximity_out_1z.radius, 400., "The adjusted radius should be the original radius");
+    assert_eq!(zoomed_out_1z.zoom, 3, "The adjusted zoom should be the target zoom");
+    let zoomed_out_2z = match_opts3.adjust_to_zoom(2);
+    let proximity_out_2z = zoomed_out_2z.proximity.unwrap();
+    assert_eq!(proximity_out_2z.point, [1, 1], "4/6/6 zoomed out to zoom 2 should be 2/1/1");
+    assert_eq!(proximity_out_2z.radius, 400., "The adjusted radius should be the original radius");
+    assert_eq!(zoomed_out_2z.zoom, 2, "The adjusted zoom should be the target zoom");
+    let zoomed_in_1z = match_opts3.adjust_to_zoom(5);
+    let proximity_in_1z = zoomed_in_1z.proximity.unwrap();
+    assert_eq!(proximity_in_1z.point, [12, 12], "4/6/6 zoomed in to zoom 5 should be 5/12/12");
+    assert_eq!(proximity_in_1z.radius, 400., "The adjusted radius should be the original radius");
+    assert_eq!(zoomed_in_1z.zoom, 5, "The adjusted zoom should be the target zoom");
+    let zoomed_in_2z = match_opts3.adjust_to_zoom(6);
+    let proximity_in_2z = zoomed_in_2z.proximity.unwrap();
+    assert_eq!(proximity_in_2z.point, [25, 25], "4/6/6 zoomed in to zoom 6 should be 6/25/25");
+    assert_eq!(proximity_in_2z.radius, 400., "The adjusted radius should be the original radius");
+    assert_eq!(zoomed_in_2z.zoom, 6, "The adjusted zoom should be the target zoom");
+    let zoomed_in_3z = match_opts3.adjust_to_zoom(7);
+    let proximity_in_3z = zoomed_in_3z.proximity.unwrap();
+    assert_eq!(proximity_in_3z.point, [51, 51], "4/6/6 zoomed in to zoom 7 should be 7/51/51");
+    assert_eq!(proximity_in_3z.radius, 400., "The adjusted radius should be the original radius");
+    assert_eq!(zoomed_in_3z.zoom, 7, "The adjusted zoom should be the target zoom");
+}
+
+#[test]
+fn adjust_to_zoom_text_bbox() {
+    // Test case where single parent tile contains entire bbox
+    let match_opts = MatchOpts { bbox: Some([6, 4, 7, 5]), zoom: 4, ..MatchOpts::default() };
+    let zoomed_out_1z = match_opts.adjust_to_zoom(3);
+    assert_eq!(zoomed_out_1z.bbox.unwrap(), [3,2,3,2], "Bbox covering 4 tiles zoomed out 1z can be 1 parent tile if it contains all 4 original tiles");
+    assert_eq!(zoomed_out_1z.zoom, 3, "The adjusted zoom should be the target zoom");
+    let zoomed_back_in_1z = zoomed_out_1z.adjust_to_zoom(4);
+    assert_eq!(
+        zoomed_back_in_1z, match_opts,
+        "The zoomed in bbox from 1 parent tile should include the 4 tiles it contains"
+    );
+
+    // Test case where higher zoom level bbox spans multiple parent tiles
+    let match_opts2 = MatchOpts { bbox: Some([6, 5, 7, 6]), zoom: 4, ..MatchOpts::default() };
+    let zoomed_out_1z_2 = match_opts2.adjust_to_zoom(3);
+    assert_eq!(
+        zoomed_out_1z_2.bbox.unwrap(),
+        [3, 2, 3, 3],
+        "Bboxes that span two parent tiles should return a bbox that includes both parent tiles"
+    );
+    let zoomed_back_in_1z_2 = zoomed_out_1z_2.adjust_to_zoom(4);
+    assert_eq!(
+        zoomed_back_in_1z_2.bbox.unwrap(),
+        [6, 4, 7, 7],
+        "The zoomed in bbox from 2 parent tiles should include all 8 tiles they contain"
+    );
+
+    // Gut check simple case
+    let simple_match_opts = MatchOpts { bbox: Some([3, 3, 3, 3]), zoom: 3, ..MatchOpts::default() };
+    assert_eq!(
+        simple_match_opts.adjust_to_zoom(4).bbox.unwrap(),
+        [6, 6, 7, 7],
+        "[3,3,3,3] is correctly scaled to zoom 4"
+    );
+    assert_eq!(
+        simple_match_opts.adjust_to_zoom(5).bbox.unwrap(),
+        [12, 12, 15, 15],
+        "[3,3,3,3] is correctly scaled to zoom 5"
+    );
+
+    // Multi-tile parent bbox zoom in
+    let multi_tile_match_opts =
+        MatchOpts { bbox: Some([5, 3, 7, 4]), zoom: 3, ..MatchOpts::default() };
+    assert_eq!(
+        multi_tile_match_opts.adjust_to_zoom(4).bbox.unwrap(),
+        [10, 6, 15, 9],
+        "Multi-tile parent zoomed in one zoom level includes all the higher-zoom tiles"
+    );
+    assert_eq!(
+        multi_tile_match_opts.adjust_to_zoom(5).bbox.unwrap(),
+        [20, 12, 31, 19],
+        "Multi-tile parent zoomed in two zoom levels includes all the higher-zoom tiles"
+    );
+
+    // Multi-parent, multi-tile bbox zoomed out
+    let multi_parent_match_opts =
+        MatchOpts { bbox: Some([6, 3, 8, 4]), zoom: 5, ..MatchOpts::default() };
+    assert_eq!(
+        multi_parent_match_opts.adjust_to_zoom(4).bbox.unwrap(),
+        [3, 1, 4, 2],
+        "Multi-tile parent zoomed in one zoom level includes all the higher-zoom tiles"
+    );
+}
+
 // keys consist of a marker byte indicating type (regular entry, prefix cache, etc.) followed by
 // a 32-bit phrase ID followed by a variable-length set of bytes for language -- everything after
 // the phrase ID is assumed to be language, and it might be up to 128 bits long, but we'll strip
