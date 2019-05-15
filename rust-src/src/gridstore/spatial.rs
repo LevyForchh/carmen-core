@@ -62,7 +62,7 @@ pub fn bbox_filter<'a>(
     }
 
     let range = bbox_range(coords, bbox)?;
-    Some((range.0..(range.1 + 1)).filter_map(move |idx| {
+    Some((range.0..=range.1).filter_map(move |idx| {
         let grid = coords.get(idx as usize);
         let (x, y) = deinterleave_morton(grid.coord()); // TODO capture this so we don't have to do it again.
         if x >= bbox[0] && x <= bbox[2] && y >= bbox[1] && y <= bbox[3] {
@@ -123,9 +123,20 @@ pub fn bbox_proximity_filter<'a>(
         Err(_) => return None,
     };
 
-    let getter = move |i| coords.get(i as usize);
-    let head = Box::new((range.0..prox_mid).rev().map(getter)) as Box<Iterator<Item = Coord>>;
-    let tail = Box::new((prox_mid..=range.1).map(getter)) as Box<Iterator<Item = Coord>>;
+    let filtered_get = move |idx| {
+        let grid = coords.get(idx as usize);
+        let (x, y) = deinterleave_morton(grid.coord()); // TODO capture this so we don't have to do it again.
+        if x >= bbox[0] && x <= bbox[2] && y >= bbox[1] && y <= bbox[3] {
+            return Some(grid);
+        } else {
+            return None;
+        };
+    };
+
+    let head =
+        Box::new((range.0..prox_mid).rev().filter_map(filtered_get)) as Box<Iterator<Item = Coord>>;
+    let tail =
+        Box::new((prox_mid..=range.1).filter_map(filtered_get)) as Box<Iterator<Item = Coord>>;
     let coord_sets = vec![head, tail].into_iter().kmerge_by(move |a, b| {
         let d1 = (a.coord() as i64 - prox_pt) as i64;
         let d2 = (b.coord() as i64 - prox_pt) as i64;
@@ -328,7 +339,7 @@ mod test {
             .map(|x| x.coord())
             .collect::<Vec<u32>>();
         assert_eq!(
-            vec![4, 3, 5, 6, 2, 1, 7],
+            vec![4, 3, 5, 6, 7, 1],
             result,
             "bbox within the range of coordinates; proximity point within the result set"
         );
@@ -344,7 +355,7 @@ mod test {
             .map(|x| x.coord())
             .collect::<Vec<u32>>();
         assert_eq!(
-            vec![1, 2, 3, 4, 5, 6, 7],
+            vec![1, 3, 4, 5, 6, 7],
             result,
             "bbox within the range of coordinates; proximity point outside the result set"
         );
@@ -357,12 +368,12 @@ mod test {
             .map(|x| x.coord())
             .collect::<Vec<u32>>();
         assert_eq!(
-            vec![3, 4],
+            vec![3],
             result,
             "bbox starts in between the list of coordinates and ends after; proximity point outside the result set"
         );
 
-        let sparse: Vec<u32> = vec![24, 21, 13, 8, 7, 6, 1];
+        let sparse: Vec<u32> = vec![24, 23, 13, 8, 7, 6, 1];
         let buffer = flatbuffer_generator(sparse.into_iter());
         let rs = flatbuffers::get_root::<RelevScore>(&buffer);
         let coords = rs.coords().unwrap();
@@ -372,7 +383,7 @@ mod test {
             .map(|x| x.coord())
             .collect::<Vec<u32>>();
         assert_eq!(
-            vec![7, 8, 13, 21],
+            vec![7, 23],
             result,
             "bbox within sparse result set; proximity within result set"
         );
