@@ -195,14 +195,14 @@ fn coalesce_multi(
             })
             .dedup()
             .collect();
-
-        // TODO: normalize options by zoom
-        // maybe could look like: match_opts.convert_to_zoom(subquery.zoom)
-        let grids = subquery.store.get_matching(&subquery.match_key, match_opts)?;
+        // TODO: check if zooms are equivalent here, and only call adjust_to_zoom if they arent?
+        // That way we could avoid a function call and creating a cloned object in the common case where the zooms are the same
+        let adjusted_match_opts = match_opts.adjust_to_zoom(subquery.zoom);
+        let grids = subquery.store.get_matching(&subquery.match_key, &adjusted_match_opts)?;
 
         // TODO: limit how many grids we consume
         for grid in grids {
-            let coalesce_entry = grid_to_coalesce_entry(&grid, subquery, match_opts);
+            let coalesce_entry = grid_to_coalesce_entry(&grid, subquery, &adjusted_match_opts);
 
             let zxy = (subquery.zoom, grid.grid_entry.x, grid.grid_entry.y);
 

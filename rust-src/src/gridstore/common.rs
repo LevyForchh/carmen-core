@@ -98,70 +98,82 @@ impl Default for MatchOpts {
 }
 
 impl MatchOpts {
-    fn adjust_to_zoom(&self, target_z: u16) -> MatchOpts {
-        let z_diff = target_z as i16 - self.zoom as i16;
-        if z_diff == 0 {
+    pub fn adjust_to_zoom(&self, target_z: u16) -> MatchOpts {
+        if self.zoom == target_z {
             self.clone()
         } else {
-            let mut adjusted_match_opts = MatchOpts { zoom: target_z, ..MatchOpts::default() };
-            if let Some(orig_proximity) = &self.proximity {
-                if z_diff < 0 {
-                    // If this is a zoom out, just divide by 2 for every level of zooming out
-                    let zoom_levels = z_diff.abs();
-                    adjusted_match_opts.proximity = Some(Proximity {
-                        // Shifting to the right by a number is the same as dividing by 2 that number of times
-                        point: [
-                            orig_proximity.point[0] >> zoom_levels,
-                            orig_proximity.point[1] >> zoom_levels,
-                        ],
-                        radius: orig_proximity.radius,
-                    });
-                } else {
-                    // If this is a zoom in, choose the closest to the middle of the possible tiles at the higher zoom level
-                    // The scale of the coordinates for zooming in is 2^(difference in zs)
-                    let scale_multiplier = 1 << z_diff;
-                    // Pick a coordinate halfway between the possible higher zoom tiles, subtracting one to pick the one on the top left of the four middle tiles for consistency
-                    let midpoint_coord_adjuster = scale_multiplier / 2 - 1;
-                    let adjusted_coords: Vec<u16> = orig_proximity
-                        .point
-                        .iter()
-                        .map(|coord| coord * scale_multiplier + midpoint_coord_adjuster)
-                        .collect();
-                    adjusted_match_opts.proximity = Some(Proximity {
-                        point: [adjusted_coords[0], adjusted_coords[1]],
-                        radius: orig_proximity.radius,
-                    });
+            let adjusted_proximity = match &self.proximity {
+                Some(orig_proximity) => {
+                    if target_z < self.zoom {
+                        // If this is a zoom out, divide by 2 for every level of zooming out.
+                        let zoom_levels = self.zoom - target_z;
+                        Some(Proximity {
+                            // Shifting to the right by a number is the same as dividing by 2 that number of times.
+                            point: [
+                                orig_proximity.point[0] >> zoom_levels,
+                                orig_proximity.point[1] >> zoom_levels,
+                            ],
+                            radius: orig_proximity.radius,
+                        })
+                    } else {
+                        // If this is a zoom in, choose the closest to the middle of the possible tiles at the higher zoom level.
+                        // The scale of the coordinates for zooming in is 2^(difference in zs).
+                        let scale_multiplier = 1 << (target_z - self.zoom);
+                        // Pick a coordinate halfway between the possible higher zoom tiles,
+                        // subtracting one to pick the one on the top left of the four middle tiles for consistency.
+                        let mid_coord_adjuster = scale_multiplier / 2 - 1;
+                        let adjusted_x =
+                            orig_proximity.point[0] * scale_multiplier + mid_coord_adjuster;
+                        let adjusted_y =
+                            orig_proximity.point[1] * scale_multiplier + mid_coord_adjuster;
+
+                        Some(Proximity {
+                            point: [adjusted_x, adjusted_y],
+                            radius: orig_proximity.radius,
+                        })
+                    }
                 }
-            }
-            if let Some(orig_bbox) = &self.bbox {
-                let [mut min_x, mut min_y, mut max_x, mut max_y] = orig_bbox;
-                if z_diff < 0 {
-                    let zoom_levels = z_diff.abs();
-                    // TODO: is it more performant to just do these 4 calculations, or to turn it into an iter, then map, then collect, then access items in the vector?
-                    // If this is a zoom out, just divide each coordinate by 2^(positive zoom diff). This is the same as shifting bits to the right.
-                    min_x = min_x >> zoom_levels;
-                    min_y = min_y >> zoom_levels;
-                    max_x = max_x >> zoom_levels;
-                    max_y = max_y >> zoom_levels;
-                    adjusted_match_opts.bbox = Some([min_x, min_y, max_x, max_y]);
-                } else {
-                    // If this is a zoom in
-                    let scale_multiplier = 1 << z_diff;
-                    // Scale the top left (min x and y) tile coordinates by 2^(zoom diff).
-                    min_x = min_x * scale_multiplier;
-                    min_y = min_y * scale_multiplier;
-                    // Scale the bottom right (max x and y) tile coordinates by 2^(zoom diff), and add the new number of tiles (-1) to get the outer edge of possible tiles
-                    max_x = max_x * scale_multiplier + scale_multiplier - 1;
-                    max_y = max_y * scale_multiplier + scale_multiplier - 1;
-                    adjusted_match_opts.bbox = Some([min_x, min_y, max_x, max_y]);
+                None => None,
+            };
+
+            let adjusted_bbox = match &self.bbox {
+                Some(orig_bbox) => {
+                    if target_z < self.zoom {
+                        let zoom_levels = self.zoom - target_z;
+                        // If this is a zoom out, divide each coordinate by 2^(number of zoom levels).
+                        // This is the same as shifting bits to the right by the number of zoom levels.
+                        Some([
+                            orig_bbox[0] >> zoom_levels,
+                            orig_bbox[1] >> zoom_levels,
+                            orig_bbox[2] >> zoom_levels,
+                            orig_bbox[3] >> zoom_levels,
+                        ])
+                    } else {
+                        // If this is a zoom in
+                        let scale_multiplier = 1 << (target_z - self.zoom);
+
+                        // Scale the top left (min x and y) tile coordinates by 2^(zoom diff).
+                        // Scale the bottom right (max x and y) tile coordinates by 2^(zoom diff),
+                        // and add the new number of tiles (-1) to get the outer edge of possible tiles.
+                        // TODO comment explaining why parens for -1
+                        Some([
+                            orig_bbox[0] * scale_multiplier,
+                            orig_bbox[1] * scale_multiplier,
+                            orig_bbox[2] * scale_multiplier + (scale_multiplier - 1),
+                            orig_bbox[3] * scale_multiplier + (scale_multiplier - 1),
+                        ])
+                    }
                 }
-            }
-            adjusted_match_opts.clone()
-            // TODO: error handling?
+                None => None,
+            };
+
+            MatchOpts { zoom: target_z, proximity: adjusted_proximity, bbox: adjusted_bbox }
         }
     }
 }
 
+// TODO: test what happens with invalid bbox
+// TODO: test bottom right most tile at highest zoom
 #[test]
 fn adjust_to_zoom_test_proximity() {
     let match_opts1 = MatchOpts {
