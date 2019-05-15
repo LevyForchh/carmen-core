@@ -249,11 +249,23 @@ impl GridStore {
                         get_vector::<Coord>(record_ref.1, &rs_obj._tab, RelevScore::VT_COORDS)
                             .unwrap();
                     let coords = match match_opts {
-                        MatchOpts { bbox: None, .. } => {
+                        MatchOpts { bbox: None, proximity: None } => {
                             Some(Box::new(coords_vec.into_iter()) as Box<Iterator<Item = Coord>>)
                         }
-                        MatchOpts { bbox: Some(bbox), .. } => {
+                        MatchOpts { bbox: Some(bbox), proximity: None } => {
                             match spatial::bbox_filter(coords_vec, bbox) {
+                                Some(v) => Some(Box::new(v) as Box<Iterator<Item = Coord>>),
+                                None => None,
+                            }
+                        }
+                        MatchOpts { bbox: None, proximity: Some(prox_pt) } => {
+                            match spatial::proximity(coords_vec, prox_pt) {
+                                Some(v) => Some(Box::new(v) as Box<Iterator<Item = Coord>>),
+                                None => None,
+                            }
+                        }
+                        MatchOpts { bbox: Some(bbox), proximity: Some(prox_pt) } => {
+                            match spatial::bbox_proximity_filter(coords_vec, bbox, prox_pt) {
                                 Some(v) => Some(Box::new(v) as Box<Iterator<Item = Coord>>),
                                 None => None,
                             }
