@@ -130,6 +130,7 @@ fn matching_test() {
                 GridEntry { id: i + 3, x: ((2 * i) + 1) as u16, y: 1, relev: 1., score: 7, source_phrase_hash: 0 },
             ];
             i += 4;
+
             builder.insert(&key, &entries).expect("Unable to insert record");
         }
     }

@@ -74,8 +74,8 @@ pub fn bbox_filter<'a>(
 
 /// Generate an Iterator over a Coord Vector given a proximity point
 ///
-/// Returns [`Some(Iterator<>`] which is a Coord Vector morton order range that overlaps with a bounding box and is ordered by the z-order distance from the proximity point
-/// [`None`] if the bounding box does not overlap with the morton order range
+/// Returns [`Some(Iterator<>`] which is a Coord Vector morton order range ordered by the z-order distance from the proximity point
+/// [`None`] if the Coord Vector is empty
 pub fn proximity<'a>(
     coords: flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Coord<'a>>>,
     proximity: [u16; 2],
@@ -105,8 +105,8 @@ pub fn proximity<'a>(
 
 /// Generate an Iterator for a bounding box and proximity point over a Coord Vector
 ///
-/// Returns [`Some(Iterator<>`] which is a Coord Vector morton order range ordered by the z-order distance from the proximity point
-/// [`None`] if the Coord Vector is empty
+/// Returns [`Some(Iterator<>`] which is a Coord Vector morton order range that overlaps with a bounding box and is ordered by the z-order distance from the proximity point
+/// [`None`] if the bounding box does not overlap with the morton order range
 pub fn bbox_proximity_filter<'a>(
     coords: flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Coord<'a>>>,
     bbox: [u16; 4],
@@ -125,7 +125,7 @@ pub fn bbox_proximity_filter<'a>(
 
     let getter = move |i| coords.get(i as usize);
     let head = Box::new((range.0..prox_mid).rev().map(getter)) as Box<Iterator<Item = Coord>>;
-    let tail = Box::new((prox_mid..range.1 + 1).map(getter)) as Box<Iterator<Item = Coord>>;
+    let tail = Box::new((prox_mid..=range.1).map(getter)) as Box<Iterator<Item = Coord>>;
     let coord_sets = vec![head, tail].into_iter().kmerge_by(move |a, b| {
         let d1 = (a.coord() as i64 - prox_pt) as i64;
         let d2 = (b.coord() as i64 - prox_pt) as i64;
