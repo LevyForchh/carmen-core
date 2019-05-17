@@ -15,3 +15,5 @@ neon-build = "0.2.0"
 
 [dependencies]
 neon = "0.2.0"
+neon-serde = "0.1.1"
+carmen-core = { path = "../" }
