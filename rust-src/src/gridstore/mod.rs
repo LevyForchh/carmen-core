@@ -289,7 +289,7 @@ fn matching_test() {
     let search_key =
         MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 };
     let records: Vec<_> = reader
-        .get_matching(&search_key, &MatchOpts { bbox: Some([0, 2, 100, 2]), proximity: None })
+        .get_matching(&search_key, &MatchOpts { bbox: Some([0, 2, 100, 2]), proximity: None, ..MatchOpts::default() })
         .unwrap()
         .collect();
     assert_eq!(records.len(), 0, "no matching recods in bbox");
@@ -298,7 +298,7 @@ fn matching_test() {
     let search_key =
         MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 };
     let records: Vec<_> = reader
-        .get_matching(&search_key, &MatchOpts { bbox: Some([100, 100, 100, 100]), proximity: None })
+        .get_matching(&search_key, &MatchOpts { bbox: Some([100, 100, 100, 100]), proximity: None, ..MatchOpts::default() })
         .unwrap()
         .collect();
     assert_eq!(records.len(), 0, "no matching recods in bbox");
@@ -306,7 +306,7 @@ fn matching_test() {
     let search_key =
         MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 2 };
     let records: Vec<_> = reader
-        .get_matching(&search_key, &MatchOpts { bbox: None, proximity: Some([26, 1]) })
+        .get_matching(&search_key, &MatchOpts { bbox: None, proximity: Some(Proximity { point: [26, 1], radius: 1000.}), ..MatchOpts::default() })
         .unwrap()
         .collect();
     #[cfg_attr(rustfmt, rustfmt::skip)]
@@ -333,7 +333,7 @@ fn matching_test() {
     let records: Vec<_> = reader
         .get_matching(
             &search_key,
-            &MatchOpts { bbox: Some([10, 0, 41, 2]), proximity: Some([26, 1]) },
+            &MatchOpts { bbox: Some([10, 0, 41, 2]), proximity: Some(Proximity { point: [26, 1], radius: 1000.}), ..MatchOpts::default() },
         )
         .unwrap()
         .collect();

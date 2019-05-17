@@ -249,27 +249,36 @@ impl GridStore {
                     let coords_vec =
                         get_vector::<Coord>(record_ref.1, &rs_obj._tab, RelevScore::VT_COORDS)
                             .unwrap();
-                    let coords = match match_opts {
-                        MatchOpts { bbox: None, proximity: None } => {
+                    // TODO could this be a reference? The compiler was saying:
+                    // "cannot move out of captured variable in an `FnMut` closure"
+                    // "help: consider borrowing here: `&match_opts`rustc(E0507)""
+                    let coords = match &match_opts {
+                        MatchOpts { bbox: None, proximity: None, zoom: 0...16 } => {
                             Some(Box::new(coords_vec.into_iter()) as Box<Iterator<Item = Coord>>)
                         }
-                        MatchOpts { bbox: Some(bbox), proximity: None } => {
-                            match spatial::bbox_filter(coords_vec, bbox) {
+                        MatchOpts { bbox: Some(bbox), proximity: None, zoom: 0...16 } => {
+                            // TODO should the bbox argument be changed to a reference in bbox? The compiler was complaining
+                            match spatial::bbox_filter(coords_vec, *bbox) {
                                 Some(v) => Some(Box::new(v) as Box<Iterator<Item = Coord>>),
                                 None => None,
                             }
                         }
-                        MatchOpts { bbox: None, proximity: Some(prox_pt) } => {
-                            match spatial::proximity(coords_vec, prox_pt) {
+                        MatchOpts { bbox: None, proximity: Some(prox_pt), zoom: 0...16 } => {
+                            match spatial::proximity(coords_vec, prox_pt.point) {
                                 Some(v) => Some(Box::new(v) as Box<Iterator<Item = Coord>>),
                                 None => None,
                             }
                         }
-                        MatchOpts { bbox: Some(bbox), proximity: Some(prox_pt) } => {
-                            match spatial::bbox_proximity_filter(coords_vec, bbox, prox_pt) {
+                        MatchOpts { bbox: Some(bbox), proximity: Some(prox_pt), zoom: 0...16 } => {
+                            match spatial::bbox_proximity_filter(coords_vec, *bbox, prox_pt.point) {
                                 Some(v) => Some(Box::new(v) as Box<Iterator<Item = Coord>>),
                                 None => None,
                             }
+                        }
+                        // TODO: the linter was complaining that not all MatchOpts zooms are covered. The zoom isn't even used for get_matching.
+                        // Should we have separate matchopts structs for this vs coalesce?
+                        _ => {
+                            None
                         }
                     };
 
