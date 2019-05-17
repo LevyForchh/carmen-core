@@ -8,23 +8,13 @@ use ordered_float::OrderedFloat;
 use crate::gridstore::common::*;
 use crate::gridstore::store::GridStore;
 
-#[derive(Debug, Clone)]
-pub struct PhrasematchSubquery<'a> {
-    pub store: &'a GridStore,
-    pub weight: f64,
-    pub match_key: MatchKey,
-    pub idx: u16,
-    pub zoom: u16,
-    pub mask: u32,
-}
-
 /// Takes a vector of phrasematch subqueries (stack) and match options, gets matching grids, sorts the grids,
 /// and returns a result of a sorted vector of contexts (lists of grids with added metadata)
 pub fn coalesce(
     stack: &[PhrasematchSubquery],
     match_opts: &MatchOpts,
 ) -> Result<Vec<CoalesceContext>, Box<Error>> {
-    let contexts = if stack.len() > 1 {
+    let contexts = if stack.len() <= 1 {
         coalesce_single(&stack[0], match_opts)?
     } else {
         coalesce_multi(stack, match_opts)?
@@ -67,7 +57,7 @@ fn grid_to_coalesce_entry(
             let scoredist = scoredist(match_opts.zoom, distance, grid.grid_entry.score, radius);
             // Don't do language penalty if feature is inside proximity/scaled radius
             let relev =
-                if !grid.matches_language || distance > proximity_radius(match_opts.zoom, radius) {
+                if !grid.matches_language && distance > proximity_radius(match_opts.zoom, radius) {
                     grid.grid_entry.relev * 0.96
                 } else {
                     grid.grid_entry.relev

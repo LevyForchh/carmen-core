@@ -277,9 +277,7 @@ impl GridStore {
                         }
                         // TODO: the linter was complaining that not all MatchOpts zooms are covered. The zoom isn't even used for get_matching.
                         // Should we have separate matchopts structs for this vs coalesce?
-                        _ => {
-                            None
-                        }
+                        _ => None,
                     };
 
                     if coords.is_some() {

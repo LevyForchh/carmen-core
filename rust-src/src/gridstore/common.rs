@@ -3,6 +3,8 @@ use std::error::Error;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use serde::{Deserialize, Serialize};
 
+use crate::gridstore::store::GridStore;
+
 #[derive(Serialize, Deserialize, Debug, PartialOrd, Ord, PartialEq, Eq, Clone)]
 pub struct GridKey {
     pub phrase_id: u32,
@@ -338,6 +340,16 @@ pub struct CoalesceContext {
     pub mask: u32,
     pub relev: f32,
     pub entries: Vec<CoalesceEntry>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PhrasematchSubquery<'a> {
+    pub store: &'a GridStore,
+    pub weight: f64,
+    pub match_key: MatchKey,
+    pub idx: u16,
+    pub zoom: u16,
+    pub mask: u32,
 }
 
 #[inline]

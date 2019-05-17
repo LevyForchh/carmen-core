@@ -289,7 +289,10 @@ fn matching_test() {
     let search_key =
         MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 };
     let records: Vec<_> = reader
-        .get_matching(&search_key, &MatchOpts { bbox: Some([0, 2, 100, 2]), proximity: None, ..MatchOpts::default() })
+        .get_matching(
+            &search_key,
+            &MatchOpts { bbox: Some([0, 2, 100, 2]), proximity: None, ..MatchOpts::default() },
+        )
         .unwrap()
         .collect();
     assert_eq!(records.len(), 0, "no matching recods in bbox");
@@ -298,7 +301,14 @@ fn matching_test() {
     let search_key =
         MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 };
     let records: Vec<_> = reader
-        .get_matching(&search_key, &MatchOpts { bbox: Some([100, 100, 100, 100]), proximity: None, ..MatchOpts::default() })
+        .get_matching(
+            &search_key,
+            &MatchOpts {
+                bbox: Some([100, 100, 100, 100]),
+                proximity: None,
+                ..MatchOpts::default()
+            },
+        )
         .unwrap()
         .collect();
     assert_eq!(records.len(), 0, "no matching recods in bbox");
@@ -306,7 +316,14 @@ fn matching_test() {
     let search_key =
         MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 2 };
     let records: Vec<_> = reader
-        .get_matching(&search_key, &MatchOpts { bbox: None, proximity: Some(Proximity { point: [26, 1], radius: 1000.}), ..MatchOpts::default() })
+        .get_matching(
+            &search_key,
+            &MatchOpts {
+                bbox: None,
+                proximity: Some(Proximity { point: [26, 1], radius: 1000. }),
+                ..MatchOpts::default()
+            },
+        )
         .unwrap()
         .collect();
     #[cfg_attr(rustfmt, rustfmt::skip)]
@@ -333,7 +350,11 @@ fn matching_test() {
     let records: Vec<_> = reader
         .get_matching(
             &search_key,
-            &MatchOpts { bbox: Some([10, 0, 41, 2]), proximity: Some(Proximity { point: [26, 1], radius: 1000.}), ..MatchOpts::default() },
+            &MatchOpts {
+                bbox: Some([10, 0, 41, 2]),
+                proximity: Some(Proximity { point: [26, 1], radius: 1000. }),
+                ..MatchOpts::default()
+            },
         )
         .unwrap()
         .collect();
@@ -350,4 +371,84 @@ fn matching_test() {
             MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 1, x: 40, y: 1, id: 20, source_phrase_hash: 0 }, matches_language: false }
         ]
     );
+}
+
+#[test]
+fn coalesce_test() {
+    let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
+    let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
+
+    let key = GridKey { phrase_id: 1, lang_set: 1 };
+
+    let entries = vec![
+        GridEntry { id: 1, x: 200, y: 200, relev: 1., score: 1, source_phrase_hash: 0 },
+        GridEntry { id: 2, x: 200, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },
+        GridEntry { id: 3, x: 0, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },
+        GridEntry { id: 4, x: 0, y: 200, relev: 1., score: 1, source_phrase_hash: 0 },
+    ];
+    builder.insert(&key, &entries).expect("Unable to insert record");
+
+    builder.finish().unwrap();
+
+    let store = GridStore::new(directory.path()).unwrap();
+    let subquery = PhrasematchSubquery {
+        store: &store,
+        weight: 1.,
+        match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 },
+        idx: 1,
+        zoom: 14,
+        mask: 1 << 0,
+    };
+    let stack = [subquery];
+    let match_opts = MatchOpts {
+        zoom: 14,
+        proximity: Some(Proximity { point: [110, 85], radius: 400. }),
+        ..MatchOpts::default()
+    };
+    let result = coalesce(&stack, &match_opts).unwrap();
+    println!("Result: {:?}", result);
+    let result_ids: Vec<u32> =
+        result.iter().map(|context| context.entries[0].grid_entry.id).collect();
+
+    assert_eq!(result_ids, [1, 4, 2, 3]);
+}
+
+#[test]
+fn coalesce_test2() {
+    let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
+    let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
+
+    let key = GridKey { phrase_id: 1, lang_set: 1 };
+
+    let entries = vec![
+        GridEntry { id: 1, x: 2, y: 2, relev: 1., score: 1, source_phrase_hash: 0 },
+        GridEntry { id: 2, x: 2, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },
+        GridEntry { id: 3, x: 0, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },
+        GridEntry { id: 4, x: 0, y: 2, relev: 1., score: 1, source_phrase_hash: 0 },
+    ];
+    builder.insert(&key, &entries).expect("Unable to insert record");
+
+    builder.finish().unwrap();
+
+    let store = GridStore::new(directory.path()).unwrap();
+    let subquery = PhrasematchSubquery {
+        store: &store,
+        weight: 1.,
+        match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 },
+        idx: 1,
+        zoom: 14,
+        mask: 1 << 0,
+    };
+    let stack = [subquery];
+    let match_opts = MatchOpts {
+        zoom: 14,
+        proximity: Some(Proximity { point: [2, 2], radius: 400. }),
+        ..MatchOpts::default()
+    };
+    let result = coalesce(&stack, &match_opts).unwrap();
+    println!("Result: {:?}", result);
+    let result_ids: Vec<u32> =
+        result.iter().map(|context| context.entries[0].grid_entry.id).collect();
+
+    assert_eq!(result_ids, [1, 2, 4, 3]);
 }
