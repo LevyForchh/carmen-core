@@ -1,27 +1,19 @@
 #[macro_use]
 extern crate neon;
-extern crate neon_serde;
 extern crate carmen_core;
+extern crate neon_serde;
+use carmen_core::gridstore::{GridEntry, GridKey, GridStoreBuilder};
 use neon::prelude::*;
-use carmen_core::gridstore::{GridStoreBuilder, GridEntry, GridKey};
-
-trait take {
-    fn take<V: Value>(&mut self, i: i32) -> JsResult<V>;
-}
-pub fn take(&mut self) -> Option<T> {
-       mem::replace(self, None)
-   }
-
-impl
+use std::error::Error;
 
 declare_types! {
-    pub class JsGridStoreBuilder as JsGridStoreBuilder for GridStoreBuilder {
+    pub class JsGridStoreBuilder as JsGridStoreBuilder for Option<GridStoreBuilder> {
         init(mut cx) {
             let filename = cx
                 .argument::<JsString>(0)
                 ?.value();
             match GridStoreBuilder::new(filename) {
-                Ok(s) => Ok(s),
+                Ok(s) => Ok(Some(s)),
                 Err(e) => cx.throw_type_error(e.description())
             }
         }
@@ -35,36 +27,48 @@ declare_types! {
 
             // lock falls out of scope at the end of this block
             // in order to be able to borrow `cx` for the error block we assign it to a variable
-            let insert = {
+
+            let insert: Result<Result<(), Box<dyn Error>>, &str> = {
                 let lock = cx.lock();
                 let mut gridstore = this.borrow_mut(&lock);
-                gridstore.insert(&key, &values)
+                match gridstore.as_mut() {
+                    Some(builder) => {
+                        Ok(builder.insert(&key, &values))
+                    }
+                    None => {
+                        Err("unable to insert()")
+                    }
+                }
             };
 
             match insert {
                 Ok(_) => Ok(JsUndefined::new().upcast()),
-                Err(e) => cx.throw_type_error(e.description())
+                Err(e) => cx.throw_type_error(e)
             }
         }
 
         method finish(mut cx) {
-            let this = cx.this();
+            let mut this = cx.this();
 
-            let finish = {
+            let finish: Result<Result<(), Box<dyn Error>>, &str> = {
                 let lock = cx.lock();
-                let gridstore = this.borrow(&lock);
-                gridstore.take().finish()
+                let mut gridstore = this.borrow_mut(&lock);
+                match gridstore.take() {
+                    Some(builder) => {
+                        Ok(builder.finish())
+                    }
+                    None => {
+                        Err("unable to finish()")
+                    }
+                }
             };
 
             match finish {
                 Ok(_) => Ok(JsUndefined::new().upcast()),
-                Err(e) => cx.throw_type_error(e.description())
+                Err(e) => cx.throw_type_error(e)
             }
         }
     }
 }
 
-
-register_module!(mut m, {
-    m.export_class::<JsGridStoreBuilder>("JsGridStoreBuilder")
-});
+register_module!(mut m, { m.export_class::<JsGridStoreBuilder>("JsGridStoreBuilder") });
