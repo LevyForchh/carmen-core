@@ -393,7 +393,11 @@ fn proximity_radius_test() {
         "proximity_radius should work for zoom 14"
     );
     assert_eq!(proximity_radius(6, 0.), 0., "proximity_radius for a radius of 0 should be 0");
-    assert_eq!(proximity_radius(6, 40.), 1.2485901539399482, "proximity_radius in tiles for zoom 6, radius 40 is as expected");
+    assert_eq!(
+        proximity_radius(6, 40.),
+        1.2485901539399482,
+        "proximity_radius in tiles for zoom 6, radius 40 is as expected"
+    );
     // TODO: test zoom > 14?
 }
 
