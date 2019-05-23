@@ -345,7 +345,7 @@ pub struct CoalesceContext {
 #[derive(Debug, Clone)]
 pub struct PhrasematchSubquery<'a> {
     pub store: &'a GridStore,
-    pub weight: f64,
+    pub weight: f32,
     pub match_key: MatchKey,
     pub idx: u16,
     pub zoom: u16,

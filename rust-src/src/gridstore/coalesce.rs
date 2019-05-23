@@ -46,8 +46,10 @@ fn grid_to_coalesce_entry(
     subquery: &PhrasematchSubquery,
     match_opts: &MatchOpts,
 ) -> CoalesceEntry {
+    // Zoom has been adjusted in coalesce_multi, or correct zoom has been passed in for coalesce_single
     debug_assert!(match_opts.zoom == subquery.zoom);
-
+    // TODO: do we need to check for bbox here?
+    let mut relev = grid.grid_entry.relev * subquery.weight;
     // Calculate distance, scoredist, and language-adjusted relevance
     let (distance, scoredist, relev) = match match_opts.proximity {
         Some(Proximity { point: [proximity_x, proximity_y], radius }) => {
@@ -56,20 +58,16 @@ fn grid_to_coalesce_entry(
                 tile_dist(proximity_x, proximity_y, grid.grid_entry.x, grid.grid_entry.y);
             let scoredist = scoredist(match_opts.zoom, distance, grid.grid_entry.score, radius);
             // Don't do language penalty if feature is inside proximity/scaled radius
-            let relev =
+            relev =
                 if !grid.matches_language && distance > proximity_radius(match_opts.zoom, radius) {
-                    grid.grid_entry.relev * 0.96
+                    relev * 0.96
                 } else {
-                    grid.grid_entry.relev
+                    relev
                 };
             (distance, scoredist, relev)
         }
         None => {
-            let relev = if !grid.matches_language {
-                grid.grid_entry.relev * 0.96
-            } else {
-                grid.grid_entry.relev
-            };
+            let relev = if !grid.matches_language { relev * 0.96 } else { relev };
             (0., grid.grid_entry.score as f64, relev)
         }
     };
@@ -395,7 +393,7 @@ fn proximity_radius_test() {
         "proximity_radius should work for zoom 14"
     );
     assert_eq!(proximity_radius(6, 0.), 0., "proximity_radius for a radius of 0 should be 0");
-    // TODO: test proximity radius 0
+    assert_eq!(proximity_radius(6, 40.), 1.2485901539399482, "proximity_radius in tiles for zoom 6, radius 40 is as expected");
     // TODO: test zoom > 14?
 }
 
@@ -437,5 +435,5 @@ fn scoredist(mut zoom: u16, mut distance: f64, mut score: u8, radius: f64) -> f6
 #[test]
 fn scoredist_test() {
     assert_eq!(scoredist(14, 1., 0, 400.), 321.7508133738646, "scoredist for a feature 1 tile away from proximity point with score 0 and radius 400 should be 321.7508133738646");
-    assert_eq!(scoredist(14, 0., 0, 400.), 402.1885167173308, "scoredist for a feature on the sane tile as the proximity point with score 0 and radius 400 should be 402.1885167173308,");
+    assert_eq!(scoredist(14, 0., 0, 400.), 402.1885167173308, "scoredist for a feature on the same tile as the proximity point with score 0 and radius 400 should be 402.1885167173308,");
 }
