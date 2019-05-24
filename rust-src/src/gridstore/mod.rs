@@ -825,9 +825,109 @@ mod tests {
             }],
         }, "With bbox and prox - result has expected properties, including scoredist");
     }
-    // TODO: test with more than one result within bbox, to make sure results are still ordered by proximity?
+
+
+    #[test]
+    fn coalesce_single_languages_test() {
+        let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
+        let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
+        let lang_sets: [Vec<u128>; 4] = [vec![0], vec![1], vec![0,1], vec![2]];
+        // Load each grid_entry with a grid key for each language
+        for (i, lang_set) in lang_sets.iter().enumerate() {
+            println!("lang_set, {:?}", lang_set);
+            for lang in lang_set {
+                let key = GridKey { phrase_id: 1, lang_set: *lang };
+                let grid_entry = GridEntry { id: i as u32, x: 1, y: 1, relev: 1., score: 0, source_phrase_hash: 0 };
+                println!("Grid_entry: {:?}", grid_entry);
+                builder.insert(&key, &[grid_entry]).expect("Unable to insert record");
+            }
+        }
+        builder.finish().unwrap();
+
+        let store = GridStore::new(directory.path()).unwrap();
+        // Test query with no language specified
+        let subquery = PhrasematchSubquery {
+            store: &store,
+            weight: 1.,
+            // TODO: how do you set no language?
+            match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 0 },
+            idx: 1,
+            zoom: 6,
+            mask: 1 << 0,
+        };
+        let stack = [subquery];
+        let match_opts = MatchOpts {
+            zoom: 6,
+            ..MatchOpts::default()
+        };
+        let result = coalesce(&stack, &match_opts).unwrap();
+        println!("result: {:?}", result);
+        assert_eq!(result[0].entries.len(), 4, "All languges - returns 4 results");
+    }
+
+
+
+    // #[test]
+    // fn coalesce_multi_test() {
+    //     // Set up 2 GridStores
+    //     // TODO: can any of this be generalized into a setup function?
+    //     let directory1: tempfile::TempDir = tempfile::tempdir().unwrap();
+    //     let directory2: tempfile::TempDir = tempfile::tempdir().unwrap();
+    //     let mut builder1 = GridStoreBuilder::new(directory1.path()).unwrap();
+    //     let mut builder2 = GridStoreBuilder::new(directory2.path()).unwrap();
+
+    //     // Add more specific layer into a store
+    //     let mut grid_key = GridKey { phrase_id: 1, lang_set: 1 };
+    //     let mut entries = vec![
+    //            GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 1, source_phrase_hash: 0 },
+    //            GridEntry { id: 2, x: 2, y: 2, relev: 1., score: 1, source_phrase_hash: 0 },
+    //     ];
+    //     builder1.insert(&grid_key, &entries).expect("Unable to insert record");
+    //     builder1.finish().unwrap();
+
+    //     // Add less specific layer into a store
+    //     grid_key = GridKey { phrase_id: 2, lang_set: 1 };
+    //     entries = vec![
+    //         GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 3, source_phrase_hash: 0 },
+    //         GridEntry { id: 2, x: 2, y: 2, relev: 1., score: 3, source_phrase_hash: 0 },
+    //         GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 1, source_phrase_hash: 0 },
+    //     ];
+    //     builder2.insert(&grid_key, &entries).expect("Unable to insert record");
+    //     builder2.finish().unwrap();
+
+    //     let store1 = GridStore::new(directory1.path()).unwrap();
+    //     let store2 = GridStore::new(directory2.path()).unwrap();
+
+    //     let stack = [
+    //         PhrasematchSubquery {
+    //             store: &store1,
+    //             weight: 0.5,
+    //             match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 2 },
+    //             idx: 1,
+    //             zoom: 1,
+    //             mask: 1 << 1,
+    //         },
+    //         PhrasematchSubquery {
+    //             store: &store2,
+    //             weight: 0.5,
+    //             match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 2 },
+    //             idx: 2,
+    //             zoom: 2,
+    //             mask: 1 << 0,
+    //         },
+    //     ];
+    //     let match_opts = MatchOpts {
+    //         zoom: 1,
+    //         bbox: Some([1,1,1,1]),
+    //         ..MatchOpts::default()
+    //     };
+    //     let result = coalesce(&stack, &match_opts).unwrap();
+
+    // }
+    // // TODO: test with more than one result within bbox, to make sure results are still ordered by proximity?
+    // // TODO: language tests
 }
 
-// TODO: language tests
+
 // TODO: add proximity test with max score
 // TODO: add sort tests?

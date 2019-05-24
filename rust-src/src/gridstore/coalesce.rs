@@ -87,6 +87,10 @@ fn coalesce_single(
     match_opts: &MatchOpts,
 ) -> Result<Vec<CoalesceContext>, Box<Error>> {
     let grids = subquery.store.get_matching(&subquery.match_key, match_opts)?;
+    let toprint: Vec<MatchEntry> = grids.collect();
+    println!("grids {:?}", toprint);
+    println!("Number of grids: {:}", toprint.len());
+    let grids = toprint.iter();
     let mut contexts: Vec<CoalesceContext> = Vec::new();
     let mut max_relev: f32 = 0.;
     // TODO: rename all of the last things to previous things
@@ -98,6 +102,7 @@ fn coalesce_single(
     let mut feature_count: usize = 0;
 
     for grid in grids {
+        println!("grid: {:?}", grid);
         let coalesce_entry = grid_to_coalesce_entry(&grid, subquery, match_opts);
 
         // If it's the same feature as the last one, but a lower scoredist don't add it
@@ -116,6 +121,7 @@ fn coalesce_single(
         }
 
         if max_relev - coalesce_entry.grid_entry.relev >= 0.25 {
+            println!("Breaking because diff from max relev is > 0.25");
             break;
         }
         if coalesce_entry.grid_entry.relev > max_relev {
@@ -439,4 +445,39 @@ fn scoredist(mut zoom: u16, mut distance: f64, mut score: u8, radius: f64) -> f6
 fn scoredist_test() {
     assert_eq!(scoredist(14, 1., 0, 400.), 321.7508133738646, "scoredist for a feature 1 tile away from proximity point with score 0 and radius 400 should be 321.7508133738646");
     assert_eq!(scoredist(14, 0., 0, 400.), 402.1885167173308, "scoredist for a feature on the same tile as the proximity point with score 0 and radius 400 should be 402.1885167173308,");
+    let result = [
+        MatchEntry {
+            grid_entry: GridEntry {
+                relev: 1.0,
+                score: 0,
+                x: 1,
+                y: 1,
+                id: 2,
+                source_phrase_hash: 0,
+            },
+            matches_language: true,
+        },
+        MatchEntry {
+            grid_entry: GridEntry {
+                relev: 1.0,
+                score: 0,
+                x: 1,
+                y: 1,
+                id: 3,
+                source_phrase_hash: 0,
+            },
+            matches_language: false,
+        },
+        MatchEntry {
+            grid_entry: GridEntry {
+                relev: 1.0,
+                score: 0,
+                x: 1,
+                y: 1,
+                id: 2,
+                source_phrase_hash: 0,
+            },
+            matches_language: false,
+        },
+    ];
 }
