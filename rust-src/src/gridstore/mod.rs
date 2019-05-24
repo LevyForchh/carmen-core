@@ -13,9 +13,18 @@ pub use store::*;
 #[cfg(test)]
 mod tests {
     use super::*;
+
     fn round(value: f64, digits: i32) -> f64 {
         let multiplier = 10.0_f64.powi(digits);
         (value * multiplier).round() / multiplier
+    }
+
+    fn langarray_to_langfield(array: &[u32]) -> u128 {
+        let mut out = 0u128;
+        for lang in array {
+            out = out | (1 << *lang as usize);
+        }
+        out
     }
 
     #[test]
@@ -489,7 +498,7 @@ mod tests {
 
     #[test]
     #[cfg_attr(rustfmt, rustfmt::skip)]
-    fn coalesce_test_language_penalty() {
+    fn coalesce_single_test_language_penalty() {
         let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
         let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
 
@@ -826,9 +835,182 @@ mod tests {
             }],
         }, "With bbox and prox - result has expected properties, including scoredist");
     }
+
+    #[test]
+    fn coalesce_single_languages_test() {
+        let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
+        let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
+        let lang_sets: [Vec<u32>; 4] = [vec![0], vec![1], vec![0, 1], vec![2]];
+        // Load each grid_entry with a grid key for each language
+        for (i, langs) in lang_sets.iter().enumerate() {
+            let lang_set = langarray_to_langfield(&langs[..]);
+            let key = GridKey { phrase_id: 1, lang_set };
+            let grid_entry =
+                GridEntry { id: i as u32, x: 1, y: 1, relev: 1., score: 0, source_phrase_hash: 0 };
+            builder.insert(&key, &[grid_entry]).expect("Unable to insert record");
+        }
+        builder.finish().unwrap();
+
+        let store = GridStore::new(directory.path()).unwrap();
+        // Test query with all languages
+        let subquery = PhrasematchSubquery {
+            store: &store,
+            weight: 1.,
+            match_key: MatchKey {
+                match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                lang_set: u128::max_value(),
+            },
+            idx: 1,
+            zoom: 6,
+            mask: 1 << 0,
+        };
+        let stack = [subquery];
+        let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
+        let result = coalesce(&stack, &match_opts).unwrap();
+
+        assert_eq!(result.len(), 4, "All languges - returns 4 results");
+        // TODO: rest of the language tests
+    }
+
+    #[test]
+    fn coalesce_multi_test() {
+        // Set up 2 GridStores
+        // TODO: can any of this be generalized into a setup function?
+        let directory1: tempfile::TempDir = tempfile::tempdir().unwrap();
+        let directory2: tempfile::TempDir = tempfile::tempdir().unwrap();
+        let mut builder1 = GridStoreBuilder::new(directory1.path()).unwrap();
+        let mut builder2 = GridStoreBuilder::new(directory2.path()).unwrap();
+
+        // Add more specific layer into a store
+        let mut grid_key = GridKey { phrase_id: 1, lang_set: 1 };
+        let mut entries = vec![
+            GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 1, source_phrase_hash: 0 },
+            GridEntry { id: 2, x: 2, y: 2, relev: 1., score: 1, source_phrase_hash: 0 }, // TODO: this isn't a real tile at zoom level 1. Maybe pick a more realistic test case?
+        ];
+        builder1.insert(&grid_key, &entries).expect("Unable to insert record");
+        builder1.finish().unwrap();
+
+        // Add less specific layer into a store
+        grid_key = GridKey { phrase_id: 2, lang_set: 1 };
+        entries = vec![
+            GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 3, source_phrase_hash: 0 },
+            GridEntry { id: 2, x: 2, y: 2, relev: 1., score: 3, source_phrase_hash: 0 },
+            GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 1, source_phrase_hash: 0 },
+        ];
+        builder2.insert(&grid_key, &entries).expect("Unable to insert record");
+        builder2.finish().unwrap();
+
+        let store1 = GridStore::new(directory1.path()).unwrap();
+        let store2 = GridStore::new(directory2.path()).unwrap();
+
+        let stack = [
+            PhrasematchSubquery {
+                store: &store1,
+                weight: 0.5,
+                match_key: MatchKey {
+                    match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                    lang_set: 1,
+                },
+                idx: 0,
+                zoom: 1,
+                mask: 1 << 1,
+            },
+            PhrasematchSubquery {
+                store: &store2,
+                weight: 0.5,
+                match_key: MatchKey {
+                    match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                    lang_set: 1,
+                },
+                idx: 1,
+                zoom: 2,
+                mask: 1 << 0,
+            },
+        ];
+        let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
+        let result = coalesce(&stack, &match_opts).unwrap();
+        assert_eq!(result[0].relev, 1., "No prox no bbox - 1st result has relevance 1");
+        assert_eq!(result[0].mask, 3, "No prox no bbox - 1st result context has correct mask");
+        assert_eq!(
+            result[0].entries.len(),
+            2,
+            "No prox no bbox - 1st result has 2 coalesce entries"
+        );
+        assert_eq!(result[0].entries[0], CoalesceEntry {
+            matches_language: true,
+            idx: 1,
+            tmp_id: 33554434,
+            mask: 1 << 0,
+            distance: 0.,
+            scoredist: 3.,
+            grid_entry: GridEntry {
+                id: 2,
+                x: 2,
+                y: 2,
+                relev: 0.5,
+                score: 3,
+                source_phrase_hash: 0,
+            }
+        }, "No prox no bbox - 1st result first entry is the entry with the highest score from the higher zoom index");
+        assert_eq!(result[0].entries[1], CoalesceEntry {
+            matches_language: true,
+            idx: 0,
+            tmp_id: 1,
+            mask: 1 << 1,
+            distance: 0.,
+            scoredist: 1.,
+            grid_entry: GridEntry {
+                id: 1,
+                x: 1,
+                y: 1,
+                relev: 0.5,
+                score: 1,
+                source_phrase_hash: 0,
+            }
+        }, "No prox no bbox - 1st result 2nd entry is the overelpping grid from the lower zoom index");
+        assert_eq!(result[1].relev, 1., "No prox no bbox - 2nd result has relevance 1");
+        assert_eq!(result[1].mask, 3, "No prox no bbox - 2nd result context has correct mask");
+        assert_eq!(
+            result[1].entries.len(),
+            2,
+            "No prox no bbox - 2nd result has 2 coalesce entries"
+        );
+        assert_eq!(result[1].entries[0], CoalesceEntry {
+            matches_language: true,
+            idx: 1,
+            tmp_id: 33554435,
+            mask: 1 << 0,
+            distance: 0.,
+            scoredist: 1.,
+            grid_entry: GridEntry {
+                id: 3,
+                x: 3,
+                y: 3,
+                relev: 0.5,
+                score: 1,
+                source_phrase_hash: 0,
+            }
+        }, "No prox no bbox - 2nd result first entry is the lower score grid that overlaps with a grid ");
+        assert_eq!(result[0].entries[1], CoalesceEntry {
+            matches_language: true,
+            idx: 0,
+            tmp_id: 1,
+            mask: 1 << 1,
+            distance: 0.,
+            scoredist: 1.,
+            grid_entry: GridEntry {
+                id: 1,
+                x: 1,
+                y: 1,
+                relev: 0.5,
+                score: 1,
+                source_phrase_hash: 0,
+            }
+        }, "No prox no bbox - 2nd result 2nd entry is the overlapping grid from the lower zoom index");
+    }
     // TODO: test with more than one result within bbox, to make sure results are still ordered by proximity?
+    // TODO: language tests
 }
 
-// TODO: language tests
 // TODO: add proximity test with max score
 // TODO: add sort tests?
