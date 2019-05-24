@@ -608,158 +608,226 @@ mod tests {
         assert_eq!(result[0].entries[0].grid_entry.relev, 0.48, "With no proximity, cross language grids get a penalty");
         assert_eq!(result[0].entries[0].matches_language, false, "Matches language property is correctly set on CoalesceEntry");
     }
-}
 
-#[test]
-#[cfg_attr(rustfmt, rustfmt::skip)]
-fn coalesce_single_test() {
-    let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
-    let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
+    #[test]
+    #[cfg_attr(rustfmt, rustfmt::skip)]
+    fn coalesce_single_test() {
+        // TODO: break this setup out, and break sets of tests into separate functions?
+        let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
+        let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
 
-    let key = GridKey { phrase_id: 1, lang_set: 1 };
+        let key = GridKey { phrase_id: 1, lang_set: 1 };
 
-    let entries = vec![
-        GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 3, source_phrase_hash: 0 },
-        GridEntry { id: 2, x: 2, y: 2, relev: 0.8, score: 3, source_phrase_hash: 0 },
-        GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 1, source_phrase_hash: 0 },
-    ];
-    builder.insert(&key, &entries).expect("Unable to insert record");
-    builder.finish().unwrap();
+        let entries = vec![
+            GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 3, source_phrase_hash: 0 },
+            GridEntry { id: 2, x: 2, y: 2, relev: 0.8, score: 3, source_phrase_hash: 0 },
+            GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 1, source_phrase_hash: 0 },
+        ];
+        builder.insert(&key, &entries).expect("Unable to insert record");
+        builder.finish().unwrap();
 
-    let store = GridStore::new(directory.path()).unwrap();
-    let subquery = PhrasematchSubquery {
-        store: &store,
-        weight: 1.,
-        match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 },
-        idx: 1,
-        zoom: 6,
-        mask: 1 << 0,
-    };
-    let stack = [subquery];
-
-    // Test default opts - no proximity or bbox
-    let match_opts = MatchOpts {
-        zoom: 6,
-        ..MatchOpts::default()
-    };
-    let result = coalesce(&stack, &match_opts).unwrap();
-    assert_eq!(result[0].relev, 1., "No prox no bbox - 1st result has relevance 1");
-    assert_eq!(result[0].entries.len(), 1, "No prox no bbox - 1st result has one coalesce entry");
-    assert_eq!(result[0].entries[0].matches_language, true, "No prox no bbox - 1st result is a language match");
-    assert_eq!(result[0].entries[0].distance, 0., "No prox no bbox - 1st result has distance 0");
-    assert_eq!(result[0].entries[0].idx, 1, "No prox no bbox - 1st result has idx of subquery");
-    assert_eq!(result[0].entries[0].mask, 1 << 0, "No prox no bbox - 1st result has original mask");
-    assert_eq!(result[0].entries[0].scoredist, 3., "No prox no bbox - 1st result scoredist is the grid score");
-    assert_eq!(result[0].entries[0].grid_entry, GridEntry {
-            id: 1,
-            x: 1,
-            y: 1,
-            relev: 1.,
-            score: 3,
-            source_phrase_hash: 0,
-        }, "No prox no bbox - 1st result grid entry is the highest relevance and score");
-    assert_eq!(result[1].relev, 1., "No prox no bbox - 2nd result has relevance 1");
-    assert_eq!(result[1].entries.len(), 1, "No prox no bbox - 2nd result has one coalesce entry");
-    assert_eq!(result[1].entries[0].matches_language, true, "No prox no bbox - 2nd result is a language match");
-    assert_eq!(result[1].entries[0].distance, 0., "No prox no bbox - 2nd result has distance 0");
-    assert_eq!(result[1].entries[0].idx, 1, "No prox no bbox - 2nd result has idx of subquery");
-    assert_eq!(result[1].entries[0].mask, 1 << 0, "No prox no bbox - 2nd result has original mask");
-    assert_eq!(result[1].entries[0].scoredist, 1., "No prox no bbox - 2nd result scoredist is the grid score");
-    assert_eq!(result[1].entries[0].grid_entry, GridEntry {
-            id: 3,
-            x: 3,
-            y: 3,
-            relev: 1.,
-            score: 1,
-            source_phrase_hash: 0,
-        }, "No prox no bbox - 2nd result grid entry is the highest relevance, lower score");
-    assert_eq!(result[2].relev, 0.8, "No prox no bbox - 3rd result has relevance 0.8");
-    assert_eq!(result[2].entries.len(), 1, "No prox no bbox - 3rd result has one coalesce entry");
-    assert_eq!(result[2].entries[0].matches_language, true, "No prox no bbox - 3rd result is a language match");
-    assert_eq!(result[2].entries[0].distance, 0., "No prox no bbox - 3rd result has distance 0");
-    assert_eq!(result[2].entries[0].idx, 1, "No prox no bbox - 3rd result has idx of subquery");
-    assert_eq!(result[2].entries[0].mask, 1 << 0, "No prox no bbox - 3rd result has original mask");
-    assert_eq!(result[2].entries[0].scoredist, 3., "No prox no bbox - 3rd result scoredist is the grid score");
-    assert_eq!(result[2].entries[0].grid_entry, GridEntry {
-            id: 2,
-            x: 2,
-            y: 2,
-            relev: 0.8,
-            score: 3,
-            source_phrase_hash: 0,
-        }, "No prox no bbox - 3rd result grid entry is the lowest relevance, even though score is higher than 2nd");
-
-    // Test opts with proximity
-    let match_opts = MatchOpts {
-        zoom: 6,
-        proximity: Some(Proximity {
-            point: [3,3],
-            radius: 40.,
-        }),
-        ..MatchOpts::default()
-    };
-    let result = coalesce(&stack, &match_opts).unwrap();
-    assert_eq!(result[0].entries[0].grid_entry.id, 3, "With proximity - 1st result is the closest, even if its a slightly lower score");
-    assert_eq!(result[1].entries[0].grid_entry.id, 1, "With proximity - 2nd result is farther away than 3rd but has a higher relevance");
-    assert_eq!(result[2].entries[0].grid_entry.id, 2, "With proximity - 3rd is closer but has a lower relevance");
-    assert_eq!(result[0], CoalesceContext {
-        mask: 1 << 0,
-        relev: 1.,
-        entries: vec![CoalesceEntry {
-            matches_language: true,
+        let store = GridStore::new(directory.path()).unwrap();
+        let subquery = PhrasematchSubquery {
+            store: &store,
+            weight: 1.,
+            match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 },
             idx: 1,
-            tmp_id: 33554435,
+            zoom: 6,
             mask: 1 << 0,
-            distance: 0.,
-            scoredist: 1.5839497841387566,
-            grid_entry: GridEntry {
-                id: 3,
-                x: 3,
-                y: 3,
-                relev: 1.,
-                score: 1,
-                source_phrase_hash: 0,
-            }
-        }],
-    }, "With proximity - 1st result has expected properties");
-    assert_eq!(result[1], CoalesceContext {
-        mask: 1 << 0,
-        relev: 1.,
-        entries: vec![CoalesceEntry {
-            matches_language: true,
-            idx: 1,
-            tmp_id: 33554433,
-            mask: 1 << 0,
-            distance: 2.8284271247461903,
-            scoredist: 1.109893833332405,
-            grid_entry: GridEntry {
+        };
+        let stack = [subquery];
+
+        // Test default opts - no proximity or bbox
+        let match_opts = MatchOpts {
+            zoom: 6,
+            ..MatchOpts::default()
+        };
+        let result = coalesce(&stack, &match_opts).unwrap();
+        assert_eq!(result[0].relev, 1., "No prox no bbox - 1st result has relevance 1");
+        assert_eq!(result[0].entries.len(), 1, "No prox no bbox - 1st result has one coalesce entry");
+        assert_eq!(result[0].entries[0].matches_language, true, "No prox no bbox - 1st result is a language match");
+        assert_eq!(result[0].entries[0].distance, 0., "No prox no bbox - 1st result has distance 0");
+        assert_eq!(result[0].entries[0].idx, 1, "No prox no bbox - 1st result has idx of subquery");
+        assert_eq!(result[0].entries[0].mask, 1 << 0, "No prox no bbox - 1st result has original mask");
+        assert_eq!(result[0].entries[0].scoredist, 3., "No prox no bbox - 1st result scoredist is the grid score");
+        assert_eq!(result[0].entries[0].grid_entry, GridEntry {
                 id: 1,
                 x: 1,
                 y: 1,
                 relev: 1.,
                 score: 3,
                 source_phrase_hash: 0,
-            }
-        }],
-    }, "With proximity - 2nd result has expected properties");
-    assert_eq!(result[2], CoalesceContext {
-        mask: 1 << 0,
-        relev: 0.8,
-        entries: vec![CoalesceEntry {
-            matches_language: true,
-            idx: 1,
-            tmp_id: 33554434,
-            mask: 1 << 0,
-            distance: 1.4142135623730951,
-            scoredist: 1.109893833332405, // Has the same scoredist as 2nd result because they're both beyond proximity radius
-            grid_entry: GridEntry {
+            }, "No prox no bbox - 1st result grid entry is the highest relevance and score");
+        assert_eq!(result[1].relev, 1., "No prox no bbox - 2nd result has relevance 1");
+        assert_eq!(result[1].entries.len(), 1, "No prox no bbox - 2nd result has one coalesce entry");
+        assert_eq!(result[1].entries[0].matches_language, true, "No prox no bbox - 2nd result is a language match");
+        assert_eq!(result[1].entries[0].distance, 0., "No prox no bbox - 2nd result has distance 0");
+        assert_eq!(result[1].entries[0].idx, 1, "No prox no bbox - 2nd result has idx of subquery");
+        assert_eq!(result[1].entries[0].mask, 1 << 0, "No prox no bbox - 2nd result has original mask");
+        assert_eq!(result[1].entries[0].scoredist, 1., "No prox no bbox - 2nd result scoredist is the grid score");
+        assert_eq!(result[1].entries[0].grid_entry, GridEntry {
+                id: 3,
+                x: 3,
+                y: 3,
+                relev: 1.,
+                score: 1,
+                source_phrase_hash: 0,
+            }, "No prox no bbox - 2nd result grid entry is the highest relevance, lower score");
+        assert_eq!(result[2].relev, 0.8, "No prox no bbox - 3rd result has relevance 0.8");
+        assert_eq!(result[2].entries.len(), 1, "No prox no bbox - 3rd result has one coalesce entry");
+        assert_eq!(result[2].entries[0].matches_language, true, "No prox no bbox - 3rd result is a language match");
+        assert_eq!(result[2].entries[0].distance, 0., "No prox no bbox - 3rd result has distance 0");
+        assert_eq!(result[2].entries[0].idx, 1, "No prox no bbox - 3rd result has idx of subquery");
+        assert_eq!(result[2].entries[0].mask, 1 << 0, "No prox no bbox - 3rd result has original mask");
+        assert_eq!(result[2].entries[0].scoredist, 3., "No prox no bbox - 3rd result scoredist is the grid score");
+        assert_eq!(result[2].entries[0].grid_entry, GridEntry {
                 id: 2,
                 x: 2,
                 y: 2,
                 relev: 0.8,
                 score: 3,
                 source_phrase_hash: 0,
-            }
-        }],
-    }, "With proximity - 2nd result has expected properties");
+            }, "No prox no bbox - 3rd result grid entry is the lowest relevance, even though score is higher than 2nd");
+
+        // Test opts with proximity
+        let match_opts = MatchOpts {
+            zoom: 6,
+            proximity: Some(Proximity {
+                point: [3,3],
+                radius: 40.,
+            }),
+            ..MatchOpts::default()
+        };
+        let result = coalesce(&stack, &match_opts).unwrap();
+        assert_eq!(result[0].entries[0].grid_entry.id, 3, "With proximity - 1st result is the closest, even if its a slightly lower score");
+        assert_eq!(result[1].entries[0].grid_entry.id, 1, "With proximity - 2nd result is farther away than 3rd but has a higher relevance");
+        assert_eq!(result[2].entries[0].grid_entry.id, 2, "With proximity - 3rd is closer but has a lower relevance");
+        assert_eq!(result[0], CoalesceContext {
+            mask: 1 << 0,
+            relev: 1.,
+            entries: vec![CoalesceEntry {
+                matches_language: true,
+                idx: 1,
+                tmp_id: 33554435,
+                mask: 1 << 0,
+                distance: 0.,
+                scoredist: 1.5839497841387566,
+                grid_entry: GridEntry {
+                    id: 3,
+                    x: 3,
+                    y: 3,
+                    relev: 1.,
+                    score: 1,
+                    source_phrase_hash: 0,
+                }
+            }],
+        }, "With proximity - 1st result has expected properties");
+        assert_eq!(result[1], CoalesceContext {
+            mask: 1 << 0,
+            relev: 1.,
+            entries: vec![CoalesceEntry {
+                matches_language: true,
+                idx: 1,
+                tmp_id: 33554433,
+                mask: 1 << 0,
+                distance: 2.8284271247461903,
+                scoredist: 1.109893833332405,
+                grid_entry: GridEntry {
+                    id: 1,
+                    x: 1,
+                    y: 1,
+                    relev: 1.,
+                    score: 3,
+                    source_phrase_hash: 0,
+                }
+            }],
+        }, "With proximity - 2nd result has expected properties");
+        assert_eq!(result[2], CoalesceContext {
+            mask: 1 << 0,
+            relev: 0.8,
+            entries: vec![CoalesceEntry {
+                matches_language: true,
+                idx: 1,
+                tmp_id: 33554434,
+                mask: 1 << 0,
+                distance: 1.4142135623730951,
+                scoredist: 1.109893833332405, // Has the same scoredist as 2nd result because they're both beyond proximity radius
+                grid_entry: GridEntry {
+                    id: 2,
+                    x: 2,
+                    y: 2,
+                    relev: 0.8,
+                    score: 3,
+                    source_phrase_hash: 0,
+                }
+            }],
+        }, "With proximity - 2nd result has expected properties");
+
+        // Test with bbox
+        let match_opts = MatchOpts {
+            zoom: 6,
+            bbox: Some([1,1,1,1]),
+            ..MatchOpts::default()
+        };
+        let result = coalesce(&stack, &match_opts).unwrap();
+        assert_eq!(result[0].entries.len(), 1, "With bbox - only one result is within the bbox, so only one result is returned");
+        assert_eq!(result[0].entries[0].grid_entry.id, 1, "With bbox - result is the one that's within the bbox");
+        assert_eq!(result[0], CoalesceContext {
+            mask: 1 << 0,
+            relev: 1.,
+            entries: vec![CoalesceEntry {
+                matches_language: true,
+                idx: 1,
+                tmp_id: 33554433,
+                mask: 1 << 0,
+                distance: 0.,
+                scoredist: 3.,
+                grid_entry: GridEntry {
+                    id: 1,
+                    x: 1,
+                    y: 1,
+                    relev: 1.,
+                    score: 3,
+                    source_phrase_hash: 0,
+                }
+            }],
+        }, "With bbox - result has expected properties");
+    
+        // Test with bbox and proximity
+        let match_opts = MatchOpts {
+            zoom: 6,
+            bbox: Some([1,1,1,1]),
+            proximity: Some(Proximity {
+                point: [1,1],
+                radius: 40.,
+            }),
+        };
+        let result = coalesce(&stack, &match_opts).unwrap();
+        assert_eq!(result[0].entries.len(), 1, "With bbox and prox - only one result is within the bbox, so only one result is returned");
+           assert_eq!(result[0], CoalesceContext {
+            mask: 1 << 0,
+            relev: 1.,
+            entries: vec![CoalesceEntry {
+                matches_language: true,
+                idx: 1,
+                tmp_id: 33554433,
+                mask: 1 << 0,
+                distance: 0.,
+                scoredist: 1.7322531402718835,
+                grid_entry: GridEntry {
+                    id: 1,
+                    x: 1,
+                    y: 1,
+                    relev: 1.,
+                    score: 3,
+                    source_phrase_hash: 0,
+                }
+            }],
+        }, "With bbox and prox - result has expected properties, including scoredist");
+    }
+    // TODO: test with more than one result within bbox, to make sure results are still ordered by proximity?
 }
+
+// TODO: language tests
+// TODO: add proximity test with max score
+// TODO: add sort tests?

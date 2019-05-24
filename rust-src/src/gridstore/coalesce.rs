@@ -6,7 +6,6 @@ use itertools::Itertools;
 use ordered_float::OrderedFloat;
 
 use crate::gridstore::common::*;
-use crate::gridstore::store::GridStore;
 
 /// Takes a vector of phrasematch subqueries (stack) and match options, gets matching grids, sorts the grids,
 /// and returns a result of a sorted vector of contexts (lists of grids with added metadata)
