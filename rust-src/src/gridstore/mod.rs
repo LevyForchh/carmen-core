@@ -27,6 +27,27 @@ mod tests {
         out
     }
 
+    /// Mapping of GridKey to all of the grid entries to insert into a store for that GridKey
+    struct StoreEntryBuildingBlock {
+        grid_key: GridKey,
+        entries: Vec<GridEntry>,
+    }
+
+    /// Utility to create stores
+    /// Takes an vector, with each item mapping to a store to create
+    /// Each item is a vector with maps of grid keys to the entries to insert into the store for that grid key
+    fn create_store(store_entries: Vec<StoreEntryBuildingBlock>) -> GridStore {
+        let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
+        let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
+        for building_block in store_entries {
+            builder
+                .insert(&building_block.grid_key, &building_block.entries)
+                .expect("Unable to insert record");
+        }
+        builder.finish().unwrap();
+        GridStore::new(directory.path()).unwrap()
+    }
+
     #[test]
     fn combined_test() {
         let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
@@ -400,7 +421,7 @@ mod tests {
     }
 
     #[test]
-    fn coalesce_test_ns_bias() {
+    fn coalesce_single_test_ns_bias() {
         let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
         let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
 
@@ -455,7 +476,7 @@ mod tests {
 
     #[test]
     #[cfg_attr(rustfmt, rustfmt::skip)]
-    fn coalesce_test_proximity_basic() {
+    fn coalesce_single_test_proximity_basic() {
         let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
         let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
 
@@ -549,33 +570,29 @@ mod tests {
     #[test]
     #[cfg_attr(rustfmt, rustfmt::skip)]
     fn coalesce_multi_test_language_penalty() {
-        // Set up 2 GridStores
-        let directory1: tempfile::TempDir = tempfile::tempdir().unwrap();
-        let directory2: tempfile::TempDir = tempfile::tempdir().unwrap();
-        let mut builder1 = GridStoreBuilder::new(directory1.path()).unwrap();
-        let mut builder2 = GridStoreBuilder::new(directory2.path()).unwrap();
-
         // Add more specific layer into a store
-        let mut grid_key = GridKey { phrase_id: 1, lang_set: 1 };
-        let mut entries = vec![
-               GridEntry { id: 1, x: 2, y: 2, relev: 1., score: 1, source_phrase_hash: 0 },
-               GridEntry { id: 2, x: 12800, y: 12800, relev: 1., score: 1, source_phrase_hash: 0 },
-        ];
-        builder1.insert(&grid_key, &entries).expect("Unable to insert record");
-        builder1.finish().unwrap();
+        let store1 = create_store(vec![
+            StoreEntryBuildingBlock {
+                grid_key: GridKey { phrase_id: 1, lang_set: 1 },
+                entries: vec![
+                    GridEntry { id: 1, x: 2, y: 2, relev: 1., score: 1, source_phrase_hash: 0 },
+                    GridEntry { id: 2, x: 12800, y: 12800, relev: 1., score: 1, source_phrase_hash: 0 },
+                ],
+            }
+        ]);
 
         // Add less specific layer into a store
-        grid_key = GridKey { phrase_id: 2, lang_set: 1 };
-        entries = vec![
-            GridEntry { id: 3, x: 0, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },
-            GridEntry { id: 4, x: 50, y: 50, relev: 1., score: 1, source_phrase_hash: 0 },
-        ];
-        builder2.insert(&grid_key, &entries).expect("Unable to insert record");
-        builder2.finish().unwrap();
+        let store2 = create_store(vec![
+            StoreEntryBuildingBlock {
+                grid_key: GridKey { phrase_id: 2, lang_set: 1 },
+                entries: vec![
+                    GridEntry { id: 3, x: 0, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },
+                    GridEntry { id: 4, x: 50, y: 50, relev: 1., score: 1, source_phrase_hash: 0 },
+                ],
+            }
+        ]);
 
-        let store1 = GridStore::new(directory1.path()).unwrap();
-        let store2 = GridStore::new(directory2.path()).unwrap();
-
+        // Subqueries with a different language set
         let stack = vec![
             PhrasematchSubquery {
                 store: &store1,
@@ -594,7 +611,7 @@ mod tests {
                 mask: 1 << 1,
             },
         ];
-        
+
         let match_opts = MatchOpts {
             zoom: 14,
             proximity: Some(Proximity { point: [2, 2], radius: 1. }),
@@ -874,34 +891,24 @@ mod tests {
 
     #[test]
     fn coalesce_multi_test() {
-        // Set up 2 GridStores
-        // TODO: can any of this be generalized into a setup function?
-        let directory1: tempfile::TempDir = tempfile::tempdir().unwrap();
-        let directory2: tempfile::TempDir = tempfile::tempdir().unwrap();
-        let mut builder1 = GridStoreBuilder::new(directory1.path()).unwrap();
-        let mut builder2 = GridStoreBuilder::new(directory2.path()).unwrap();
-
         // Add more specific layer into a store
-        let mut grid_key = GridKey { phrase_id: 1, lang_set: 1 };
-        let mut entries = vec![
-            GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 1, source_phrase_hash: 0 },
-            GridEntry { id: 2, x: 2, y: 2, relev: 1., score: 1, source_phrase_hash: 0 }, // TODO: this isn't a real tile at zoom level 1. Maybe pick a more realistic test case?
-        ];
-        builder1.insert(&grid_key, &entries).expect("Unable to insert record");
-        builder1.finish().unwrap();
+        let store1 = create_store(vec![StoreEntryBuildingBlock {
+            grid_key: GridKey { phrase_id: 1, lang_set: 1 },
+            entries: vec![
+                GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 1, source_phrase_hash: 0 },
+                // TODO: this isn't a real tile at zoom 1. Maybe pick more realistic test case?
+                GridEntry { id: 2, x: 2, y: 2, relev: 1., score: 1, source_phrase_hash: 0 },
+            ],
+        }]);
 
-        // Add less specific layer into a store
-        grid_key = GridKey { phrase_id: 2, lang_set: 1 };
-        entries = vec![
-            GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 3, source_phrase_hash: 0 },
-            GridEntry { id: 2, x: 2, y: 2, relev: 1., score: 3, source_phrase_hash: 0 },
-            GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 1, source_phrase_hash: 0 },
-        ];
-        builder2.insert(&grid_key, &entries).expect("Unable to insert record");
-        builder2.finish().unwrap();
-
-        let store1 = GridStore::new(directory1.path()).unwrap();
-        let store2 = GridStore::new(directory2.path()).unwrap();
+        let store2 = create_store(vec![StoreEntryBuildingBlock {
+            grid_key: GridKey { phrase_id: 2, lang_set: 1 },
+            entries: vec![
+                GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 3, source_phrase_hash: 0 },
+                GridEntry { id: 2, x: 2, y: 2, relev: 1., score: 3, source_phrase_hash: 0 },
+                GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 1, source_phrase_hash: 0 },
+            ],
+        }]);
 
         let stack = vec![
             PhrasematchSubquery {
@@ -1101,36 +1108,47 @@ mod tests {
 
     #[test]
     fn coalesce_multi_languages_test() {
-        let directory1: tempfile::TempDir = tempfile::tempdir().unwrap();
-        let directory2: tempfile::TempDir = tempfile::tempdir().unwrap();
-        let mut builder1 = GridStoreBuilder::new(directory1.path()).unwrap();
-        let mut builder2 = GridStoreBuilder::new(directory2.path()).unwrap();
+        // Store 1 with grids in all languages
+        let store1 = create_store(vec![StoreEntryBuildingBlock {
+            grid_key: GridKey { phrase_id: 1, lang_set: u128::max_value() },
+            entries: vec![GridEntry {
+                id: 1,
+                x: 1,
+                y: 1,
+                relev: 1.,
+                score: 1,
+                source_phrase_hash: 0,
+            }],
+        }]);
 
-        // Add more specific layer into a store
-        // TODO: is this how to do this?
-        let grid_key = GridKey { phrase_id: 1, lang_set: u128::max_value() };
-        let entries =
-            vec![GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 1, source_phrase_hash: 0 }];
-        builder1.insert(&grid_key, &entries).expect("Unable to insert record");
-        builder1.finish().unwrap();
+        // Store 2 with grids in multiple language sets
+        let store2 = create_store(vec![
+            // Insert grid with lang_set 1
+            StoreEntryBuildingBlock {
+                grid_key: GridKey { phrase_id: 2, lang_set: langarray_to_langfield(&[1]) },
+                entries: vec![GridEntry {
+                    id: 2,
+                    x: 1,
+                    y: 1,
+                    relev: 1.,
+                    score: 1,
+                    source_phrase_hash: 0,
+                }],
+            },
+            // Insert grid with lang_set 0
+            StoreEntryBuildingBlock {
+                grid_key: GridKey { phrase_id: 2, lang_set: langarray_to_langfield(&[0]) },
+                entries: vec![GridEntry {
+                    id: 3,
+                    x: 1,
+                    y: 1,
+                    relev: 1.,
+                    score: 1,
+                    source_phrase_hash: 0,
+                }],
+            },
+        ]);
 
-        // Add less specific layer into a store
-        // Start with the entry with lang_set 0
-        // TODO: does lang_set 0 mean the same thing as 0 in carmen-cache?
-        let grid_key = GridKey { phrase_id: 2, lang_set: langarray_to_langfield(&[1]) };
-        let entries =
-            vec![GridEntry { id: 2, x: 1, y: 1, relev: 1., score: 1, source_phrase_hash: 0 }];
-        builder2.insert(&grid_key, &entries).expect("Unable to insert record");
-
-        // Insert entry with lang_set 1
-        let grid_key = GridKey { phrase_id: 2, lang_set: langarray_to_langfield(&[0]) };
-        let entries =
-            vec![GridEntry { id: 3, x: 1, y: 1, relev: 1., score: 1, source_phrase_hash: 0 }];
-        builder2.insert(&grid_key, &entries).expect("Unable to insert record");
-        builder2.finish().unwrap();
-
-        let store1 = GridStore::new(directory1.path()).unwrap();
-        let store2 = GridStore::new(directory2.path()).unwrap();
         // Test ALL LANGUAGES
         let stack = vec![
             PhrasematchSubquery {
@@ -1176,7 +1194,6 @@ mod tests {
         assert_eq!(result[1].entries[1].grid_entry.id, 1, "All languages - 2nd entry in second result is the overlapping grid");
         assert_eq!(result[1].entries[1].grid_entry.relev, 0.5, "All languages - 2nd entry in second result has original relevance");
         assert_eq!(result[1].entries[1].matches_language, true, "All languages - 2nd entry in second result matches language");
-
 
         // Test language 0
         let stack = vec![
@@ -1273,37 +1290,31 @@ mod tests {
 
     #[test]
     fn coalesce_multi_scoredist() {
-        // Set up 2 GridStores
-        let directory1: tempfile::TempDir = tempfile::tempdir().unwrap();
-        let directory2: tempfile::TempDir = tempfile::tempdir().unwrap();
-        let mut builder1 = GridStoreBuilder::new(directory1.path()).unwrap();
-        let mut builder2 = GridStoreBuilder::new(directory2.path()).unwrap();
-
         // Add more specific layer into a store
-        let mut grid_key = GridKey { phrase_id: 1, lang_set: 0 };
-        let mut entries = vec![
-               GridEntry { id: 1, x: 0, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },
-        ];
-        builder1.insert(&grid_key, &entries).expect("Unable to insert record");
-        builder1.finish().unwrap();
+        let store1 = create_store(vec![StoreEntryBuildingBlock {
+            grid_key: GridKey { phrase_id: 1, lang_set: 0 },
+            entries: vec![
+                GridEntry { id: 1, x: 0, y: 0, relev: 1., score: 1, source_phrase_hash: 0},
+            ],
+        }]);
 
         // Add less specific layer into a store
-        grid_key = GridKey { phrase_id: 2, lang_set: 0 };
-        entries = vec![
-            GridEntry { id: 2, x: 4800, y: 6200, relev: 1., score: 7, source_phrase_hash: 0 },
-            GridEntry { id: 3, x: 4600, y: 6200, relev: 1., score: 1, source_phrase_hash: 0 },
-        ];
-        builder2.insert(&grid_key, &entries).expect("Unable to insert record");
-        builder2.finish().unwrap();
-
-        let store1 = GridStore::new(directory1.path()).unwrap();
-        let store2 = GridStore::new(directory2.path()).unwrap();
+        let store2 = create_store(vec![StoreEntryBuildingBlock {
+            grid_key: GridKey { phrase_id: 2, lang_set: 0 },
+            entries: vec![
+                GridEntry { id: 2, x: 4800, y: 6200, relev: 1., score: 7, source_phrase_hash: 0 },
+                GridEntry { id: 3, x: 4600, y: 6200, relev: 1., score: 1, source_phrase_hash: 0 },
+            ],
+        }]);
 
         let stack = vec![
             PhrasematchSubquery {
                 store: &store1,
                 weight: 0.5,
-                match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 0 },
+                match_key: MatchKey {
+                    match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                    lang_set: 0,
+                },
                 idx: 0,
                 zoom: 0,
                 mask: 1 << 1,
@@ -1311,7 +1322,10 @@ mod tests {
             PhrasematchSubquery {
                 store: &store2,
                 weight: 0.5,
-                match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 0 },
+                match_key: MatchKey {
+                    match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                    lang_set: 0,
+                },
                 idx: 1,
                 zoom: 14,
                 mask: 1 << 0,
@@ -1320,7 +1334,7 @@ mod tests {
         // Closer proximity to one grid
         let match_opts = MatchOpts {
             zoom: 14,
-            proximity: Some(Proximity { point: [4601,6200], radius: 40. }),
+            proximity: Some(Proximity { point: [4601, 6200], radius: 40. }),
             ..MatchOpts::default()
         };
         let result = coalesce(stack.clone(), &match_opts).unwrap();
@@ -1330,7 +1344,7 @@ mod tests {
         // Proximity is still close to same grid, but less close
         let match_opts = MatchOpts {
             zoom: 14,
-            proximity: Some(Proximity { point: [4610,6200], radius: 40. }),
+            proximity: Some(Proximity { point: [4610, 6200], radius: 40. }),
             ..MatchOpts::default()
         };
         let result = coalesce(stack.clone(), &match_opts).unwrap();
