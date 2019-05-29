@@ -438,39 +438,4 @@ fn scoredist(mut zoom: u16, mut distance: f64, mut score: u8, radius: f64) -> f6
 fn scoredist_test() {
     assert_eq!(scoredist(14, 1., 0, 400.), 321.7508133738646, "scoredist for a feature 1 tile away from proximity point with score 0 and radius 400 should be 321.7508133738646");
     assert_eq!(scoredist(14, 0., 0, 400.), 402.1885167173308, "scoredist for a feature on the same tile as the proximity point with score 0 and radius 400 should be 402.1885167173308,");
-    let result = [
-        MatchEntry {
-            grid_entry: GridEntry {
-                relev: 1.0,
-                score: 0,
-                x: 1,
-                y: 1,
-                id: 2,
-                source_phrase_hash: 0,
-            },
-            matches_language: true,
-        },
-        MatchEntry {
-            grid_entry: GridEntry {
-                relev: 1.0,
-                score: 0,
-                x: 1,
-                y: 1,
-                id: 3,
-                source_phrase_hash: 0,
-            },
-            matches_language: false,
-        },
-        MatchEntry {
-            grid_entry: GridEntry {
-                relev: 1.0,
-                score: 0,
-                x: 1,
-                y: 1,
-                id: 2,
-                source_phrase_hash: 0,
-            },
-            matches_language: false,
-        },
-    ];
 }

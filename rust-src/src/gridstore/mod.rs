@@ -864,9 +864,9 @@ mod tests {
             zoom: 6,
             mask: 1 << 0,
         };
-        let stack = [subquery];
+        let stack = vec![subquery];
         let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
-        let result = coalesce(&stack, &match_opts).unwrap();
+        let result = coalesce(stack.clone(), &match_opts).unwrap();
 
         assert_eq!(result.len(), 4, "All languges - returns 4 results");
         // TODO: rest of the language tests
@@ -903,7 +903,7 @@ mod tests {
         let store1 = GridStore::new(directory1.path()).unwrap();
         let store2 = GridStore::new(directory2.path()).unwrap();
 
-        let stack = [
+        let stack = vec![
             PhrasematchSubquery {
                 store: &store1,
                 weight: 0.5,
@@ -930,7 +930,7 @@ mod tests {
 
         // Test coalesce multi with no proximity or bbox
         let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
-        let result = coalesce(&stack, &match_opts).unwrap();
+        let result = coalesce(stack.clone(), &match_opts).unwrap();
         assert_eq!(result[0].relev, 1., "No prox no bbox - 1st result has relevance 1");
         assert_eq!(result[0].mask, 3, "No prox no bbox - 1st result context has correct mask");
         assert_eq!(
@@ -1016,7 +1016,7 @@ mod tests {
             proximity: Some(Proximity { point: [3, 3], radius: 40. }),
             ..MatchOpts::default()
         };
-        let result = coalesce(&stack, &match_opts).unwrap();
+        let result = coalesce(stack.clone(), &match_opts).unwrap();
         assert_eq!(result[0].relev, 1., "With Proximity - 1st result context has relevance 1");
         assert_eq!(result[0].mask, 3, "With Proximity - 1st result context has correct mask");
         assert_eq!(
@@ -1132,7 +1132,7 @@ mod tests {
         let store1 = GridStore::new(directory1.path()).unwrap();
         let store2 = GridStore::new(directory2.path()).unwrap();
         // Test ALL LANGUAGES
-        let stack = [
+        let stack = vec![
             PhrasematchSubquery {
                 store: &store1,
                 weight: 0.5,
@@ -1158,7 +1158,7 @@ mod tests {
             },
         ];
         let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
-        let result = coalesce(&stack, &match_opts).unwrap();
+        let result = coalesce(stack.clone(), &match_opts).unwrap();
         assert_eq!(result.len(), 2, "All languages - Two results are returned");
         assert_eq!(result[0].entries.len(), 2, "All languages - First context has two entries");
         assert_eq!(result[0].relev, 1., "All languages - First context has relevance of 1");
@@ -1179,7 +1179,7 @@ mod tests {
 
 
         // Test language 0
-        let stack = [
+        let stack = vec![
             PhrasematchSubquery {
                 store: &store1,
                 weight: 0.5,
@@ -1205,7 +1205,7 @@ mod tests {
             },
         ];
         let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
-        let result = coalesce(&stack, &match_opts).unwrap();
+        let result = coalesce(stack.clone(), &match_opts).unwrap();
         assert_eq!(result.len(), 2, "Language 0 - Two results are returned");
         assert_eq!(result[0].entries.len(), 2, "Language 0 - First context has two entries");
         assert_eq!(result[0].relev, 1., "Language 0 - First context has relevance of 1");
@@ -1225,7 +1225,7 @@ mod tests {
         assert_eq!(result[1].entries[1].matches_language, true, "Language 0 - 2nd entry in second result matches language");
 
         // Test language 3
-        let stack = [
+        let stack = vec![
             PhrasematchSubquery {
                 store: &store1,
                 weight: 0.5,
@@ -1251,7 +1251,7 @@ mod tests {
             },
         ];
         let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
-        let result = coalesce(&stack, &match_opts).unwrap();
+        let result = coalesce(stack.clone(), &match_opts).unwrap();
         assert_eq!(result.len(), 2, "Language 3 - Two results are returned");
         assert_eq!(result[0].entries.len(), 2, "Language 3 - First context has two entries");
         assert_eq!(result[0].relev, 0.98, "Language 3 - First context has lower overall relevance due to language penalty");
@@ -1299,7 +1299,7 @@ mod tests {
         let store1 = GridStore::new(directory1.path()).unwrap();
         let store2 = GridStore::new(directory2.path()).unwrap();
 
-        let stack = [
+        let stack = vec![
             PhrasematchSubquery {
                 store: &store1,
                 weight: 0.5,
@@ -1323,7 +1323,7 @@ mod tests {
             proximity: Some(Proximity { point: [4601,6200], radius: 40. }),
             ..MatchOpts::default()
         };
-        let result = coalesce(&stack, &match_opts).unwrap();
+        let result = coalesce(stack.clone(), &match_opts).unwrap();
         assert_eq!(result[0].entries[0].grid_entry.id, 3, "Close proximity - Closer feature is first");
         assert_eq!(result[1].entries[0].grid_entry.id, 2, "Close proximity - Farther feature is second");
         assert_eq!(result[0].entries[0].distance < result[1].entries[0].distance, true, "First grid in first context is closer than first grid in second context");
@@ -1333,7 +1333,7 @@ mod tests {
             proximity: Some(Proximity { point: [4610,6200], radius: 40. }),
             ..MatchOpts::default()
         };
-        let result = coalesce(&stack, &match_opts).unwrap();
+        let result = coalesce(stack.clone(), &match_opts).unwrap();
         assert_eq!(result[0].entries[0].grid_entry.id, 3, "Less close proximity - Farther feature with higher score is first");
         assert_eq!(result[1].entries[0].grid_entry.id, 2, "Less close proximity - Closer feature with lower score is second");
         assert_eq!(result[0].entries[0].distance > result[1].entries[0].distance, false, "First grid in first context is not closer than first grid in second context");
