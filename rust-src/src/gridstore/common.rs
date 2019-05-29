@@ -80,13 +80,13 @@ impl MatchKey {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Proximity {
     pub point: [u16; 2],
     pub radius: f64,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct MatchOpts {
     pub bbox: Option<[u16; 4]>,
     pub proximity: Option<Proximity>,
@@ -343,8 +343,8 @@ pub struct CoalesceContext {
 }
 
 #[derive(Debug, Clone)]
-pub struct PhrasematchSubquery<'a> {
-    pub store: &'a GridStore,
+pub struct PhrasematchSubquery<T: AsRef<GridStore> + Clone> {
+    pub store: T,
     pub weight: f32,
     pub match_key: MatchKey,
     pub idx: u16,
