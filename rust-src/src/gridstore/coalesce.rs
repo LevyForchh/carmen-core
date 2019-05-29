@@ -11,7 +11,7 @@ use crate::gridstore::store::GridStore;
 /// Takes a vector of phrasematch subqueries (stack) and match options, gets matching grids, sorts the grids,
 /// and returns a result of a sorted vector of contexts (lists of grids with added metadata)
 pub fn coalesce<T: AsRef<GridStore> + Clone>(
-    stack: &[PhrasematchSubquery<T>],
+    stack: Vec<PhrasematchSubquery<T>>,
     match_opts: &MatchOpts,
 ) -> Result<Vec<CoalesceContext>, Box<Error>> {
     let contexts = if stack.len() <= 1 {
@@ -160,10 +160,9 @@ fn coalesce_single<T: AsRef<GridStore> + Clone>(
 }
 
 fn coalesce_multi<T: AsRef<GridStore> + Clone>(
-    stack: &[PhrasematchSubquery<T>],
+    mut stack: Vec<PhrasematchSubquery<T>>,
     match_opts: &MatchOpts,
 ) -> Result<Vec<CoalesceContext>, Box<Error>> {
-    let mut stack: Vec<PhrasematchSubquery<T>> = stack.iter().cloned().collect();
     stack.sort_by_key(|subquery| (subquery.zoom, subquery.idx));
 
     let mut coalesced: HashMap<(u16, u16, u16), Vec<CoalesceContext>> = HashMap::new();
@@ -186,8 +185,7 @@ fn coalesce_multi<T: AsRef<GridStore> + Clone>(
         // TODO: check if zooms are equivalent here, and only call adjust_to_zoom if they arent?
         // That way we could avoid a function call and creating a cloned object in the common case where the zooms are the same
         let adjusted_match_opts = match_opts.adjust_to_zoom(subquery.zoom);
-        let grids =
-            subquery.store.as_ref().get_matching(&subquery.match_key, &adjusted_match_opts)?;
+        let grids = subquery.store.as_ref().get_matching(&subquery.match_key, &adjusted_match_opts)?;
 
         // TODO: limit how many grids we consume
         for grid in grids {

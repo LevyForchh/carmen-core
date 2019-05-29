@@ -25,7 +25,7 @@ impl Task for CoalesceTask {
     type JsEvent = JsArray;
 
     fn perform(&self) -> Result<Vec<CoalesceContext>, String> {
-        coalesce(&self.argument.0, &self.argument.1).map_err(|err| err.to_string())
+        coalesce(self.argument.0.clone(), &self.argument.1).map_err(|err| err.to_string())
     }
 
     fn complete<'a>(
