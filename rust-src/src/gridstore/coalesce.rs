@@ -10,7 +10,7 @@ use crate::gridstore::common::*;
 /// Takes a vector of phrasematch subqueries (stack) and match options, gets matching grids, sorts the grids,
 /// and returns a result of a sorted vector of contexts (lists of grids with added metadata)
 pub fn coalesce(
-    stack: &[PhrasematchSubquery],
+    stack: Vec<PhrasematchSubquery>,
     match_opts: &MatchOpts,
 ) -> Result<Vec<CoalesceContext>, Box<Error>> {
     let contexts = if stack.len() <= 1 {
@@ -159,10 +159,9 @@ fn coalesce_single(
 }
 
 fn coalesce_multi(
-    stack: &[PhrasematchSubquery],
+    mut stack: Vec<PhrasematchSubquery>,
     match_opts: &MatchOpts,
 ) -> Result<Vec<CoalesceContext>, Box<Error>> {
-    let mut stack: Vec<PhrasematchSubquery> = stack.iter().cloned().collect();
     stack.sort_by_key(|subquery| (subquery.zoom, subquery.idx));
 
     let mut coalesced: HashMap<(u16, u16, u16), Vec<CoalesceContext>> = HashMap::new();
@@ -421,7 +420,7 @@ fn scoredist(mut zoom: u16, mut distance: f64, mut score: u8, radius: f64) -> f6
         score = 7;
     }
 
-    // If the distance is 0, set a minimum distance to avoid dividing by distatios that approach zero
+    // If the distance is 0, set a minimum distance to avoid dividing by distratios that approach zero
     if distance < 1. {
         distance = 0.8;
     }

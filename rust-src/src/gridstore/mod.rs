@@ -419,13 +419,13 @@ mod tests {
             zoom: 14,
             mask: 1 << 0,
         };
-        let stack = [subquery];
+        let stack = vec![subquery];
         let match_opts = MatchOpts {
             zoom: 14,
             proximity: Some(Proximity { point: [110, 115], radius: 200. }),
             ..MatchOpts::default()
         };
-        let result = coalesce(&stack, &match_opts).unwrap();
+        let result = coalesce(stack.clone(), &match_opts).unwrap();
         let result_ids: Vec<u32> =
             result.iter().map(|context| context.entries[0].grid_entry.id).collect();
         // TODO: is this description correct?
@@ -471,13 +471,13 @@ mod tests {
             zoom: 14,
             mask: 1 << 0,
         };
-        let stack = [subquery];
+        let stack = vec![subquery];
         let match_opts = MatchOpts {
             zoom: 14,
             proximity: Some(Proximity { point: [2, 2], radius: 400. }),
             ..MatchOpts::default()
         };
-        let result = coalesce(&stack, &match_opts).unwrap();
+        let result = coalesce(stack.clone(), &match_opts).unwrap();
         let result_ids: Vec<u32> =
             result.iter().map(|context| context.entries[0].grid_entry.id).collect();
         assert_eq!(result_ids, [1, 2, 4, 3], "Results with the same relev and score should be ordered by distance");
@@ -513,13 +513,13 @@ mod tests {
             zoom: 14,
             mask: 1 << 0,
         };
-        let stack = [subquery];
+        let stack = vec![subquery.clone()];
         let match_opts = MatchOpts {
             zoom: 14,
             proximity: Some(Proximity { point: [2, 2], radius: 1. }),
             ..MatchOpts::default()
         };
-        let result = coalesce(&stack, &match_opts).unwrap();
+        let result = coalesce(stack.clone(), &match_opts).unwrap();
         assert_eq!(result[0].relev, 1., "Contexts inside the proximity radius don't get a cross langauge penalty");
         assert_eq!(result[0].entries[0].grid_entry.relev, 1., "Grids inside the proximity radius don't get a cross language penalty");
         assert_eq!(result[0].entries[0].matches_language, false, "Matches language property is correctly set on CoalesceEntry");
@@ -530,7 +530,8 @@ mod tests {
             zoom: 14,
             ..MatchOpts::default()
         };
-        let result = coalesce(&stack, &match_opts).unwrap();
+        let stack = vec![subquery.clone()];
+        let result = coalesce(stack.clone(), &match_opts).unwrap();
         assert_eq!(result[0].relev, 0.96, "With no proximity, cross language contexts get a penalty");
         assert_eq!(result[0].entries[0].grid_entry.relev, 0.96, "With no proximity, cross language grids get a penalty");
         assert_eq!(result[0].entries[0].matches_language, false, "Matches language property is correctly set on CoalesceEntry");
@@ -566,7 +567,7 @@ mod tests {
         let store1 = GridStore::new(directory1.path()).unwrap();
         let store2 = GridStore::new(directory2.path()).unwrap();
 
-        let stack = [
+        let stack = vec![
             PhrasematchSubquery {
                 store: &store1,
                 weight: 0.5,
@@ -584,13 +585,13 @@ mod tests {
                 mask: 1 << 1,
             },
         ];
-            
+        
         let match_opts = MatchOpts {
             zoom: 14,
             proximity: Some(Proximity { point: [2, 2], radius: 1. }),
             ..MatchOpts::default()
         };
-        let result = coalesce(&stack, &match_opts).unwrap();
+        let result = coalesce(stack.clone(), &match_opts).unwrap();
         assert_eq!(result[0].relev, 1., "Contexts inside the proximity radius don't get a cross langauge penalty");
         assert_eq!(result[0].entries[0].grid_entry.relev, 0.5, "Grids inside the proximity radius don't get a cross language penalty");
         assert_eq!(result[0].entries[0].matches_language, false, "Matches language property is correctly set on CoalesceEntry");
@@ -603,7 +604,7 @@ mod tests {
             zoom: 14,
             ..MatchOpts::default()
         };
-        let result = coalesce(&stack, &match_opts).unwrap();
+        let result = coalesce(stack.clone(), &match_opts).unwrap();
         assert_eq!(result[0].relev, 0.96, "With no proximity, cross language contexts get a penalty");
         assert_eq!(result[0].entries[0].grid_entry.relev, 0.48, "With no proximity, cross language grids get a penalty");
         assert_eq!(result[0].entries[0].matches_language, false, "Matches language property is correctly set on CoalesceEntry");
@@ -635,14 +636,14 @@ mod tests {
             zoom: 6,
             mask: 1 << 0,
         };
-        let stack = [subquery];
+        let stack = vec![subquery];
 
         // Test default opts - no proximity or bbox
         let match_opts = MatchOpts {
             zoom: 6,
             ..MatchOpts::default()
         };
-        let result = coalesce(&stack, &match_opts).unwrap();
+        let result = coalesce(stack.clone(), &match_opts).unwrap();
         assert_eq!(result[0].relev, 1., "No prox no bbox - 1st result has relevance 1");
         assert_eq!(result[0].entries.len(), 1, "No prox no bbox - 1st result has one coalesce entry");
         assert_eq!(result[0].entries[0].matches_language, true, "No prox no bbox - 1st result is a language match");
@@ -698,7 +699,7 @@ mod tests {
             }),
             ..MatchOpts::default()
         };
-        let result = coalesce(&stack, &match_opts).unwrap();
+        let result = coalesce(stack.clone(), &match_opts).unwrap();
         assert_eq!(result[0].entries[0].grid_entry.id, 3, "With proximity - 1st result is the closest, even if its a slightly lower score");
         assert_eq!(result[1].entries[0].grid_entry.id, 1, "With proximity - 2nd result is farther away than 3rd but has a higher relevance");
         assert_eq!(result[2].entries[0].grid_entry.id, 2, "With proximity - 3rd is closer but has a lower relevance");
@@ -769,7 +770,7 @@ mod tests {
             bbox: Some([1,1,1,1]),
             ..MatchOpts::default()
         };
-        let result = coalesce(&stack, &match_opts).unwrap();
+        let result = coalesce(stack.clone(), &match_opts).unwrap();
         assert_eq!(result[0].entries.len(), 1, "With bbox - only one result is within the bbox, so only one result is returned");
         assert_eq!(result[0].entries[0].grid_entry.id, 1, "With bbox - result is the one that's within the bbox");
         assert_eq!(result[0], CoalesceContext {
@@ -802,7 +803,7 @@ mod tests {
                 radius: 40.,
             }),
         };
-        let result = coalesce(&stack, &match_opts).unwrap();
+        let result = coalesce(stack.clone(), &match_opts).unwrap();
         assert_eq!(result[0].entries.len(), 1, "With bbox and prox - only one result is within the bbox, so only one result is returned");
            assert_eq!(result[0], CoalesceContext {
             mask: 1 << 0,
