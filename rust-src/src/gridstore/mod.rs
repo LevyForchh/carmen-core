@@ -927,6 +927,8 @@ mod tests {
                 mask: 1 << 0,
             },
         ];
+
+        // Test coalesce multi with no proximity or bbox
         let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
         let result = coalesce(&stack, &match_opts).unwrap();
         assert_eq!(result[0].relev, 1., "No prox no bbox - 1st result has relevance 1");
@@ -1007,7 +1009,336 @@ mod tests {
                 source_phrase_hash: 0,
             }
         }, "No prox no bbox - 2nd result 2nd entry is the overlapping grid from the lower zoom index");
+
+        // Test coalesce multi with proximity
+        let match_opts = MatchOpts {
+            zoom: 2,
+            proximity: Some(Proximity { point: [3, 3], radius: 40. }),
+            ..MatchOpts::default()
+        };
+        let result = coalesce(&stack, &match_opts).unwrap();
+        assert_eq!(result[0].relev, 1., "With Proximity - 1st result context has relevance 1");
+        assert_eq!(result[0].mask, 3, "With Proximity - 1st result context has correct mask");
+        assert_eq!(
+            result[0].entries.len(),
+            2,
+            "With Proximity - 1st result has 2 coalesce entries"
+        );
+        assert_eq!(
+            result[0].entries[0],
+            CoalesceEntry {
+                matches_language: true,
+                idx: 1,
+                tmp_id: 33554435,
+                mask: 1 << 0,
+                distance: 0.,
+                scoredist: 1.5839497841387566,
+                grid_entry: GridEntry {
+                    id: 3,
+                    x: 3,
+                    y: 3,
+                    relev: 0.5,
+                    score: 1,
+                    source_phrase_hash: 0,
+                }
+            },
+            "With Proximity - 1st result first entry is closest entry in the higher zoom index"
+        );
+        assert_eq!(result[0].entries[1], CoalesceEntry {
+            matches_language: true,
+            idx: 0,
+            tmp_id: 1,
+            mask: 1 << 1,
+            distance: 0.,
+            scoredist: 1.5839497841387566,
+            grid_entry: GridEntry {
+                id: 1,
+                x: 1,
+                y: 1,
+                relev: 0.5,
+                score: 1,
+                source_phrase_hash: 0,
+            }
+        }, "With Proximity - 1st result second entry is the overlapping entry, the distance for the outer entry is 0");
+        assert_eq!(
+            result[1].entries.len(),
+            2,
+            "With Proximity - 2nd result has 2 coalesce entries"
+        );
+        assert_eq!(result[1].entries[0], CoalesceEntry {
+            matches_language: true,
+            idx: 1,
+            tmp_id: 33554434,
+            mask: 1 << 0,
+            distance: 1.4142135623730951,
+            scoredist: 1.109893833332405,
+            grid_entry: GridEntry {
+                id: 2,
+                x: 2,
+                y: 2,
+                relev: 0.5,
+                score: 3,
+                source_phrase_hash: 0,
+            }
+        }, "With Proximity - 2nd result first entry is the farther away entry from the higher zoom index");
+        assert_eq!(result[1].entries[1], CoalesceEntry {
+            matches_language: true,
+            idx: 0,
+            tmp_id: 1,
+            mask: 1 << 1,
+            distance: 0.,
+            scoredist: 1.5839497841387566,
+            grid_entry: GridEntry {
+                id: 1,
+                x: 1,
+                y: 1,
+                relev: 0.5,
+                score: 1,
+                source_phrase_hash: 0,
+            }
+        }, "With Proximity - 2nd result second entry is the overlapping entry, the distance for the outer entry is 0");
     }
+
+    #[test]
+    fn coalesce_multi_languages_test() {
+        let directory1: tempfile::TempDir = tempfile::tempdir().unwrap();
+        let directory2: tempfile::TempDir = tempfile::tempdir().unwrap();
+        let mut builder1 = GridStoreBuilder::new(directory1.path()).unwrap();
+        let mut builder2 = GridStoreBuilder::new(directory2.path()).unwrap();
+
+        // Add more specific layer into a store
+        // TODO: is this how to do this?
+        let grid_key = GridKey { phrase_id: 1, lang_set: u128::max_value() };
+        let entries =
+            vec![GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 1, source_phrase_hash: 0 }];
+        builder1.insert(&grid_key, &entries).expect("Unable to insert record");
+        builder1.finish().unwrap();
+
+        // Add less specific layer into a store
+        // Start with the entry with lang_set 0
+        // TODO: does lang_set 0 mean the same thing as 0 in carmen-cache?
+        let grid_key = GridKey { phrase_id: 2, lang_set: langarray_to_langfield(&[1]) };
+        let entries =
+            vec![GridEntry { id: 2, x: 1, y: 1, relev: 1., score: 1, source_phrase_hash: 0 }];
+        builder2.insert(&grid_key, &entries).expect("Unable to insert record");
+
+        // Insert entry with lang_set 1
+        let grid_key = GridKey { phrase_id: 2, lang_set: langarray_to_langfield(&[0]) };
+        let entries =
+            vec![GridEntry { id: 3, x: 1, y: 1, relev: 1., score: 1, source_phrase_hash: 0 }];
+        builder2.insert(&grid_key, &entries).expect("Unable to insert record");
+        builder2.finish().unwrap();
+
+        let store1 = GridStore::new(directory1.path()).unwrap();
+        let store2 = GridStore::new(directory2.path()).unwrap();
+        // Test ALL LANGUAGES
+        let stack = [
+            PhrasematchSubquery {
+                store: &store1,
+                weight: 0.5,
+                match_key: MatchKey {
+                    match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                    lang_set: u128::max_value(),
+                },
+                idx: 0,
+                zoom: 1,
+                mask: 1 << 1,
+            },
+            PhrasematchSubquery {
+                store: &store2,
+                weight: 0.5,
+                match_key: MatchKey {
+                    match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                    lang_set: u128::max_value(),
+                },
+                idx: 1,
+                // TODO: when would these have the same zoom?
+                zoom: 1,
+                mask: 1 << 0,
+            },
+        ];
+        let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
+        let result = coalesce(&stack, &match_opts).unwrap();
+        assert_eq!(result.len(), 2, "All languages - Two results are returned");
+        assert_eq!(result[0].entries.len(), 2, "All languages - First context has two entries");
+        assert_eq!(result[0].relev, 1., "All languages - First context has relevance of 1");
+        assert_eq!(result[0].entries[0].grid_entry.id, 2, "All languages - 1st entry in first result has lowest grid id, which is the tiebreaker for sorting");
+        assert_eq!(result[0].entries[0].grid_entry.relev, 0.5, "All languages - 1st entry in first result has original relevance");
+        assert_eq!(result[0].entries[0].matches_language, true, "All languages - 1st entry in first result matches language");
+        assert_eq!(result[0].entries[1].grid_entry.id, 1, "All languages - 2nd entry in first result is the overapping grid");
+        assert_eq!(result[0].entries[1].grid_entry.relev, 0.5, "All languages - 2nd entry in first result has original relevance");
+        assert_eq!(result[0].entries[1].matches_language, true, "All languages - 2nd entry in first result matches language");
+        assert_eq!(result[1].entries.len(), 2, "All languages - Second context has two entries");
+        assert_eq!(result[1].relev, 1., "All languages - Second context has relevance of 1");
+        assert_eq!(result[1].entries[0].grid_entry.id, 3, "All languages - 1st entry in second result is the higher grid id");
+        assert_eq!(result[1].entries[0].grid_entry.relev, 0.5, "All languages - 1st entry in second result has original relevance");
+        assert_eq!(result[1].entries[0].matches_language, true, "All languages - 1st entry in second result matches language");
+        assert_eq!(result[1].entries[1].grid_entry.id, 1, "All languages - 2nd entry in second result is the overlapping grid");
+        assert_eq!(result[1].entries[1].grid_entry.relev, 0.5, "All languages - 2nd entry in second result has original relevance");
+        assert_eq!(result[1].entries[1].matches_language, true, "All languages - 2nd entry in second result matches language");
+
+
+        // Test language 0
+        let stack = [
+            PhrasematchSubquery {
+                store: &store1,
+                weight: 0.5,
+                match_key: MatchKey {
+                    match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                    lang_set: u128::max_value(),
+                },
+                idx: 0,
+                zoom: 1,
+                mask: 1 << 1,
+            },
+            PhrasematchSubquery {
+                store: &store2,
+                weight: 0.5,
+                match_key: MatchKey {
+                    match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                    lang_set: langarray_to_langfield(&[0]),
+                },
+                idx: 1,
+                // TODO: when would these have the same zoom?
+                zoom: 1,
+                mask: 1 << 0,
+            },
+        ];
+        let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
+        let result = coalesce(&stack, &match_opts).unwrap();
+        assert_eq!(result.len(), 2, "Language 0 - Two results are returned");
+        assert_eq!(result[0].entries.len(), 2, "Language 0 - First context has two entries");
+        assert_eq!(result[0].relev, 1., "Language 0 - First context has relevance of 1");
+        assert_eq!(result[0].entries[0].grid_entry.id, 3, "Language 0 - 1st entry in first result is the id of the better language match");
+        assert_eq!(result[0].entries[0].grid_entry.relev, 0.5, "Language 0 - 1st entry in first result has original relevance");
+        assert_eq!(result[0].entries[0].matches_language, true, "Language 0 - 1st entry in first result matches language");
+        assert_eq!(result[0].entries[1].grid_entry.id, 1, "Language 0 - 2nd entry in first result is the overapping grid");
+        assert_eq!(result[0].entries[1].grid_entry.relev, 0.5, "Language 0 - 2nd entry in first result has original relevance because the grid has all languages");
+        assert_eq!(result[0].entries[1].matches_language, true, "Language 0 - 2nd entry in first result matches language");
+        assert_eq!(result[1].entries.len(), 2, "Language 0 - Second context has two entries");
+        assert_eq!(result[1].relev, 0.98, "Language 0 - Second context has lower overall relevance due to language penalty");
+        assert_eq!(result[1].entries[0].grid_entry.id, 2, "Language 0 - 1st entry in second result has the id of the worse language match");
+        assert_eq!(result[1].entries[0].grid_entry.relev, 0.48, "Language 0 - 1st entry in second result has lower relevance due to language penalty");
+        assert_eq!(result[1].entries[0].matches_language, false, "Language 0 - 1st entry in second result does not match language");
+        assert_eq!(result[1].entries[1].grid_entry.id, 1, "Language 0 - 2nd entry in second result is the overlapping grid");
+        assert_eq!(result[1].entries[1].grid_entry.relev, 0.5, "Language 0 - 2nd entry in second result has original relevance because the grid has all languages");
+        assert_eq!(result[1].entries[1].matches_language, true, "Language 0 - 2nd entry in second result matches language");
+
+        // Test language 3
+        let stack = [
+            PhrasematchSubquery {
+                store: &store1,
+                weight: 0.5,
+                match_key: MatchKey {
+                    match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                    lang_set: u128::max_value(),
+                },
+                idx: 0,
+                zoom: 1,
+                mask: 1 << 1,
+            },
+            PhrasematchSubquery {
+                store: &store2,
+                weight: 0.5,
+                match_key: MatchKey {
+                    match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                    lang_set: langarray_to_langfield(&[3]),
+                },
+                idx: 1,
+                // TODO: when would these have the same zoom?
+                zoom: 1,
+                mask: 1 << 0,
+            },
+        ];
+        let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
+        let result = coalesce(&stack, &match_opts).unwrap();
+        assert_eq!(result.len(), 2, "Language 3 - Two results are returned");
+        assert_eq!(result[0].entries.len(), 2, "Language 3 - First context has two entries");
+        assert_eq!(result[0].relev, 0.98, "Language 3 - First context has lower overall relevance due to language penalty");
+        assert_eq!(result[0].entries[0].grid_entry.id, 2, "Language 3 - 1st entry in first result has lowest grid id, which is the tiebreaker for sorting");
+        assert_eq!(result[0].entries[0].grid_entry.relev, 0.48, "Language 3 - 1st entry in first result has lower relevance due to language penalty");
+        assert_eq!(result[0].entries[0].matches_language, false, "Language 3 - 1st entry in first result does not match language");
+        assert_eq!(result[0].entries[1].grid_entry.id, 1, "Language 3 - 2nd entry in first result is the overapping grid");
+        assert_eq!(result[0].entries[1].grid_entry.relev, 0.5, "Language 3 - 2nd entry in first result has original relevance because the grid has all languages");
+        assert_eq!(result[0].entries[1].matches_language, true, "Language 3 - 2nd entry in first result matches language");
+        assert_eq!(result[1].entries.len(), 2, "Language 3 - Second context has two entries");
+        assert_eq!(result[1].relev, 0.98, "Language 3 - Second context has lower overall relevance due to language penalty");
+        assert_eq!(result[1].entries[0].grid_entry.id, 3, "Language 3 - 1st entry in second result has the id of the other grid");
+        assert_eq!(result[1].entries[0].grid_entry.relev, 0.48, "Language 3 - 1st entry in second result has lower relevance due to language penalty");
+        assert_eq!(result[1].entries[0].matches_language, false, "Language 3 - 1st entry in second result does not match language");
+        assert_eq!(result[1].entries[1].grid_entry.id, 1, "Language 3 - 2nd entry in second result is the overlapping grid");
+        assert_eq!(result[1].entries[1].grid_entry.relev, 0.5, "Language 3 - 2nd entry in second result has original relevance because the grid has all languages");
+        assert_eq!(result[1].entries[1].matches_language, true, "Language 3 - 2nd entry in second result matches language");
+    }
+
+    #[test]
+    fn coalesce_multi_scoredist() {
+        // Set up 2 GridStores
+        let directory1: tempfile::TempDir = tempfile::tempdir().unwrap();
+        let directory2: tempfile::TempDir = tempfile::tempdir().unwrap();
+        let mut builder1 = GridStoreBuilder::new(directory1.path()).unwrap();
+        let mut builder2 = GridStoreBuilder::new(directory2.path()).unwrap();
+
+        // Add more specific layer into a store
+        let mut grid_key = GridKey { phrase_id: 1, lang_set: 0 };
+        let mut entries = vec![
+               GridEntry { id: 1, x: 0, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },
+        ];
+        builder1.insert(&grid_key, &entries).expect("Unable to insert record");
+        builder1.finish().unwrap();
+
+        // Add less specific layer into a store
+        grid_key = GridKey { phrase_id: 2, lang_set: 0 };
+        entries = vec![
+            GridEntry { id: 2, x: 4800, y: 6200, relev: 1., score: 7, source_phrase_hash: 0 },
+            GridEntry { id: 3, x: 4600, y: 6200, relev: 1., score: 1, source_phrase_hash: 0 },
+        ];
+        builder2.insert(&grid_key, &entries).expect("Unable to insert record");
+        builder2.finish().unwrap();
+
+        let store1 = GridStore::new(directory1.path()).unwrap();
+        let store2 = GridStore::new(directory2.path()).unwrap();
+
+        let stack = [
+            PhrasematchSubquery {
+                store: &store1,
+                weight: 0.5,
+                match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 0 },
+                idx: 0,
+                zoom: 0,
+                mask: 1 << 1,
+            },
+            PhrasematchSubquery {
+                store: &store2,
+                weight: 0.5,
+                match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 0 },
+                idx: 1,
+                zoom: 14,
+                mask: 1 << 0,
+            },
+        ];
+        // Closer proximity to one grid
+        let match_opts = MatchOpts {
+            zoom: 14,
+            proximity: Some(Proximity { point: [4601,6200], radius: 40. }),
+            ..MatchOpts::default()
+        };
+        let result = coalesce(&stack, &match_opts).unwrap();
+        assert_eq!(result[0].entries[0].grid_entry.id, 3, "Close proximity - Closer feature is first");
+        assert_eq!(result[1].entries[0].grid_entry.id, 2, "Close proximity - Farther feature is second");
+        assert_eq!(result[0].entries[0].distance < result[1].entries[0].distance, true, "First grid in first context is closer than first grid in second context");
+        // Proximity is still close to same grid, but less close
+        let match_opts = MatchOpts {
+            zoom: 14,
+            proximity: Some(Proximity { point: [4610,6200], radius: 40. }),
+            ..MatchOpts::default()
+        };
+        let result = coalesce(&stack, &match_opts).unwrap();
+        assert_eq!(result[0].entries[0].grid_entry.id, 3, "Less close proximity - Farther feature with higher score is first");
+        assert_eq!(result[1].entries[0].grid_entry.id, 2, "Less close proximity - Closer feature with lower score is second");
+        assert_eq!(result[0].entries[0].distance > result[1].entries[0].distance, false, "First grid in first context is not closer than first grid in second context");
+    }
+
     // TODO: test with more than one result within bbox, to make sure results are still ordered by proximity?
     // TODO: language tests
 }
