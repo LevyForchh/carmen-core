@@ -1,6 +1,7 @@
 use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
+use std::borrow::Borrow;
 
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
@@ -10,7 +11,7 @@ use crate::gridstore::store::GridStore;
 
 /// Takes a vector of phrasematch subqueries (stack) and match options, gets matching grids, sorts the grids,
 /// and returns a result of a sorted vector of contexts (lists of grids with added metadata)
-pub fn coalesce<T: AsRef<GridStore> + Clone>(
+pub fn coalesce<T: Borrow<GridStore> + Clone>(
     stack: Vec<PhrasematchSubquery<T>>,
     match_opts: &MatchOpts,
 ) -> Result<Vec<CoalesceContext>, Box<Error>> {
@@ -41,7 +42,7 @@ pub fn coalesce<T: AsRef<GridStore> + Clone>(
     Ok(out)
 }
 
-fn grid_to_coalesce_entry<T: AsRef<GridStore> + Clone>(
+fn grid_to_coalesce_entry<T: Borrow<GridStore> + Clone>(
     grid: &MatchEntry,
     subquery: &PhrasematchSubquery<T>,
     match_opts: &MatchOpts,
@@ -83,11 +84,11 @@ fn grid_to_coalesce_entry<T: AsRef<GridStore> + Clone>(
     }
 }
 
-fn coalesce_single<T: AsRef<GridStore> + Clone>(
+fn coalesce_single<T: Borrow<GridStore> + Clone>(
     subquery: &PhrasematchSubquery<T>,
     match_opts: &MatchOpts,
 ) -> Result<Vec<CoalesceContext>, Box<Error>> {
-    let grids = subquery.store.as_ref().get_matching(&subquery.match_key, match_opts)?;
+    let grids = subquery.store.borrow().get_matching(&subquery.match_key, match_opts)?;
     let mut contexts: Vec<CoalesceContext> = Vec::new();
     let mut max_relev: f32 = 0.;
     // TODO: rename all of the last things to previous things
@@ -159,7 +160,7 @@ fn coalesce_single<T: AsRef<GridStore> + Clone>(
     Ok(contexts)
 }
 
-fn coalesce_multi<T: AsRef<GridStore> + Clone>(
+fn coalesce_multi<T: Borrow<GridStore> + Clone>(
     mut stack: Vec<PhrasematchSubquery<T>>,
     match_opts: &MatchOpts,
 ) -> Result<Vec<CoalesceContext>, Box<Error>> {
@@ -185,7 +186,7 @@ fn coalesce_multi<T: AsRef<GridStore> + Clone>(
         // TODO: check if zooms are equivalent here, and only call adjust_to_zoom if they arent?
         // That way we could avoid a function call and creating a cloned object in the common case where the zooms are the same
         let adjusted_match_opts = match_opts.adjust_to_zoom(subquery.zoom);
-        let grids = subquery.store.as_ref().get_matching(&subquery.match_key, &adjusted_match_opts)?;
+        let grids = subquery.store.borrow().get_matching(&subquery.match_key, &adjusted_match_opts)?;
 
         // TODO: limit how many grids we consume
         for grid in grids {

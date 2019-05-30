@@ -419,7 +419,7 @@ mod tests {
             zoom: 14,
             mask: 1 << 0,
         };
-        let stack = vec![&subquery];
+        let stack = vec![subquery];
         let match_opts = MatchOpts {
             zoom: 14,
             proximity: Some(Proximity { point: [110, 115], radius: 200. }),

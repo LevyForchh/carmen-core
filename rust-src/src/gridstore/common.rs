@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::borrow::Borrow;
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use serde::{Deserialize, Serialize};
@@ -343,7 +344,7 @@ pub struct CoalesceContext {
 }
 
 #[derive(Debug, Clone)]
-pub struct PhrasematchSubquery<T: AsRef<GridStore> + Clone> {
+pub struct PhrasematchSubquery<T: Borrow<GridStore> + Clone> {
     pub store: T,
     pub weight: f32,
     pub match_key: MatchKey,
