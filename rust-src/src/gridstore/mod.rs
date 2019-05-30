@@ -471,7 +471,7 @@ mod tests {
             zoom: 14,
             mask: 1 << 0,
         };
-        let stack = vec![subquery];
+        let stack = vec![subquery.clone()];
         let match_opts = MatchOpts {
             zoom: 14,
             proximity: Some(Proximity { point: [2, 2], radius: 400. }),
@@ -482,7 +482,7 @@ mod tests {
             result.iter().map(|context| context.entries[0].grid_entry.id).collect();
         assert_eq!(result_ids, [1, 2, 4, 3], "Results with the same relev and score should be ordered by distance");
 
-        let result_distances: Vec<f64> = 
+        let result_distances: Vec<f64> =
             result.iter().map(|context| round(context.entries[0].distance, 2)).collect();
         assert_eq!(result_distances, [0.00, 2.00, 2.00, 2.83], "Results with the same relev and score should be ordered by distance");
     }
@@ -585,7 +585,7 @@ mod tests {
                 mask: 1 << 1,
             },
         ];
-        
+
         let match_opts = MatchOpts {
             zoom: 14,
             proximity: Some(Proximity { point: [2, 2], radius: 1. }),
@@ -793,7 +793,7 @@ mod tests {
                 }
             }],
         }, "With bbox - result has expected properties");
-    
+
         // Test with bbox and proximity
         let match_opts = MatchOpts {
             zoom: 6,
