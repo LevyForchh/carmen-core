@@ -1355,6 +1355,95 @@ mod tests {
 
     // TODO: test with more than one result within bbox, to make sure results are still ordered by proximity?
     // TODO: language tests
+       #[test]
+    fn coalesce_multi_test_bbox() {
+        let store1 = create_store(vec![StoreEntryBuildingBlock {
+            grid_key: GridKey { phrase_id: 1, lang_set: u128::max_value() },
+            entries: vec![
+                GridEntry { id: 1, x: 0, y: 0, relev: 0.8, score: 1, source_phrase_hash: 0 },
+                GridEntry { id: 2, x: 1, y: 1, relev: 1., score: 1, source_phrase_hash: 0 },
+            ],
+        }]);
+        let store2 = create_store(vec![StoreEntryBuildingBlock {
+            grid_key: GridKey { phrase_id: 2, lang_set: u128::max_value() },
+            entries: vec![
+                GridEntry { id: 3, x: 3, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },
+                GridEntry { id: 4, x: 0, y: 3, relev: 1., score: 1, source_phrase_hash: 0 },
+            ],
+        }]);
+
+        let store3 = create_store(vec![StoreEntryBuildingBlock {
+            grid_key: GridKey { phrase_id: 3, lang_set: u128::max_value() },
+            entries: vec![
+                GridEntry { id: 5, x: 21, y: 7, relev: 1., score: 1, source_phrase_hash: 0 },
+                GridEntry { id: 6, x: 21, y: 18, relev: 1., score: 1, source_phrase_hash: 0 },
+            ],
+        }]);
+
+        let stack = vec![
+            PhrasematchSubquery {
+                store: &store1,
+                weight: 0.5,
+                match_key: MatchKey {
+                    match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                    lang_set: u128::max_value(),
+                },
+                idx: 0,
+                zoom: 1,
+                mask: 1 << 1,
+            },
+            PhrasematchSubquery {
+                store: &store2,
+                weight: 0.5,
+                match_key: MatchKey {
+                    match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                    lang_set: u128::max_value(),
+                },
+                idx: 1,
+                zoom: 2,
+                mask: 1 << 0,
+            },
+        ];
+        // Test bbox at zoom 1 that should contain 2 grids
+        let match_opts = MatchOpts { zoom: 1, bbox: Some([0, 0, 1, 0]), ..MatchOpts::default() };
+        let result = coalesce(stack.clone(), &match_opts).unwrap();
+        assert_eq!(result.len(), 2, "Bbox [1, 0, 0, 1, 0] - 2 results are within the bbox");
+        assert_eq!(
+            (result[0].entries[0].grid_entry.x, result[0].entries[0].grid_entry.y), (3,0),
+            "Bbox [1, 0, 0, 1, 0] - 1st result is zxy 2/3/0, and the higher relevance feature within the bbox"
+         );
+         assert_eq!(
+             (result[1].entries[0].grid_entry.x, result[1].entries[0].grid_entry.y), (0,0),
+             "Bbox [1, 0, 0, 1, 0] - 2nd result is zxy 1/0/0"
+        );
+        // Test bbox at zoom 2 that should contain 2 grids
+        let match_opts = MatchOpts { zoom: 2, bbox: Some([0, 0, 1, 3]), ..MatchOpts::default() };
+        let result = coalesce(stack.clone(), &match_opts).unwrap();
+        println!("result: {:?}", result);
+        assert_eq!(result.len(), 2, "Bbox [2, 0, 0, 1, 3] - 2 results are within the bbox");
+        assert_eq!(
+            (result[0].entries[0].grid_entry.x, result[0].entries[0].grid_entry.y), (0,3),
+            "Bbox [2, 0, 0, 1, 3] - 1st result is zxy 2/0/3"
+         );
+         assert_eq!(
+             (result[1].entries[0].grid_entry.x, result[1].entries[0].grid_entry.y), (0,0),
+             "Bbox [2, 0, 0, 1, 3] - 2nd result is zxy 1/0/0"
+        );
+
+        // Test bbox at zoom 6 that should contain 2 grids
+        let match_opts = MatchOpts { zoom: 6, bbox: Some([14, 30, 15, 64]), ..MatchOpts::default() };
+        let result = coalesce(stack.clone(), &match_opts).unwrap();
+        assert_eq!(result.len(), 2, "Bbox [6, 14, 30, 15, 64] - 2 results are within the bbox");
+        assert_eq!(
+            (result[0].entries[0].grid_entry.x, result[0].entries[0].grid_entry.y), (0,3),
+            "Bbox [6, 14, 30, 15, 64] - 1st result is zxy 2/0/3"
+         );
+         assert_eq!(
+             (result[1].entries[0].grid_entry.x, result[1].entries[0].grid_entry.y), (0,0),
+             "Bbox [6, 14, 30, 15, 64] - 2nd result is zxy 1/0/0"
+        );
+
+    }
 }
 
 // TODO: add proximity test with max score
