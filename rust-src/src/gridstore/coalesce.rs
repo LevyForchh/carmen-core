@@ -1,7 +1,7 @@
+use std::borrow::Borrow;
 use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
-use std::borrow::Borrow;
 
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
@@ -186,7 +186,8 @@ fn coalesce_multi<T: Borrow<GridStore> + Clone>(
         // TODO: check if zooms are equivalent here, and only call adjust_to_zoom if they arent?
         // That way we could avoid a function call and creating a cloned object in the common case where the zooms are the same
         let adjusted_match_opts = match_opts.adjust_to_zoom(subquery.zoom);
-        let grids = subquery.store.borrow().get_matching(&subquery.match_key, &adjusted_match_opts)?;
+        let grids =
+            subquery.store.borrow().get_matching(&subquery.match_key, &adjusted_match_opts)?;
 
         // TODO: limit how many grids we consume
         for grid in grids {

@@ -1,5 +1,5 @@
-use std::error::Error;
 use std::borrow::Borrow;
+use std::error::Error;
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use serde::{Deserialize, Serialize};
