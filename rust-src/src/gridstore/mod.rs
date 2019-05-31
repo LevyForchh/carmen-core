@@ -14,40 +14,6 @@ pub use store::*;
 mod tests {
     use super::*;
 
-    fn round(value: f64, digits: i32) -> f64 {
-        let multiplier = 10.0_f64.powi(digits);
-        (value * multiplier).round() / multiplier
-    }
-
-    fn langarray_to_langfield(array: &[u32]) -> u128 {
-        let mut out = 0u128;
-        for lang in array {
-            out = out | (1 << *lang as usize);
-        }
-        out
-    }
-
-    /// Mapping of GridKey to all of the grid entries to insert into a store for that GridKey
-    struct StoreEntryBuildingBlock {
-        grid_key: GridKey,
-        entries: Vec<GridEntry>,
-    }
-
-    /// Utility to create stores
-    /// Takes an vector, with each item mapping to a store to create
-    /// Each item is a vector with maps of grid keys to the entries to insert into the store for that grid key
-    fn create_store(store_entries: Vec<StoreEntryBuildingBlock>) -> GridStore {
-        let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
-        let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
-        for building_block in store_entries {
-            builder
-                .insert(&building_block.grid_key, &building_block.entries)
-                .expect("Unable to insert record");
-        }
-        builder.finish().unwrap();
-        GridStore::new(directory.path()).unwrap()
-    }
-
     #[test]
     fn combined_test() {
         let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
