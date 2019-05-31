@@ -147,6 +147,7 @@ fn coalesce_single(
         (
             Reverse(OrderedFloat(context.relev)),
             Reverse(OrderedFloat(context.entries[0].scoredist)),
+            // TODO: should id be the final tiebreaker, and have x and y before for a more obvious sort order?
             context.entries[0].grid_entry.id,
             context.entries[0].grid_entry.x,
             context.entries[0].grid_entry.y,
@@ -196,6 +197,8 @@ fn coalesce_multi(
             let mut context_relev = coalesce_entry.grid_entry.relev;
             let mut entries: Vec<CoalesceEntry> = vec![coalesce_entry];
 
+            // See which other zooms are compatible.
+            // These should all be lower zooms, so "zoom out" by dividing by 2^(difference in zooms)
             for other_zoom in compatible_zooms.iter() {
                 let scale_factor: u16 = 1 << (subquery.zoom - other_zoom);
                 let other_zxy = (
@@ -216,7 +219,7 @@ fn coalesce_multi(
                             {
                                 entries.pop();
                                 entries.push(parent_entry.clone());
-
+                                // Update the context-level aggregate relev
                                 context_relev -= prev_relev;
                                 context_relev += parent_entry.grid_entry.relev;
 

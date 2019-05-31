@@ -36,17 +36,17 @@ fn create_store(store_entries: Vec<StoreEntryBuildingBlock>) -> GridStore {
 }
 
 #[test]
-fn coalesce_single_test_ns_bias() {
+fn coalesce_single_test_proximity_quadrants() {
     let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
     let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
 
     let key = GridKey { phrase_id: 1, lang_set: 1 };
 
     let entries = vec![
-        GridEntry { id: 1, x: 200, y: 200, relev: 1., score: 1, source_phrase_hash: 0 },
-        GridEntry { id: 2, x: 200, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },
-        GridEntry { id: 3, x: 0, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },
-        GridEntry { id: 4, x: 0, y: 200, relev: 1., score: 1, source_phrase_hash: 0 },
+        GridEntry { id: 1, x: 200, y: 200, relev: 1., score: 1, source_phrase_hash: 0 }, // ne
+        GridEntry { id: 2, x: 200, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },   // se
+        GridEntry { id: 3, x: 0, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },     // sw
+        GridEntry { id: 4, x: 0, y: 200, relev: 1., score: 1, source_phrase_hash: 0 },   // nw
     ];
     builder.insert(&key, &entries).expect("Unable to insert record");
 
@@ -62,24 +62,62 @@ fn coalesce_single_test_ns_bias() {
         mask: 1 << 0,
     };
     let stack = vec![subquery];
+
+    println!("Coalesce single - NE proximity");
     let match_opts = MatchOpts {
         zoom: 14,
-        proximity: Some(Proximity { point: [110, 115], radius: 200. }),
+        proximity: Some(Proximity { point: [110, 115], radius: 200. }), // NE proximity point
         ..MatchOpts::default()
     };
     let result = coalesce(stack.clone(), &match_opts).unwrap();
     let result_ids: Vec<u32> =
         result.iter().map(|context| context.entries[0].grid_entry.id).collect();
-    // TODO: is this description correct? Is this even what it's testing?
-    assert_eq!(
-        result_ids,
-        [1, 4, 2, 3],
-        "Results should favor N/S proximity over E/W proximity for consistency"
-    );
     let result_distances: Vec<f64> =
         result.iter().map(|context| round(context.entries[0].distance, 0)).collect();
+    assert_eq!(result_ids, [1, 4, 2, 3], "Results are in the order ne, nw, se, sw");
     assert_eq!(result_distances, [124.0, 139.0, 146.0, 159.0], "Result distances are correct");
-    // TODO: figure out what these tests are trying to test in carmen-cache, and port the rest
+
+    println!("Coalesce single - SE proximity");
+    let match_opts = MatchOpts {
+        zoom: 14,
+        proximity: Some(Proximity { point: [110, 85], radius: 200. }), // SE proximity point
+        ..MatchOpts::default()
+    };
+    let result = coalesce(stack.clone(), &match_opts).unwrap();
+    let result_ids: Vec<u32> =
+        result.iter().map(|context| context.entries[0].grid_entry.id).collect();
+    let result_distances: Vec<f64> =
+        result.iter().map(|context| round(context.entries[0].distance, 0)).collect();
+    assert_eq!(result_ids, [2, 3, 1, 4], "Results are in the order se, sw, ne, nw");
+    assert_eq!(result_distances, [124.0, 139.0, 146.0, 159.0], "Result distances are correct");
+
+    println!("Coalesce single - SW proximity");
+    let match_opts = MatchOpts {
+        zoom: 14,
+        proximity: Some(Proximity { point: [90, 85], radius: 200. }), // SW proximity point
+        ..MatchOpts::default()
+    };
+    let result = coalesce(stack.clone(), &match_opts).unwrap();
+    let result_ids: Vec<u32> =
+        result.iter().map(|context| context.entries[0].grid_entry.id).collect();
+    let result_distances: Vec<f64> =
+        result.iter().map(|context| round(context.entries[0].distance, 0)).collect();
+    assert_eq!(result_ids, [3, 2, 4, 1], "Results are in the order sw, se, nw, ne");
+    assert_eq!(result_distances, [124.0, 139.0, 146.0, 159.0], "Result distances are correct");
+
+    println!("Coalesce single - NW proximity");
+    let match_opts = MatchOpts {
+        zoom: 14,
+        proximity: Some(Proximity { point: [90, 115], radius: 200. }), // NW proximity point
+        ..MatchOpts::default()
+    };
+    let result = coalesce(stack.clone(), &match_opts).unwrap();
+    let result_ids: Vec<u32> =
+        result.iter().map(|context| context.entries[0].grid_entry.id).collect();
+    let result_distances: Vec<f64> =
+        result.iter().map(|context| round(context.entries[0].distance, 0)).collect();
+    assert_eq!(result_ids, [4, 1, 3, 2], "Results are in the order nw, ne, sw, se");
+    assert_eq!(result_distances, [124.0, 139.0, 146.0, 159.0], "Result distances are correct");
 }
 
 #[test]
