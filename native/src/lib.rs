@@ -8,7 +8,6 @@ use neon::prelude::*;
 use neon::{class_definition, declare_types, impl_managed, register_module};
 use neon_serde::errors::Result as LibResult;
 use std::sync::Arc;
-use failure::Error;
 
 type ArcGridStore = Arc<GridStore>;
 
@@ -78,15 +77,15 @@ declare_types! {
             // lock falls out of scope at the end of this block
             // in order to be able to borrow `cx` for the error block we assign it to a variable
 
-            let insert: Result<Result<(), Error>, &str> = {
+            let insert: Result<(), String> = {
                 let lock = cx.lock();
                 let mut gridstore = this.borrow_mut(&lock);
                 match gridstore.as_mut() {
                     Some(builder) => {
-                        Ok(builder.insert(&key, &values))
+                        builder.insert(&key, &values).map_err(|e| e.to_string())
                     }
                     None => {
-                        Err("unable to insert()")
+                        Err("unable to insert()".to_string())
                     }
                 }
             };
@@ -100,15 +99,15 @@ declare_types! {
         method finish(mut cx) {
             let mut this = cx.this();
 
-            let finish: Result<Result<(), Error>, &str> = {
+            let finish: Result<(), String> = {
                 let lock = cx.lock();
                 let mut gridstore = this.borrow_mut(&lock);
                 match gridstore.take() {
                     Some(builder) => {
-                        Ok(builder.finish())
+                        builder.finish().map_err(|e| e.to_string())
                     }
                     None => {
-                        Err("unable to finish()")
+                        Err("unable to finish()".to_string())
                     }
                 }
             };
@@ -197,8 +196,8 @@ where
 }
 
 register_module!(mut m, {
-    m.export_class::<JsGridStoreBuilder>("JsGridStoreBuilder")?;
-    m.export_class::<JsGridStore>("JsGridStore")?;
+    m.export_class::<JsGridStoreBuilder>("GridStoreBuilder")?;
+    m.export_class::<JsGridStore>("GridStore")?;
     m.export_function("coalesce", js_coalesce)?;
     Ok(())
 });
