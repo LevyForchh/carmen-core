@@ -96,6 +96,39 @@ declare_types! {
             }
         }
 
+        method renumber(mut cx) {
+            let js_id_map = cx.argument::<JsArrayBuffer>(0)?;
+            let mut this = cx.this();
+
+            let result: Result<(), String> = {
+                let lock = cx.lock();
+
+                let borrow_result = match js_id_map.try_borrow(&lock) {
+                    Ok(data) => {
+                        let slice = data.as_slice::<u32>();
+
+                        let mut gridstore = this.borrow_mut(&lock);
+                        match gridstore.as_mut() {
+                            Some(builder) => {
+                                builder.renumber(slice).map_err(|e| e.to_string())
+                            }
+                            None => {
+                                Err("can't call renumber after finish()".to_owned())
+                            }
+                        }
+                    },
+                    Err(e) => Err(e.to_string())
+                };
+
+                borrow_result
+            };
+
+            match result {
+                Ok(_) => Ok(JsUndefined::new().upcast()),
+                Err(e) => cx.throw_type_error(e)
+            }
+        }
+
         method finish(mut cx) {
             let mut this = cx.this();
 
