@@ -19,7 +19,7 @@
     "nyc": "^14.0.0"
   },
   "scripts": {
-    "install": "neon build",
+    "install": "neon build --release",
     "test": "node -e \"require('.')\"",
     "coverage": "nyc node -e \"require('.')\" && nyc report --reporter=text-lcov > coverage.lcov && codecov"
   }
