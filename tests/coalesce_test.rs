@@ -35,7 +35,6 @@ fn create_store(store_entries: Vec<StoreEntryBuildingBlock>) -> GridStore {
     GridStore::new(directory.path()).unwrap()
 }
 
-
 #[test]
 fn coalesce_single_test_ns_bias() {
     let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
@@ -57,10 +56,7 @@ fn coalesce_single_test_ns_bias() {
     let subquery = PhrasematchSubquery {
         store: &store,
         weight: 1.,
-        match_key: MatchKey {
-            match_phrase: MatchPhrase::Range { start: 1, end: 3 },
-            lang_set: 1,
-        },
+        match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 },
         idx: 1,
         zoom: 14,
         mask: 1 << 0,
@@ -75,16 +71,18 @@ fn coalesce_single_test_ns_bias() {
     let result_ids: Vec<u32> =
         result.iter().map(|context| context.entries[0].grid_entry.id).collect();
     // TODO: is this description correct? Is this even what it's testing?
-    assert_eq!(result_ids, [1, 4, 2, 3], "Results should favor N/S proximity over E/W proximity for consistency");
-    let result_distances: Vec<f64> = result.iter()
-        .map(|context| round(context.entries[0].distance, 0))
-        .collect();
+    assert_eq!(
+        result_ids,
+        [1, 4, 2, 3],
+        "Results should favor N/S proximity over E/W proximity for consistency"
+    );
+    let result_distances: Vec<f64> =
+        result.iter().map(|context| round(context.entries[0].distance, 0)).collect();
     assert_eq!(result_distances, [124.0, 139.0, 146.0, 159.0], "Result distances are correct");
     // TODO: figure out what these tests are trying to test in carmen-cache, and port the rest
 }
 
 #[test]
-#[cfg_attr(rustfmt, rustfmt::skip)]
 fn coalesce_single_test_proximity_basic() {
     let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
     let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
@@ -120,14 +118,16 @@ fn coalesce_single_test_proximity_basic() {
     let result_ids: Vec<u32> =
         result.iter().map(|context| context.entries[0].grid_entry.id).collect();
     assert_eq!(
-        result_ids, [1, 2, 4, 3],
+        result_ids,
+        [1, 2, 4, 3],
         "Results with the same relev and score should be ordered by distance"
     );
 
-    let result_distances: Vec<f64> = 
+    let result_distances: Vec<f64> =
         result.iter().map(|context| round(context.entries[0].distance, 2)).collect();
     assert_eq!(
-        result_distances,[0.00, 2.00, 2.00, 2.83],
+        result_distances,
+        [0.00, 2.00, 2.00, 2.83],
         "Results with the same relev and score should be ordered by distance"
     );
 }
@@ -173,10 +173,7 @@ fn coalesce_single_test_language_penalty() {
         assert_eq!(result[1].entries[0].grid_entry.relev, 0.96, "Grids outside the proximity radius get a cross language penalty");
         assert_eq!(result[1].entries[0].matches_language, false, "Matches language property is correctly set on CoalesceEntry");
     }
-    let match_opts = MatchOpts {
-        zoom: 14,
-        ..MatchOpts::default()
-    };
+    let match_opts = MatchOpts { zoom: 14, ..MatchOpts::default() };
     let stack = vec![subquery.clone()];
     let result = coalesce(stack.clone(), &match_opts).unwrap();
     #[cfg_attr(rustfmt, rustfmt::skip)]
@@ -188,29 +185,24 @@ fn coalesce_single_test_language_penalty() {
 }
 
 #[test]
-#[cfg_attr(rustfmt, rustfmt::skip)]
 fn coalesce_multi_test_language_penalty() {
     // Add more specific layer into a store
-    let store1 = create_store(vec![
-        StoreEntryBuildingBlock {
-            grid_key: GridKey { phrase_id: 1, lang_set: 1 },
-            entries: vec![
-                GridEntry { id: 1, x: 2, y: 2, relev: 1., score: 1, source_phrase_hash: 0 },
-                GridEntry { id: 2, x: 12800, y: 12800, relev: 1., score: 1, source_phrase_hash: 0 },
-            ],
-        }
-    ]);
+    let store1 = create_store(vec![StoreEntryBuildingBlock {
+        grid_key: GridKey { phrase_id: 1, lang_set: 1 },
+        entries: vec![
+            GridEntry { id: 1, x: 2, y: 2, relev: 1., score: 1, source_phrase_hash: 0 },
+            GridEntry { id: 2, x: 12800, y: 12800, relev: 1., score: 1, source_phrase_hash: 0 },
+        ],
+    }]);
 
     // Add less specific layer into a store
-    let store2 = create_store(vec![
-        StoreEntryBuildingBlock {
-            grid_key: GridKey { phrase_id: 2, lang_set: 1 },
-            entries: vec![
-                GridEntry { id: 3, x: 0, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },
-                GridEntry { id: 4, x: 50, y: 50, relev: 1., score: 1, source_phrase_hash: 0 },
-            ],
-        }
-    ]);
+    let store2 = create_store(vec![StoreEntryBuildingBlock {
+        grid_key: GridKey { phrase_id: 2, lang_set: 1 },
+        entries: vec![
+            GridEntry { id: 3, x: 0, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },
+            GridEntry { id: 4, x: 50, y: 50, relev: 1., score: 1, source_phrase_hash: 0 },
+        ],
+    }]);
 
     // Subqueries with a different language set
     println!("Coalesce multi - Subqueries with different language set from grids, with proximity");
@@ -218,7 +210,10 @@ fn coalesce_multi_test_language_penalty() {
         PhrasematchSubquery {
             store: &store1,
             weight: 0.5,
-            match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 2 },
+            match_key: MatchKey {
+                match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                lang_set: 2,
+            },
             idx: 1,
             zoom: 14,
             mask: 1 << 0,
@@ -226,7 +221,10 @@ fn coalesce_multi_test_language_penalty() {
         PhrasematchSubquery {
             store: &store2,
             weight: 0.5,
-            match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 2 },
+            match_key: MatchKey {
+                match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                lang_set: 2,
+            },
             idx: 2,
             zoom: 6,
             mask: 1 << 1,
@@ -251,10 +249,7 @@ fn coalesce_multi_test_language_penalty() {
         assert_eq!(result[1].entries[1].matches_language, false, "matches_language property is correctly set on 2nd CoalesceEntry in context");
     }
     println!("Coalesce multi - Subqueires with different lang set from grids, no proximity");
-    let match_opts = MatchOpts {
-        zoom: 14,
-        ..MatchOpts::default()
-    };
+    let match_opts = MatchOpts { zoom: 14, ..MatchOpts::default() };
     let result = coalesce(stack.clone(), &match_opts).unwrap();
     #[cfg_attr(rustfmt, rustfmt::skip)]
     {
@@ -266,16 +261,14 @@ fn coalesce_multi_test_language_penalty() {
 
 #[test]
 fn coalesce_single_test() {
-    let store = create_store(vec![
-        StoreEntryBuildingBlock {
-            grid_key: GridKey { phrase_id: 1, lang_set: 1 },
-            entries: vec![
-                GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 3, source_phrase_hash: 0 },
-                GridEntry { id: 2, x: 2, y: 2, relev: 0.8, score: 3, source_phrase_hash: 0 },
-                GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 1, source_phrase_hash: 0 },
-            ],
-        }
-    ]);
+    let store = create_store(vec![StoreEntryBuildingBlock {
+        grid_key: GridKey { phrase_id: 1, lang_set: 1 },
+        entries: vec![
+            GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 3, source_phrase_hash: 0 },
+            GridEntry { id: 2, x: 2, y: 2, relev: 0.8, score: 3, source_phrase_hash: 0 },
+            GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 1, source_phrase_hash: 0 },
+        ],
+    }]);
     let subquery = PhrasematchSubquery {
         store: &store,
         weight: 1.,
@@ -288,10 +281,7 @@ fn coalesce_single_test() {
 
     // Test default opts - no proximity or bbox
     println!("Coalsece single - no proximity, no bbox");
-    let match_opts = MatchOpts {
-        zoom: 6,
-        ..MatchOpts::default()
-    };
+    let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
     let result = coalesce(stack.clone(), &match_opts).unwrap();
 
     #[cfg_attr(rustfmt, rustfmt::skip)]
@@ -346,10 +336,7 @@ fn coalesce_single_test() {
     println!("Coalsece single - with proximity");
     let match_opts = MatchOpts {
         zoom: 6,
-        proximity: Some(Proximity {
-            point: [3,3],
-            radius: 40.,
-        }),
+        proximity: Some(Proximity { point: [3, 3], radius: 40. }),
         ..MatchOpts::default()
     };
     let result = coalesce(stack.clone(), &match_opts).unwrap();
@@ -359,134 +346,146 @@ fn coalesce_single_test() {
         assert_eq!(result[1].entries[0].grid_entry.id, 1, "2nd result is farther away than 3rd but has a higher relevance");
         assert_eq!(result[2].entries[0].grid_entry.id, 2, "3rd is closer but has a lower relevance");
     }
-    assert_eq!(result[0], CoalesceContext {
-        mask: 1 << 0,
-        relev: 1.,
-        entries: vec![CoalesceEntry {
-            matches_language: true,
-            idx: 1,
-            tmp_id: 33554435,
+    assert_eq!(
+        result[0],
+        CoalesceContext {
             mask: 1 << 0,
-            distance: 0.,
-            scoredist: 1.5839497841387566,
-            grid_entry: GridEntry {
-                id: 3,
-                x: 3,
-                y: 3,
-                relev: 1.,
-                score: 1,
-                source_phrase_hash: 0,
-            }
-        }],
-    }, "1st result has expected properties");
-    assert_eq!(result[1], CoalesceContext {
-        mask: 1 << 0,
-        relev: 1.,
-        entries: vec![CoalesceEntry {
-            matches_language: true,
-            idx: 1,
-            tmp_id: 33554433,
+            relev: 1.,
+            entries: vec![CoalesceEntry {
+                matches_language: true,
+                idx: 1,
+                tmp_id: 33554435,
+                mask: 1 << 0,
+                distance: 0.,
+                scoredist: 1.5839497841387566,
+                grid_entry: GridEntry {
+                    id: 3,
+                    x: 3,
+                    y: 3,
+                    relev: 1.,
+                    score: 1,
+                    source_phrase_hash: 0,
+                }
+            }],
+        },
+        "1st result has expected properties"
+    );
+    assert_eq!(
+        result[1],
+        CoalesceContext {
             mask: 1 << 0,
-            distance: 2.8284271247461903,
-            scoredist: 1.109893833332405,
-            grid_entry: GridEntry {
-                id: 1,
-                x: 1,
-                y: 1,
-                relev: 1.,
-                score: 3,
-                source_phrase_hash: 0,
-            }
-        }],
-    }, "2nd result has expected properties");
-    assert_eq!(result[2], CoalesceContext {
-        mask: 1 << 0,
-        relev: 0.8,
-        entries: vec![CoalesceEntry {
-            matches_language: true,
-            idx: 1,
-            tmp_id: 33554434,
+            relev: 1.,
+            entries: vec![CoalesceEntry {
+                matches_language: true,
+                idx: 1,
+                tmp_id: 33554433,
+                mask: 1 << 0,
+                distance: 2.8284271247461903,
+                scoredist: 1.109893833332405,
+                grid_entry: GridEntry {
+                    id: 1,
+                    x: 1,
+                    y: 1,
+                    relev: 1.,
+                    score: 3,
+                    source_phrase_hash: 0,
+                }
+            }],
+        },
+        "2nd result has expected properties"
+    );
+    assert_eq!(
+        result[2],
+        CoalesceContext {
             mask: 1 << 0,
-            distance: 1.4142135623730951,
-            // Has the same scoredist as 2nd result because they're both beyond proximity radius
-            scoredist: 1.109893833332405,
-            grid_entry: GridEntry {
-                id: 2,
-                x: 2,
-                y: 2,
-                relev: 0.8,
-                score: 3,
-                source_phrase_hash: 0,
-            }
-        }],
-    }, "2nd result has expected properties");
+            relev: 0.8,
+            entries: vec![CoalesceEntry {
+                matches_language: true,
+                idx: 1,
+                tmp_id: 33554434,
+                mask: 1 << 0,
+                distance: 1.4142135623730951,
+                // Has the same scoredist as 2nd result because they're both beyond proximity radius
+                scoredist: 1.109893833332405,
+                grid_entry: GridEntry {
+                    id: 2,
+                    x: 2,
+                    y: 2,
+                    relev: 0.8,
+                    score: 3,
+                    source_phrase_hash: 0,
+                }
+            }],
+        },
+        "2nd result has expected properties"
+    );
 
     // Test with bbox
     println!("Coalsece single - with bbox");
-    let match_opts = MatchOpts {
-        zoom: 6,
-        bbox: Some([1,1,1,1]),
-        ..MatchOpts::default()
-    };
+    let match_opts = MatchOpts { zoom: 6, bbox: Some([1, 1, 1, 1]), ..MatchOpts::default() };
     let result = coalesce(stack.clone(), &match_opts).unwrap();
     assert_eq!(result[0].entries.len(), 1, "Only one result is within the bbox");
     assert_eq!(result[0].entries[0].grid_entry.id, 1, "Result is the one that's within the bbox");
-    assert_eq!(result[0], CoalesceContext {
-        mask: 1 << 0,
-        relev: 1.,
-        entries: vec![CoalesceEntry {
-            matches_language: true,
-            idx: 1,
-            tmp_id: 33554433,
+    assert_eq!(
+        result[0],
+        CoalesceContext {
             mask: 1 << 0,
-            distance: 0.,
-            scoredist: 3.,
-            grid_entry: GridEntry {
-                id: 1,
-                x: 1,
-                y: 1,
-                relev: 1.,
-                score: 3,
-                source_phrase_hash: 0,
-            }
-        }],
-    }, "Result has expected properties");
+            relev: 1.,
+            entries: vec![CoalesceEntry {
+                matches_language: true,
+                idx: 1,
+                tmp_id: 33554433,
+                mask: 1 << 0,
+                distance: 0.,
+                scoredist: 3.,
+                grid_entry: GridEntry {
+                    id: 1,
+                    x: 1,
+                    y: 1,
+                    relev: 1.,
+                    score: 3,
+                    source_phrase_hash: 0,
+                }
+            }],
+        },
+        "Result has expected properties"
+    );
 
     // Test with bbox and proximity
     println!("Coalesce single - with bbox and proximity");
     let match_opts = MatchOpts {
         zoom: 6,
-        bbox: Some([1,1,1,1]),
-        proximity: Some(Proximity {
-            point: [1,1],
-            radius: 40.,
-        }),
+        bbox: Some([1, 1, 1, 1]),
+        proximity: Some(Proximity { point: [1, 1], radius: 40. }),
     };
     let result = coalesce(stack.clone(), &match_opts).unwrap();
     assert_eq!(result[0].entries.len(), 1, "Only one result is within the bbox");
-    assert_eq!(result[0], CoalesceContext {
-    mask: 1 << 0,
-    relev: 1.,
-    entries: vec![CoalesceEntry {
-        matches_language: true,
-        idx: 1,
-        tmp_id: 33554433,
-        mask: 1 << 0,
-        distance: 0.,
-        scoredist: 1.7322531402718835,
-        grid_entry: GridEntry {
-            id: 1,
-            x: 1,
-            y: 1,
+    assert_eq!(
+        result[0],
+        CoalesceContext {
+            mask: 1 << 0,
             relev: 1.,
-            score: 3,
-            source_phrase_hash: 0,
-        }
-    }],
-    }, "Result has expected properties, including scoredist");
+            entries: vec![CoalesceEntry {
+                matches_language: true,
+                idx: 1,
+                tmp_id: 33554433,
+                mask: 1 << 0,
+                distance: 0.,
+                scoredist: 1.7322531402718835,
+                grid_entry: GridEntry {
+                    id: 1,
+                    x: 1,
+                    y: 1,
+                    relev: 1.,
+                    score: 3,
+                    source_phrase_hash: 0,
+                }
+            }],
+        },
+        "Result has expected properties, including scoredist"
+    );
     // TODO: test with more than one result within bbox, to make sure results are still ordered by proximity?
 }
-
 
 #[test]
 fn coalesce_single_languages_test() {
@@ -578,73 +577,89 @@ fn coalesce_multi_test() {
     assert_eq!(result[0].relev, 1., "1st result has relevance 1");
     assert_eq!(result[0].mask, 3, "1st result context has correct mask");
     assert_eq!(result[0].entries.len(), 2, "1st result has 2 coalesce entries");
-    assert_eq!(result[0].entries[0], CoalesceEntry {
-        matches_language: true,
-        idx: 1,
-        tmp_id: 33554434,
-        mask: 1 << 0,
-        distance: 0.,
-        scoredist: 3.,
-        grid_entry: GridEntry {
-            id: 2,
-            x: 2,
-            y: 2,
-            relev: 0.5,
-            score: 3,
-            source_phrase_hash: 0,
-        }
-    }, "1st result 1st entry is the highest score from the higher zoom index");
-    assert_eq!(result[0].entries[1], CoalesceEntry {
-        matches_language: true,
-        idx: 0,
-        tmp_id: 1,
-        mask: 1 << 1,
-        distance: 0.,
-        scoredist: 1.,
-        grid_entry: GridEntry {
-            id: 1,
-            x: 1,
-            y: 1,
-            relev: 0.5,
-            score: 1,
-            source_phrase_hash: 0,
-        }
-    }, "1st result 2nd entry is the overelpping grid from the lower zoom index");
+    assert_eq!(
+        result[0].entries[0],
+        CoalesceEntry {
+            matches_language: true,
+            idx: 1,
+            tmp_id: 33554434,
+            mask: 1 << 0,
+            distance: 0.,
+            scoredist: 3.,
+            grid_entry: GridEntry {
+                id: 2,
+                x: 2,
+                y: 2,
+                relev: 0.5,
+                score: 3,
+                source_phrase_hash: 0,
+            }
+        },
+        "1st result 1st entry is the highest score from the higher zoom index"
+    );
+    assert_eq!(
+        result[0].entries[1],
+        CoalesceEntry {
+            matches_language: true,
+            idx: 0,
+            tmp_id: 1,
+            mask: 1 << 1,
+            distance: 0.,
+            scoredist: 1.,
+            grid_entry: GridEntry {
+                id: 1,
+                x: 1,
+                y: 1,
+                relev: 0.5,
+                score: 1,
+                source_phrase_hash: 0,
+            }
+        },
+        "1st result 2nd entry is the overelpping grid from the lower zoom index"
+    );
     assert_eq!(result[1].relev, 1., "2nd result has relevance 1");
     assert_eq!(result[1].mask, 3, "2nd result context has correct mask");
     assert_eq!(result[1].entries.len(), 2, "2nd result has 2 coalesce entries");
-    assert_eq!(result[1].entries[0], CoalesceEntry {
-        matches_language: true,
-        idx: 1,
-        tmp_id: 33554435,
-        mask: 1 << 0,
-        distance: 0.,
-        scoredist: 1.,
-        grid_entry: GridEntry {
-            id: 3,
-            x: 3,
-            y: 3,
-            relev: 0.5,
-            score: 1,
-            source_phrase_hash: 0,
-        }
-    }, "2nd result 1st entry is the lower score grid that overlaps with a grid ");
-    assert_eq!(result[0].entries[1], CoalesceEntry {
-        matches_language: true,
-        idx: 0,
-        tmp_id: 1,
-        mask: 1 << 1,
-        distance: 0.,
-        scoredist: 1.,
-        grid_entry: GridEntry {
-            id: 1,
-            x: 1,
-            y: 1,
-            relev: 0.5,
-            score: 1,
-            source_phrase_hash: 0,
-        }
-    }, "2nd result 2nd entry is the overlapping grid from the lower zoom index");
+    assert_eq!(
+        result[1].entries[0],
+        CoalesceEntry {
+            matches_language: true,
+            idx: 1,
+            tmp_id: 33554435,
+            mask: 1 << 0,
+            distance: 0.,
+            scoredist: 1.,
+            grid_entry: GridEntry {
+                id: 3,
+                x: 3,
+                y: 3,
+                relev: 0.5,
+                score: 1,
+                source_phrase_hash: 0,
+            }
+        },
+        "2nd result 1st entry is the lower score grid that overlaps with a grid "
+    );
+    assert_eq!(
+        result[0].entries[1],
+        CoalesceEntry {
+            matches_language: true,
+            idx: 0,
+            tmp_id: 1,
+            mask: 1 << 1,
+            distance: 0.,
+            scoredist: 1.,
+            grid_entry: GridEntry {
+                id: 1,
+                x: 1,
+                y: 1,
+                relev: 0.5,
+                score: 1,
+                source_phrase_hash: 0,
+            }
+        },
+        "2nd result 2nd entry is the overlapping grid from the lower zoom index"
+    );
 
     // Test coalesce multi with proximity
     println!("Coalesce multi - with proximity");
@@ -677,55 +692,67 @@ fn coalesce_multi_test() {
         },
         "1st result 1st entry is closest entry in the higher zoom index"
     );
-    assert_eq!(result[0].entries[1], CoalesceEntry {
-        matches_language: true,
-        idx: 0,
-        tmp_id: 1,
-        mask: 1 << 1,
-        distance: 0.,
-        scoredist: 1.5839497841387566,
-        grid_entry: GridEntry {
-            id: 1,
-            x: 1,
-            y: 1,
-            relev: 0.5,
-            score: 1,
-            source_phrase_hash: 0,
-        }
-    }, "1st result 2nd entry is the overlapping entry, the distance for the outer entry is 0");
+    assert_eq!(
+        result[0].entries[1],
+        CoalesceEntry {
+            matches_language: true,
+            idx: 0,
+            tmp_id: 1,
+            mask: 1 << 1,
+            distance: 0.,
+            scoredist: 1.5839497841387566,
+            grid_entry: GridEntry {
+                id: 1,
+                x: 1,
+                y: 1,
+                relev: 0.5,
+                score: 1,
+                source_phrase_hash: 0,
+            }
+        },
+        "1st result 2nd entry is the overlapping entry, the distance for the outer entry is 0"
+    );
     assert_eq!(result[1].entries.len(), 2, "2nd result has 2 coalesce entries");
-    assert_eq!(result[1].entries[0], CoalesceEntry {
-        matches_language: true,
-        idx: 1,
-        tmp_id: 33554434,
-        mask: 1 << 0,
-        distance: 1.4142135623730951,
-        scoredist: 1.109893833332405,
-        grid_entry: GridEntry {
-            id: 2,
-            x: 2,
-            y: 2,
-            relev: 0.5,
-            score: 3,
-            source_phrase_hash: 0,
-        }
-    }, "2nd result 1st entry is the farther away entry from the higher zoom index");
-    assert_eq!(result[1].entries[1], CoalesceEntry {
-        matches_language: true,
-        idx: 0,
-        tmp_id: 1,
-        mask: 1 << 1,
-        distance: 0.,
-        scoredist: 1.5839497841387566,
-        grid_entry: GridEntry {
-            id: 1,
-            x: 1,
-            y: 1,
-            relev: 0.5,
-            score: 1,
-            source_phrase_hash: 0,
-        }
-    }, "2nd result 2nd entry is the overlapping entry, the distance for the outer entry is 0");
+    assert_eq!(
+        result[1].entries[0],
+        CoalesceEntry {
+            matches_language: true,
+            idx: 1,
+            tmp_id: 33554434,
+            mask: 1 << 0,
+            distance: 1.4142135623730951,
+            scoredist: 1.109893833332405,
+            grid_entry: GridEntry {
+                id: 2,
+                x: 2,
+                y: 2,
+                relev: 0.5,
+                score: 3,
+                source_phrase_hash: 0,
+            }
+        },
+        "2nd result 1st entry is the farther away entry from the higher zoom index"
+    );
+    assert_eq!(
+        result[1].entries[1],
+        CoalesceEntry {
+            matches_language: true,
+            idx: 0,
+            tmp_id: 1,
+            mask: 1 << 1,
+            distance: 0.,
+            scoredist: 1.5839497841387566,
+            grid_entry: GridEntry {
+                id: 1,
+                x: 1,
+                y: 1,
+                relev: 0.5,
+                score: 1,
+                source_phrase_hash: 0,
+            }
+        },
+        "2nd result 2nd entry is the overlapping entry, the distance for the outer entry is 0"
+    );
 }
 
 #[test]
@@ -733,14 +760,7 @@ fn coalesce_multi_languages_test() {
     // Store 1 with grids in all languages
     let store1 = create_store(vec![StoreEntryBuildingBlock {
         grid_key: GridKey { phrase_id: 1, lang_set: u128::max_value() },
-        entries: vec![GridEntry {
-            id: 1,
-            x: 1,
-            y: 1,
-            relev: 1.,
-            score: 1,
-            source_phrase_hash: 0,
-        }],
+        entries: vec![GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 1, source_phrase_hash: 0 }],
     }]);
 
     // Store 2 with grids in multiple language sets
@@ -927,14 +947,7 @@ fn coalesce_multi_scoredist() {
     // Add more specific layer into a store
     let store1 = create_store(vec![StoreEntryBuildingBlock {
         grid_key: GridKey { phrase_id: 1, lang_set: 0 },
-        entries: vec![GridEntry {
-            id: 1,
-            x: 0,
-            y: 0,
-            relev: 1.,
-            score: 1,
-            source_phrase_hash: 0,
-        }],
+        entries: vec![GridEntry { id: 1, x: 0, y: 0, relev: 1., score: 1, source_phrase_hash: 0 }],
     }]);
 
     // Add less specific layer into a store
@@ -981,7 +994,8 @@ fn coalesce_multi_scoredist() {
     assert_eq!(result[0].entries[0].grid_entry.id, 3, "Closer feature is 1st");
     assert_eq!(result[1].entries[0].grid_entry.id, 2, "Farther feature is 2nd");
     assert_eq!(
-        result[0].entries[0].distance < result[1].entries[0].distance,true,
+        result[0].entries[0].distance < result[1].entries[0].distance,
+        true,
         "1st grid in 1st context is closer than 1st grid in 2nd context"
     );
 
@@ -996,7 +1010,8 @@ fn coalesce_multi_scoredist() {
     assert_eq!(result[0].entries[0].grid_entry.id, 3, "Farther feature with higher score is 1st");
     assert_eq!(result[1].entries[0].grid_entry.id, 2, "Closer feature with lower score is 2nd");
     assert_eq!(
-        result[0].entries[0].distance > result[1].entries[0].distance, false,
+        result[0].entries[0].distance > result[1].entries[0].distance,
+        false,
         "1st grid in 1st context is not closer than 1st grid in 2nd context"
     );
 }
@@ -1057,7 +1072,8 @@ fn coalesce_multi_test_bbox() {
     let result = coalesce(stack.clone(), &match_opts).unwrap();
     assert_eq!(result.len(), 2, "Bbox [1,0,0,1,0] - 2 results are within the bbox");
     assert_eq!(
-        (result[0].entries[0].grid_entry.x, result[0].entries[0].grid_entry.y), (3,0),
+        (result[0].entries[0].grid_entry.x, result[0].entries[0].grid_entry.y),
+        (3, 0),
         "Bbox [1,0,0,1,0] - 1st result is zxy 2/3/0, and the higher relevance grid within the bbox"
     );
     assert_eq!(
@@ -1070,29 +1086,31 @@ fn coalesce_multi_test_bbox() {
     let result = coalesce(stack.clone(), &match_opts).unwrap();
     assert_eq!(result.len(), 2, "Bbox [2,0,0,1,3] - 2 results are within the bbox");
     assert_eq!(
-        (result[0].entries[0].grid_entry.x, result[0].entries[0].grid_entry.y), (0, 3),
+        (result[0].entries[0].grid_entry.x, result[0].entries[0].grid_entry.y),
+        (0, 3),
         "Bbox [2,0,0,1,3] - 1st result is zxy 2/0/3"
     );
     assert_eq!(
-        (result[1].entries[0].grid_entry.x, result[1].entries[0].grid_entry.y), (0, 0),
+        (result[1].entries[0].grid_entry.x, result[1].entries[0].grid_entry.y),
+        (0, 0),
         "Bbox [2,0,0,1,3] - 2nd result is zxy 1/0/0"
     );
 
     // Test bbox at zoom 6 that should contain 2 grids
-    let match_opts =
-        MatchOpts { zoom: 6, bbox: Some([14, 30, 15, 64]), ..MatchOpts::default() };
+    let match_opts = MatchOpts { zoom: 6, bbox: Some([14, 30, 15, 64]), ..MatchOpts::default() };
     let result = coalesce(stack.clone(), &match_opts).unwrap();
     assert_eq!(result.len(), 2, "Bbox [6,14,30,15,64] - 2 results are within the bbox");
     assert_eq!(
-        (result[0].entries[0].grid_entry.x, result[0].entries[0].grid_entry.y), (0, 3),
+        (result[0].entries[0].grid_entry.x, result[0].entries[0].grid_entry.y),
+        (0, 3),
         "Bbox [6,14,30,15,64] - 1st result is zxy 2/0/3"
     );
     assert_eq!(
-        (result[1].entries[0].grid_entry.x, result[1].entries[0].grid_entry.y), (0, 0),
+        (result[1].entries[0].grid_entry.x, result[1].entries[0].grid_entry.y),
+        (0, 0),
         "Bbox [6,14,30,15,64] - 2nd result is zxy 1/0/0"
     );
 }
-
 
 // TODO: add proximity test with max score
 // TODO: add sort tests?
