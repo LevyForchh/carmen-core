@@ -1,9 +1,9 @@
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
-use std::error::Error;
 use std::path::Path;
 
 use byteorder::{LittleEndian, ReadBytesExt};
+use failure::Error;
 use flatbuffers;
 use itertools::Itertools;
 use morton::deinterleave_morton;
@@ -131,7 +131,7 @@ fn eager_test() {
 }
 
 impl GridStore {
-    pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn Error>> {
+    pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
         let path = path.as_ref().to_owned();
         let mut opts = Options::default();
         opts.set_read_only(true);
@@ -139,10 +139,7 @@ impl GridStore {
         Ok(GridStore { db })
     }
 
-    pub fn get(
-        &self,
-        key: &GridKey,
-    ) -> Result<Option<impl Iterator<Item = GridEntry>>, Box<Error>> {
+    pub fn get(&self, key: &GridKey) -> Result<Option<impl Iterator<Item = GridEntry>>, Error> {
         let mut db_key: Vec<u8> = Vec::new();
         key.write_to(0, &mut db_key)?;
 
@@ -198,7 +195,7 @@ impl GridStore {
         &self,
         match_key: &MatchKey,
         match_opts: &MatchOpts,
-    ) -> Result<impl Iterator<Item = MatchEntry>, Box<Error>> {
+    ) -> Result<impl Iterator<Item = MatchEntry>, Error> {
         let mut db_key: Vec<u8> = Vec::new();
         match_key.write_start_to(0, &mut db_key)?;
 

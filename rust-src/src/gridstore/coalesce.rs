@@ -1,8 +1,8 @@
 use std::borrow::Borrow;
 use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet};
-use std::error::Error;
 
+use failure::Error;
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
 
@@ -14,7 +14,7 @@ use crate::gridstore::store::GridStore;
 pub fn coalesce<T: Borrow<GridStore> + Clone>(
     stack: Vec<PhrasematchSubquery<T>>,
     match_opts: &MatchOpts,
-) -> Result<Vec<CoalesceContext>, Box<Error>> {
+) -> Result<Vec<CoalesceContext>, Error> {
     let contexts = if stack.len() <= 1 {
         coalesce_single(&stack[0], match_opts)?
     } else {
@@ -87,7 +87,7 @@ fn grid_to_coalesce_entry<T: Borrow<GridStore> + Clone>(
 fn coalesce_single<T: Borrow<GridStore> + Clone>(
     subquery: &PhrasematchSubquery<T>,
     match_opts: &MatchOpts,
-) -> Result<Vec<CoalesceContext>, Box<Error>> {
+) -> Result<Vec<CoalesceContext>, Error> {
     let grids = subquery.store.borrow().get_matching(&subquery.match_key, match_opts)?;
     let mut contexts: Vec<CoalesceContext> = Vec::new();
     let mut max_relev: f32 = 0.;
@@ -163,7 +163,7 @@ fn coalesce_single<T: Borrow<GridStore> + Clone>(
 fn coalesce_multi<T: Borrow<GridStore> + Clone>(
     mut stack: Vec<PhrasematchSubquery<T>>,
     match_opts: &MatchOpts,
-) -> Result<Vec<CoalesceContext>, Box<Error>> {
+) -> Result<Vec<CoalesceContext>, Error> {
     stack.sort_by_key(|subquery| (subquery.zoom, subquery.idx));
 
     let mut coalesced: HashMap<(u16, u16, u16), Vec<CoalesceContext>> = HashMap::new();

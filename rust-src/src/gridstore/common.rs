@@ -1,7 +1,7 @@
 use std::borrow::Borrow;
-use std::error::Error;
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use failure::Error;
 use serde::{Deserialize, Serialize};
 
 use crate::gridstore::store::GridStore;
@@ -13,7 +13,7 @@ pub struct GridKey {
 }
 
 impl GridKey {
-    pub fn write_to(&self, type_marker: u8, db_key: &mut Vec<u8>) -> Result<(), Box<Error>> {
+    pub fn write_to(&self, type_marker: u8, db_key: &mut Vec<u8>) -> Result<(), Error> {
         db_key.push(type_marker);
         // next goes the ID
         db_key.write_u32::<BigEndian>(self.phrase_id)?;
@@ -46,7 +46,7 @@ pub struct MatchKey {
 }
 
 impl MatchKey {
-    pub fn write_start_to(&self, type_marker: u8, db_key: &mut Vec<u8>) -> Result<(), Box<Error>> {
+    pub fn write_start_to(&self, type_marker: u8, db_key: &mut Vec<u8>) -> Result<(), Error> {
         db_key.push(type_marker);
         // next goes the ID
         let start = match self.match_phrase {
@@ -57,7 +57,7 @@ impl MatchKey {
         Ok(())
     }
 
-    pub fn matches_key(&self, db_key: &[u8]) -> Result<bool, Box<Error>> {
+    pub fn matches_key(&self, db_key: &[u8]) -> Result<bool, Error> {
         let key_phrase = (&db_key[1..]).read_u32::<BigEndian>()?;
         Ok(match self.match_phrase {
             MatchPhrase::Exact(phrase_id) => phrase_id == key_phrase,
@@ -65,7 +65,7 @@ impl MatchKey {
         })
     }
 
-    pub fn matches_language(&self, db_key: &[u8]) -> Result<bool, Box<Error>> {
+    pub fn matches_language(&self, db_key: &[u8]) -> Result<bool, Error> {
         let key_lang_partial = &db_key[5..];
         if key_lang_partial.len() == 0 {
             // 0-length language array is the shorthand for "matches everything"

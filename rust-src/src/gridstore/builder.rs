@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
-use std::error::Error;
 use std::path::{Path, PathBuf};
 
+use failure::Error;
 use itertools::Itertools;
 use morton::interleave_morton;
 use rocksdb::DB;
@@ -36,12 +36,12 @@ fn extend_entries(builder_entry: &mut BuilderEntry, values: &[GridEntry]) -> () 
 
 impl GridStoreBuilder {
     /// Makes a new GridStoreBuilder with a particular filename.
-    pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn Error>> {
+    pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
         Ok(GridStoreBuilder { path: path.as_ref().to_owned(), data: BTreeMap::new() })
     }
 
     /// Inserts a new GridStore entry with the given values.
-    pub fn insert(&mut self, key: &GridKey, values: &[GridEntry]) -> Result<(), Box<dyn Error>> {
+    pub fn insert(&mut self, key: &GridKey, values: &[GridEntry]) -> Result<(), Error> {
         let mut to_insert = BuilderEntry::new();
         extend_entries(&mut to_insert, values);
         self.data.insert(key.to_owned(), to_insert);
@@ -49,14 +49,14 @@ impl GridStoreBuilder {
     }
 
     ///  Appends a values to and existing GridStore entry.
-    pub fn append(&mut self, key: &GridKey, values: &[GridEntry]) -> Result<(), Box<dyn Error>> {
+    pub fn append(&mut self, key: &GridKey, values: &[GridEntry]) -> Result<(), Error> {
         let mut to_append = self.data.entry(key.to_owned()).or_insert_with(|| BuilderEntry::new());
         extend_entries(&mut to_append, values);
         Ok(())
     }
 
-    /// [wip] Writes data to disk.
-    pub fn finish(mut self) -> Result<(), Box<Error>> {
+    /// Writes data to disk.
+    pub fn finish(mut self) -> Result<(), Error> {
         let db = DB::open_default(&self.path)?;
         let mut db_key: Vec<u8> = Vec::with_capacity(MAX_KEY_LENGTH);
         for (grid_key, value) in self.data.iter_mut() {

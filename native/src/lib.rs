@@ -1,7 +1,3 @@
-#[macro_use]
-extern crate neon;
-extern crate carmen_core;
-extern crate neon_serde;
 use carmen_core::gridstore::coalesce;
 use carmen_core::gridstore::PhrasematchSubquery;
 use carmen_core::gridstore::{
@@ -9,9 +5,10 @@ use carmen_core::gridstore::{
 };
 
 use neon::prelude::*;
+use neon::{class_definition, declare_types, impl_managed, register_module};
 use neon_serde::errors::Result as LibResult;
-use std::error::Error;
 use std::sync::Arc;
+use failure::Error;
 
 type ArcGridStore = Arc<GridStore>;
 
@@ -51,7 +48,7 @@ declare_types! {
             let filename = cx.argument::<JsString>(0)?.value();
             match GridStoreBuilder::new(filename) {
                 Ok(s) => Ok(Some(s)),
-                Err(e) => cx.throw_type_error(e.description())
+                Err(e) => cx.throw_type_error(e.to_string())
             }
         }
 
@@ -59,21 +56,21 @@ declare_types! {
             let grid_key = cx.argument::<JsObject>(0)?;
             let grid_entry = cx.argument::<JsValue>(1)?;
             let values: Vec<GridEntry> = neon_serde::from_value(&mut cx, grid_entry)?;
-            let js_phrase_id = {
-                grid_key.get(&mut cx, "phrase_id")?
-            };
-            let phrase_id: u32 = {
-                js_phrase_id.downcast::<JsNumber>().or_throw(&mut cx)?.value() as u32
-            };
-            let js_lang_set = {
-                grid_key.get(&mut cx, "lang_set")?
-            };
+            let phrase_id: u32 = grid_key
+                .get(&mut cx, "phrase_id")?
+                .downcast::<JsNumber>()
+                .or_throw(&mut cx)?
+                .value() as u32;
 
-            let js_array_lang = {
-                js_lang_set.downcast::<JsArray>().or_throw(&mut cx)?
-            };
+            let js_lang_set = grid_key
+                .get(&mut cx, "lang_set")?
+                .downcast::<JsArray>()
+                .or_throw(&mut cx)?;
 
-            let lang_set: u128 = langarray_to_langset(&mut cx, js_array_lang)?;
+            let lang_set: u128 = langarray_to_langset(
+                &mut cx,
+                js_lang_set
+            )?;
 
             let key = GridKey { phrase_id, lang_set };
             let mut this = cx.this();
@@ -81,7 +78,7 @@ declare_types! {
             // lock falls out of scope at the end of this block
             // in order to be able to borrow `cx` for the error block we assign it to a variable
 
-            let insert: Result<Result<(), Box<dyn Error>>, &str> = {
+            let insert: Result<Result<(), Error>, &str> = {
                 let lock = cx.lock();
                 let mut gridstore = this.borrow_mut(&lock);
                 match gridstore.as_mut() {
@@ -103,7 +100,7 @@ declare_types! {
         method finish(mut cx) {
             let mut this = cx.this();
 
-            let finish: Result<Result<(), Box<dyn Error>>, &str> = {
+            let finish: Result<Result<(), Error>, &str> = {
                 let lock = cx.lock();
                 let mut gridstore = this.borrow_mut(&lock);
                 match gridstore.take() {
@@ -128,7 +125,7 @@ declare_types! {
             let filename = cx.argument::<JsString>(0)?.value();
             match GridStore::new(filename) {
                 Ok(s) => Ok(Arc::new(s)),
-                Err(e) => cx.throw_type_error(e.description())
+                Err(e) => cx.throw_type_error(e.to_string())
             }
         }
     }
