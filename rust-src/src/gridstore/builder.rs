@@ -1,7 +1,7 @@
-use std::collections::BTreeMap;
+use std::collections::{btree_map::Entry, BTreeMap};
 use std::path::{Path, PathBuf};
 
-use failure::Error;
+use failure::{Error, Fail};
 use itertools::Itertools;
 use morton::interleave_morton;
 use rocksdb::DB;
@@ -52,6 +52,31 @@ impl GridStoreBuilder {
     pub fn append(&mut self, key: &GridKey, values: &[GridEntry]) -> Result<(), Error> {
         let mut to_append = self.data.entry(key.to_owned()).or_insert_with(|| BuilderEntry::new());
         extend_entries(&mut to_append, values);
+        Ok(())
+    }
+
+    /// In situations under which data has been inserted using temporary phrase IDs, renumber
+    /// the data in the index to use final phrase IDs, given a temporary-to-final-ID mapping
+    pub fn renumber(&mut self, tmp_phrase_ids_to_ids: &[u32]) -> Result<(), Error> {
+        let mut old_data: BTreeMap<GridKey, BuilderEntry> = BTreeMap::new();
+        std::mem::swap(&mut old_data, &mut self.data);
+
+        for (key, value) in old_data.into_iter() {
+            let new_phrase_id = tmp_phrase_ids_to_ids
+                .get(key.phrase_id as usize)
+                .ok_or_else(|| BuildError::OutOfBoundsRenumberEntry { tmp_id: key.phrase_id })?;
+            let new_key = GridKey { phrase_id: *new_phrase_id, ..key };
+            match self.data.entry(new_key) {
+                Entry::Vacant(v) => {
+                    v.insert(value);
+                }
+                Entry::Occupied(_) => {
+                    return Err(Error::from(BuildError::DuplicateRenumberEntry {
+                        target_id: *new_phrase_id,
+                    }))
+                }
+            };
+        }
         Ok(())
     }
 
@@ -188,4 +213,12 @@ fn append_test() {
     assert_eq!(entry.unwrap().len(), 3, "Entry contains three grids");
 
     builder.finish().unwrap();
+}
+
+#[derive(Debug, Fail)]
+enum BuildError {
+    #[fail(display = "duplicate rename entry: {}", target_id)]
+    DuplicateRenumberEntry { target_id: u32 },
+    #[fail(display = "out of bounds: {}", tmp_id)]
+    OutOfBoundsRenumberEntry { tmp_id: u32 },
 }

@@ -51,6 +51,35 @@ mod tests {
     }
 
     #[test]
+    fn renumber_test() {
+        let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
+        let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
+
+        // phrase IDs are descending, grid IDs are ascending
+        let items = vec![
+            (GridKey { phrase_id: 2, lang_set: 1 }, GridEntry { id: 0, x: 1, y: 1, relev: 1., score: 7, source_phrase_hash: 2 }),
+            (GridKey { phrase_id: 1, lang_set: 1 }, GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 7, source_phrase_hash: 2 }),
+            (GridKey { phrase_id: 0, lang_set: 1 }, GridEntry { id: 2, x: 1, y: 1, relev: 1., score: 7, source_phrase_hash: 2 }),
+        ];
+
+        for (key, val) in items {
+            builder.insert(&key, &vec![val]).expect("Unable to insert record");
+        }
+        builder.renumber(&vec![2, 1, 0]).unwrap();
+        // after renumbering, the IDs should match
+        builder.finish().unwrap();
+
+        let reader = GridStore::new(directory.path()).unwrap();
+
+        for id in 0..=2 {
+            let entries: Vec<_> = reader.get(
+                &GridKey { phrase_id: id, lang_set: 1 }
+            ).unwrap().unwrap().collect();
+            assert_eq!(id, entries[0].id);
+        }
+    }
+
+    #[test]
     fn phrase_hash_test() {
         let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
         let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
