@@ -512,7 +512,7 @@ fn coalesce_single_languages_test() {
             match_phrase: MatchPhrase::Range { start: 1, end: 3 },
             lang_set: u128::max_value(),
         },
-        idx: 1,
+        idx: 0,
         zoom: 6,
         mask: 1 << 0,
     };
@@ -520,8 +520,102 @@ fn coalesce_single_languages_test() {
     let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
     let result = coalesce(stack.clone(), &match_opts).unwrap();
 
-    assert_eq!(result.len(), 4, "Returns 4 results");
-    // TODO: rest of the language tests
+    #[cfg_attr(rustfmt, rustfmt::skip)]
+    {
+        assert_eq!(result.len(), 4, "Returns 4 results");
+        assert_eq!(result[0].relev, 1., "1st result has relevance of 1");
+        assert_eq!(result[0].entries[0].grid_entry.id, 0, "1st result has lowest grid id, which is the tiebreaker for sorting");
+        assert_eq!(result[0].entries[0].grid_entry.relev, 1., "1st result grid has original relevance");
+        assert_eq!(result[0].entries[0].matches_language, true, "1st result matches language");
+        assert_eq!(result[1].relev, 1., "2nd result has original relevance");
+        assert_eq!(result[1].entries[0].grid_entry.id, 1, "2nd result is the 2nd highest grid id");
+        assert_eq!(result[1].entries[0].grid_entry.relev, 1., "2nd result grid has original relevance");
+        assert_eq!(result[1].entries[0].matches_language, true, "2nd result matches language");
+        assert_eq!(result[2].relev, 1., "3rd result has original relevance");
+        assert_eq!(result[2].entries[0].grid_entry.id, 2, "3rd result is the 3rd highest grid id");
+        assert_eq!(result[2].entries[0].grid_entry.relev, 1., "3rd result grid has original relevance");
+        assert_eq!(result[2].entries[0].matches_language, true, "3rd result matches language");
+        assert_eq!(result[3].relev, 1., "4th result has original relevance");
+        assert_eq!(result[3].entries[0].grid_entry.id, 3, "4th result is the 4th highest grid id");
+        assert_eq!(result[3].entries[0].grid_entry.relev, 1., "4th result grid has original relevance");
+        assert_eq!(result[3].entries[0].matches_language, true, "4th result matches language");
+    }
+
+    // Test lanuage 0
+    println!("Coalesce single - language 0, language matching 2 grids");
+    let subquery = PhrasematchSubquery {
+        store: &store,
+        weight: 1.,
+        match_key: MatchKey {
+            match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+            lang_set: langarray_to_langfield(&[0]),
+        },
+        idx: 0,
+        zoom: 6,
+        mask: 1 << 0,
+    };
+    let stack = vec![subquery];
+    let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
+    let result = coalesce(stack.clone(), &match_opts).unwrap();
+
+    #[cfg_attr(rustfmt, rustfmt::skip)]
+    {
+        assert_eq!(result.len(), 4, "Returns 4 results");
+        assert_eq!(result[0].relev, 1., "1st result has relevance of 1");
+        assert_eq!(result[0].entries[0].grid_entry.id, 0, "1st result is a grid with 0 in the lang set, and lowest grid id");
+        assert_eq!(result[0].entries[0].grid_entry.relev, 1., "1st result grid has original relevance");
+        assert_eq!(result[0].entries[0].matches_language, true, "1st result matches language");
+        assert_eq!(result[1].relev, 1., "2nd result has original relevance");
+        assert_eq!(result[1].entries[0].grid_entry.id, 2, "2nd result is a grid with 0 in the lang set");
+        assert_eq!(result[1].entries[0].grid_entry.relev, 1., "2nd result grid has original relevance");
+        assert_eq!(result[1].entries[0].matches_language, true, "2nd result matches language");
+        assert_eq!(result[2].relev, 0.96, "3rd result has reduced relevance");
+        assert_eq!(result[2].entries[0].grid_entry.id, 1, "3rd result is a grid that doesnt include lang 0");
+        assert_eq!(result[2].entries[0].grid_entry.relev, 0.96, "3rd result grid has reduced relevance");
+        assert_eq!(result[2].entries[0].matches_language, false, "3rd result does not match language");
+        assert_eq!(result[3].relev, 0.96, "4th result has reduced relevance");
+        assert_eq!(result[3].entries[0].grid_entry.id, 3, "4th result is the 4th highest grid id");
+        assert_eq!(result[3].entries[0].grid_entry.relev, 0.96, "4th result grid has reduced relevance");
+        assert_eq!(result[3].entries[0].matches_language, false, "4th result does not match language");
+    }
+
+    println!("Coalesce single - language 3, language matching no grids");
+
+    let subquery = PhrasematchSubquery {
+        store: &store,
+        weight: 1.,
+        match_key: MatchKey {
+            match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+            lang_set: langarray_to_langfield(&[3]),
+        },
+        idx: 0,
+        zoom: 6,
+        mask: 1 << 0,
+    };
+    let stack = vec![subquery];
+    let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
+    let result = coalesce(stack.clone(), &match_opts).unwrap();
+
+    #[cfg_attr(rustfmt, rustfmt::skip)]
+    {
+        assert_eq!(result.len(), 4, "Returns 4 results");
+        assert_eq!(result[0].relev, 0.96, "1st result has reduced relevance");
+        assert_eq!(result[0].entries[0].grid_entry.id, 0, "1st result has lowest grid id, which is the tiebreaker for sorting");
+        assert_eq!(result[0].entries[0].grid_entry.relev, 0.96, "1st result grid has reduced relevance");
+        assert_eq!(result[0].entries[0].matches_language, false, "1st result does not match language");
+        assert_eq!(result[1].relev, 0.96, "2nd result has reduced relevance");
+        assert_eq!(result[1].entries[0].grid_entry.id, 1, "2nd result is the 2nd highest grid id");
+        assert_eq!(result[1].entries[0].grid_entry.relev, 0.96, "2nd result grid has reduced relevance");
+        assert_eq!(result[1].entries[0].matches_language, false, "2nd result does not match language");
+        assert_eq!(result[2].relev, 0.96, "3rd result has reduced relevance");
+        assert_eq!(result[2].entries[0].grid_entry.id, 2, "3rd result is the 3rd highest grid id");
+        assert_eq!(result[2].entries[0].grid_entry.relev, 0.96, "3rd result grid has reduced relevance");
+        assert_eq!(result[2].entries[0].matches_language, false, "3rd result does not match language");
+        assert_eq!(result[3].relev, 0.96, "4th result has reduced relevance");
+        assert_eq!(result[3].entries[0].grid_entry.id, 3, "4th result is the 4th highest grid id");
+        assert_eq!(result[3].entries[0].grid_entry.relev, 0.96, "4th result grid has reduced relevance");
+        assert_eq!(result[3].entries[0].matches_language, false, "4th result does not match language");
+    }
 }
 
 #[test]
@@ -1140,11 +1234,19 @@ fn coalesce_multi_test_bbox() {
             mask: 1 << 0,
         },
     ];
-    let match_opts = MatchOpts { zoom: 1, bbox: Some([0,0,1,0]), ..MatchOpts::default() };
+    let match_opts = MatchOpts { zoom: 1, bbox: Some([0, 0, 1, 0]), ..MatchOpts::default() };
     let result = coalesce(stack.clone(), &match_opts).unwrap();
     assert_eq!(result.len(), 2, "Bbox [1,0,0,1,0] - 2 results are within the bbox");
-    assert_eq!((result[0].entries[0].grid_entry.x, result[0].entries[0].grid_entry.y), (3, 0), "Bbox [1,0,0,1,0] - 1st result is xzy 2/3/0");
-    assert_eq!((result[1].entries[0].grid_entry.x, result[1].entries[0].grid_entry.y), (21, 7), "Bbox [1,0,0,1,0] - 2nd result is xzy 5/20/7");
+    assert_eq!(
+        (result[0].entries[0].grid_entry.x, result[0].entries[0].grid_entry.y),
+        (3, 0),
+        "Bbox [1,0,0,1,0] - 1st result is xzy 2/3/0"
+    );
+    assert_eq!(
+        (result[1].entries[0].grid_entry.x, result[1].entries[0].grid_entry.y),
+        (21, 7),
+        "Bbox [1,0,0,1,0] - 2nd result is xzy 5/20/7"
+    );
 }
 
 // TODO: add proximity test with max score
