@@ -52,26 +52,7 @@ declare_types! {
         }
 
         method insert(mut cx) {
-            let grid_key = cx.argument::<JsObject>(0)?;
-            let grid_entry = cx.argument::<JsValue>(1)?;
-            let values: Vec<GridEntry> = neon_serde::from_value(&mut cx, grid_entry)?;
-            let phrase_id: u32 = grid_key
-                .get(&mut cx, "phrase_id")?
-                .downcast::<JsNumber>()
-                .or_throw(&mut cx)?
-                .value() as u32;
-
-            let js_lang_set = grid_key
-                .get(&mut cx, "lang_set")?
-                .downcast::<JsArray>()
-                .or_throw(&mut cx)?;
-
-            let lang_set: u128 = langarray_to_langset(
-                &mut cx,
-                js_lang_set
-            )?;
-
-            let key = GridKey { phrase_id, lang_set };
+            let (key, values) = prep_for_insert(&mut cx)?;
             let mut this = cx.this();
 
             // lock falls out of scope at the end of this block
@@ -83,6 +64,32 @@ declare_types! {
                 match gridstore.as_mut() {
                     Some(builder) => {
                         builder.insert(&key, &values).map_err(|e| e.to_string())
+                    }
+                    None => {
+                        Err("unable to insert()".to_string())
+                    }
+                }
+            };
+
+            match insert {
+                Ok(_) => Ok(JsUndefined::new().upcast()),
+                Err(e) => cx.throw_type_error(e)
+            }
+        }
+
+        method append(mut cx) {
+            let (key, values) = prep_for_insert(&mut cx)?;
+            let mut this = cx.this();
+
+            // lock falls out of scope at the end of this block
+            // in order to be able to borrow `cx` for the error block we assign it to a variable
+
+            let insert: Result<(), String> = {
+                let lock = cx.lock();
+                let mut gridstore = this.borrow_mut(&lock);
+                match gridstore.as_mut() {
+                    Some(builder) => {
+                        builder.append(&key, &values).map_err(|e| e.to_string())
                     }
                     None => {
                         Err("unable to insert()".to_string())
@@ -226,6 +233,32 @@ where
         phrasematches.push(subq);
     }
     Ok(phrasematches)
+}
+
+#[inline(always)]
+fn prep_for_insert<'j, T: neon::object::This>(cx: &mut CallContext<'j, T>) -> Result<(GridKey, Vec<GridEntry>), neon_serde::errors::Error> {
+    let grid_key = cx.argument::<JsObject>(0)?;
+    let grid_entry = cx.argument::<JsValue>(1)?;
+    let values: Vec<GridEntry> = neon_serde::from_value(cx, grid_entry)?;
+    let phrase_id: u32 = grid_key
+        .get(cx, "phrase_id")?
+        .downcast::<JsNumber>()
+        .or_throw(cx)?
+        .value() as u32;
+
+    let js_lang_set = grid_key
+        .get(cx, "lang_set")?
+        .downcast::<JsArray>()
+        .or_throw(cx)?;
+
+    let lang_set: u128 = langarray_to_langset(
+        cx,
+        js_lang_set
+    )?;
+
+    let key = GridKey { phrase_id, lang_set };
+
+    Ok((key, values))
 }
 
 register_module!(mut m, {
