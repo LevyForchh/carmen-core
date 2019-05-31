@@ -1,6 +1,6 @@
 'use strict';
 
-const addon = require('../native');
+const addon = require('../../native');
 const tape = require('tape');
 const tmp = require('tmp');
 
