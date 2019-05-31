@@ -1,20 +1,20 @@
 'use strict';
 
-const addon = require('../native');
+const addon = require('../../');
 const tape = require('tape');
 const tmp = require('tmp');
 
 tape('JsGridStoreBuilder init', (t) => {
     const tmpDir = tmp.dirSync();
-    t.throws(() => new addon.JsGridStoreBuilder(), 'not enough arguments');
-    const store = new addon.JsGridStoreBuilder(tmpDir.name);
+    t.throws(() => new addon.GridStoreBuilder(), 'not enough arguments');
+    const store = new addon.GridStoreBuilder(tmpDir.name);
     t.ok(store);
     t.end();
 });
 
 tape('JsGridStoreBuilder insert', (t) => {
     const tmpDir = tmp.dirSync();
-    const store = new addon.JsGridStoreBuilder(tmpDir.name);
+    const store = new addon.GridStoreBuilder(tmpDir.name);
     t.throws(() => grid.insert(), 'not enough arguments');
     const id = {
         phrase_id: 1,
