@@ -1,8 +1,8 @@
 use std::borrow::Borrow;
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use serde::{Deserialize, Serialize};
 use failure::Error;
+use serde::{Deserialize, Serialize};
 
 use crate::gridstore::store::GridStore;
 

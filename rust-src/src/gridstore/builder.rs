@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
+use failure::Error;
 use itertools::Itertools;
 use morton::interleave_morton;
 use rocksdb::DB;
-use failure::Error;
 
 use crate::gridstore::common::*;
 use crate::gridstore::gridstore_generated::*;

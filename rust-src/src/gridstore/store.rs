@@ -3,12 +3,12 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use byteorder::{LittleEndian, ReadBytesExt};
+use failure::Error;
 use flatbuffers;
 use itertools::Itertools;
 use morton::deinterleave_morton;
 use ordered_float::OrderedFloat;
 use rocksdb::{Direction, IteratorMode, Options, DB};
-use failure::Error;
 
 use crate::gridstore::common::*;
 use crate::gridstore::gridstore_generated::*;
@@ -139,10 +139,7 @@ impl GridStore {
         Ok(GridStore { db })
     }
 
-    pub fn get(
-        &self,
-        key: &GridKey,
-    ) -> Result<Option<impl Iterator<Item = GridEntry>>, Error> {
+    pub fn get(&self, key: &GridKey) -> Result<Option<impl Iterator<Item = GridEntry>>, Error> {
         let mut db_key: Vec<u8> = Vec::new();
         key.write_to(0, &mut db_key)?;
 

@@ -2,9 +2,9 @@ use std::borrow::Borrow;
 use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet};
 
+use failure::Error;
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
-use failure::Error;
 
 use crate::gridstore::common::*;
 use crate::gridstore::store::GridStore;
