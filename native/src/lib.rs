@@ -2,6 +2,7 @@
 extern crate neon;
 extern crate carmen_core;
 extern crate neon_serde;
+extern crate failure;
 use carmen_core::gridstore::coalesce;
 use carmen_core::gridstore::PhrasematchSubquery;
 use carmen_core::gridstore::{
@@ -10,8 +11,8 @@ use carmen_core::gridstore::{
 
 use neon::prelude::*;
 use neon_serde::errors::Result as LibResult;
-use std::error::Error;
 use std::sync::Arc;
+use failure::Error;
 
 type ArcGridStore = Arc<GridStore>;
 
@@ -51,7 +52,7 @@ declare_types! {
             let filename = cx.argument::<JsString>(0)?.value();
             match GridStoreBuilder::new(filename) {
                 Ok(s) => Ok(Some(s)),
-                Err(e) => cx.throw_type_error(e.description())
+                Err(e) => cx.throw_type_error(e.to_string())
             }
         }
 
@@ -81,7 +82,7 @@ declare_types! {
             // lock falls out of scope at the end of this block
             // in order to be able to borrow `cx` for the error block we assign it to a variable
 
-            let insert: Result<Result<(), Box<dyn Error>>, &str> = {
+            let insert: Result<Result<(), Error>, &str> = {
                 let lock = cx.lock();
                 let mut gridstore = this.borrow_mut(&lock);
                 match gridstore.as_mut() {
@@ -103,7 +104,7 @@ declare_types! {
         method finish(mut cx) {
             let mut this = cx.this();
 
-            let finish: Result<Result<(), Box<dyn Error>>, &str> = {
+            let finish: Result<Result<(), Error>, &str> = {
                 let lock = cx.lock();
                 let mut gridstore = this.borrow_mut(&lock);
                 match gridstore.take() {
@@ -128,7 +129,7 @@ declare_types! {
             let filename = cx.argument::<JsString>(0)?.value();
             match GridStore::new(filename) {
                 Ok(s) => Ok(Arc::new(s)),
-                Err(e) => cx.throw_type_error(e.description())
+                Err(e) => cx.throw_type_error(e.to_string())
             }
         }
     }
