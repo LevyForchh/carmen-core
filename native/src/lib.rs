@@ -1,8 +1,3 @@
-#[macro_use]
-extern crate neon;
-extern crate carmen_core;
-extern crate neon_serde;
-extern crate failure;
 use carmen_core::gridstore::coalesce;
 use carmen_core::gridstore::PhrasematchSubquery;
 use carmen_core::gridstore::{
@@ -10,6 +5,7 @@ use carmen_core::gridstore::{
 };
 
 use neon::prelude::*;
+use neon::{class_definition, declare_types, impl_managed, register_module};
 use neon_serde::errors::Result as LibResult;
 use std::sync::Arc;
 use failure::Error;
