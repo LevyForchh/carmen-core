@@ -56,21 +56,21 @@ declare_types! {
             let grid_key = cx.argument::<JsObject>(0)?;
             let grid_entry = cx.argument::<JsValue>(1)?;
             let values: Vec<GridEntry> = neon_serde::from_value(&mut cx, grid_entry)?;
-            let js_phrase_id = {
-                grid_key.get(&mut cx, "phrase_id")?
-            };
-            let phrase_id: u32 = {
-                js_phrase_id.downcast::<JsNumber>().or_throw(&mut cx)?.value() as u32
-            };
-            let js_lang_set = {
-                grid_key.get(&mut cx, "lang_set")?
-            };
+            let phrase_id: u32 = grid_key
+                .get(&mut cx, "phrase_id")?
+                .downcast::<JsNumber>()
+                .or_throw(&mut cx)?
+                .value() as u32;
 
-            let js_array_lang = {
-                js_lang_set.downcast::<JsArray>().or_throw(&mut cx)?
-            };
+            let js_lang_set = grid_key
+                .get(&mut cx, "lang_set")?
+                .downcast::<JsArray>()
+                .or_throw(&mut cx)?;
 
-            let lang_set: u128 = langarray_to_langset(&mut cx, js_array_lang)?;
+            let lang_set: u128 = langarray_to_langset(
+                &mut cx,
+                js_lang_set
+            )?;
 
             let key = GridKey { phrase_id, lang_set };
             let mut this = cx.this();
