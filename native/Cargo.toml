@@ -18,4 +18,5 @@ neon-build = "0.2.0"
 neon = "0.2.0"
 neon-serde = "0.1.1"
 failure = "0.1.5"
+owning_ref = "0.4"
 carmen-core = { path = "../" }

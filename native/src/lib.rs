@@ -7,6 +7,9 @@ use carmen_core::gridstore::{
 use neon::prelude::*;
 use neon::{class_definition, declare_types, impl_managed, register_module};
 use neon_serde::errors::Result as LibResult;
+use owning_ref::OwningHandle;
+use failure::Error;
+
 use std::sync::Arc;
 
 type ArcGridStore = Arc<GridStore>;
@@ -40,6 +43,8 @@ impl Task for CoalesceTask {
             .or_throw(&mut cx)?)
     }
 }
+
+type KeyIterator = OwningHandle<ArcGridStore, Box<dyn Iterator<Item=Result<GridKey, Error>>>>;
 
 declare_types! {
     pub class JsGridStoreBuilder as JsGridStoreBuilder for Option<GridStoreBuilder> {
@@ -168,6 +173,71 @@ declare_types! {
             }
         }
     }
+
+    pub class JsGridKeyStoreKeyIterator as JsGridKeyStoreKeyIterator for KeyIterator {
+        init(mut cx) {
+            let js_gridstore = cx.argument::<JsGridStore>(0)?;
+            let gridstore = {
+                let guard = cx.lock();
+                // shallow clone of the Arc
+                let gridstore_clone = js_gridstore.borrow(&guard).clone();
+                gridstore_clone
+            };
+
+            Ok(OwningHandle::new_with_fn(gridstore, |gs| {
+                // this is per the OwningHandle docs -- the handle keeps both the arc and the
+                // iterator, so the former is guaranteed to be around as long as the latter
+                let gridstore = unsafe { &*gs };
+                let iter: Box<dyn Iterator<Item=Result<GridKey, Error>>> = Box::new(gridstore.keys());
+                iter
+            }))
+        }
+
+        method next(mut cx) {
+            let mut this = cx.this();
+
+            let next_gk = {
+                let lock = cx.lock();
+                let mut iter = this.borrow_mut(&lock);
+
+                iter.next()
+            };
+
+            match next_gk {
+                Some(Ok(gk)) => {
+                    let out = JsObject::new(&mut cx);
+
+                    let done_label = JsString::new(&mut cx, "done");
+                    let done_value = JsBoolean::new(&mut cx, false);
+                    out.set(&mut cx, done_label, done_value)?;
+
+                    let value_label = JsString::new(&mut cx, "value");
+                    let js_gk = JsObject::new(&mut cx);
+                    out.set(&mut cx, value_label, js_gk)?;
+
+                    let phrase_id_label = JsString::new(&mut cx, "phrase_id");
+                    let phrase_id_value = JsNumber::new(&mut cx, gk.phrase_id);
+                    js_gk.set(&mut cx, phrase_id_label, phrase_id_value)?;
+
+                    let lang_set_label = JsString::new(&mut cx, "lang_set");
+                    let lang_set_value = langset_to_langarray(&mut cx, gk.lang_set);
+                    js_gk.set(&mut cx, lang_set_label, lang_set_value)?;
+
+                    Ok(out.upcast())
+                }
+                Some(Err(e)) => {
+                    cx.throw_type_error(e.to_string())
+                }
+                None => {
+                    let out = JsObject::new(&mut cx);
+                    let done_label = JsString::new(&mut cx, "done");
+                    let done_value = JsBoolean::new(&mut cx, true);
+                    out.set(&mut cx, done_label, done_value)?;
+                    Ok(out.upcast())
+                }
+            }
+        }
+    }
 }
 
 fn langarray_to_langset<'j, C>(cx: &mut C, maybe_lang_array: Handle<'j, JsValue>) -> Result<u128, neon_serde::errors::Error>
@@ -188,6 +258,20 @@ where
     } else {
         cx.throw_type_error("Expected array, undefined, or null for lang_set")?
     }
+}
+
+fn langset_to_langarray<'j, C: Context<'j>>(cx: &mut C, lang_set: u128) -> Handle<'j, JsArray> {
+    let out = JsArray::new(cx, 0);
+    let mut i = 0;
+    for j in 0..128 {
+        let bit = 1u128 << j;
+        if lang_set & bit != 0 {
+            let num = JsNumber::new(cx, j);
+            out.set(cx, i, num).expect("failed to set array slot");
+            i += 1;
+        }
+    }
+    out
 }
 
 pub fn js_coalesce(mut cx: FunctionContext) -> JsResult<JsUndefined> {
@@ -270,6 +354,7 @@ fn prep_for_insert<'j, T: neon::object::This>(cx: &mut CallContext<'j, T>) -> Re
 register_module!(mut m, {
     m.export_class::<JsGridStoreBuilder>("GridStoreBuilder")?;
     m.export_class::<JsGridStore>("GridStore")?;
+    m.export_class::<JsGridKeyStoreKeyIterator>("GridStoreKeyIterator")?;
     m.export_function("coalesce", js_coalesce)?;
     Ok(())
 });
