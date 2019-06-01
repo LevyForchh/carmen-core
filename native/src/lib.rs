@@ -1,7 +1,7 @@
 use carmen_core::gridstore::coalesce;
 use carmen_core::gridstore::PhrasematchSubquery;
 use carmen_core::gridstore::{
-    CoalesceContext, GridEntry, GridKey, GridStore, GridStoreBuilder, MatchOpts,
+    CoalesceContext, GridEntry, GridKey, GridStore, GridStoreBuilder, MatchOpts, MatchKey,
 };
 
 use neon::prelude::*;
@@ -170,16 +170,24 @@ declare_types! {
     }
 }
 
-fn langarray_to_langset<'j, C>(cx: &mut C, lang_array: Handle<'j, JsArray>) -> LibResult<u128>
+fn langarray_to_langset<'j, C>(cx: &mut C, maybe_lang_array: Handle<'j, JsValue>) -> Result<u128, neon_serde::errors::Error>
 where
     C: Context<'j>,
 {
-    let mut out = 0u128;
-    for i in 0..lang_array.len() {
-        out = out
-            | (1 << lang_array.get(cx, i)?.downcast::<JsNumber>().or_throw(cx)?.value() as usize);
+    if let Ok(lang_array) = maybe_lang_array.downcast::<JsArray>() {
+        let mut out = 0u128;
+        for i in 0..lang_array.len() {
+            out = out
+                | (1 << lang_array.get(cx, i)?.downcast::<JsNumber>().or_throw(cx)?.value() as usize);
+        }
+        Ok(out)
+    } else if let Ok(_) = maybe_lang_array.downcast::<JsNull>() {
+        Ok(std::u128::MAX)
+    } else if let Ok(_) = maybe_lang_array.downcast::<JsUndefined>() {
+        Ok(std::u128::MAX)
+    } else {
+        cx.throw_type_error("Expected array, undefined, or null for lang_set")?
     }
-    Ok(out)
 }
 
 pub fn js_coalesce(mut cx: FunctionContext) -> JsResult<JsUndefined> {
@@ -217,15 +225,20 @@ where
             gridstore_clone
         };
         let weight = js_phrasematch.get(cx, "weight")?;
-        let match_key = js_phrasematch.get(cx, "match_key")?;
         let idx = js_phrasematch.get(cx, "idx")?;
         let zoom = js_phrasematch.get(cx, "zoom")?;
         let mask = js_phrasematch.get(cx, "mask")?;
 
+        let match_key = js_phrasematch.get(cx, "match_key")?.downcast::<JsObject>().or_throw(cx)?;
+        let match_phrase = match_key.get(cx, "match_phrase")?;
+
+        let js_lang_set = match_key.get(cx, "lang_set")?;
+        let lang_set: u128 = langarray_to_langset(cx, js_lang_set)?;
+
         let subq = PhrasematchSubquery {
             store: gridstore,
             weight: neon_serde::from_value(cx, weight)?,
-            match_key: neon_serde::from_value(cx, match_key)?,
+            match_key: MatchKey { match_phrase: neon_serde::from_value(cx, match_phrase)?, lang_set },
             idx: neon_serde::from_value(cx, idx)?,
             zoom: neon_serde::from_value(cx, zoom)?,
             mask: neon_serde::from_value(cx, mask)?,
@@ -246,15 +259,8 @@ fn prep_for_insert<'j, T: neon::object::This>(cx: &mut CallContext<'j, T>) -> Re
         .or_throw(cx)?
         .value() as u32;
 
-    let js_lang_set = grid_key
-        .get(cx, "lang_set")?
-        .downcast::<JsArray>()
-        .or_throw(cx)?;
-
-    let lang_set: u128 = langarray_to_langset(
-        cx,
-        js_lang_set
-    )?;
+    let js_lang_set = grid_key.get(cx, "lang_set")?;
+    let lang_set: u128 = langarray_to_langset(cx, js_lang_set)?;
 
     let key = GridKey { phrase_id, lang_set };
 
