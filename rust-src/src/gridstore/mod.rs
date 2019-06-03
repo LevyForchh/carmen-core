@@ -176,7 +176,7 @@ mod tests {
         ];
 
         let mut i = 0;
-        for key in keys {
+        for key in keys.iter() {
             for _j in 0..2 {
                 #[cfg_attr(rustfmt, rustfmt::skip)]
                 let entries = vec![
@@ -187,7 +187,7 @@ mod tests {
                 ];
                 i += 4;
 
-                builder.insert(&key, &entries).expect("Unable to insert record");
+                builder.insert(key, &entries).expect("Unable to insert record");
             }
         }
 
@@ -425,6 +425,12 @@ mod tests {
                 MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 1, x: 40, y: 1, id: 20, source_phrase_hash: 0 }, matches_language: false }
             ]
         );
+
+        let listed_keys: Result<Vec<_>, _> = reader.keys().collect();
+        let mut orig_keys = keys.clone();
+        orig_keys.sort();
+        orig_keys.dedup();
+        assert_eq!(listed_keys.unwrap(), orig_keys);
     }
 
     #[test]
