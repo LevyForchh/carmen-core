@@ -172,6 +172,36 @@ declare_types! {
                 Err(e) => cx.throw_type_error(e.to_string())
             }
         }
+
+        method get(mut cx) {
+            let grid_key = cx.argument::<JsObject>(0)?;
+
+            let phrase_id: u32 = grid_key
+                .get(&mut cx, "phrase_id")?
+                .downcast::<JsNumber>()
+                .or_throw(&mut cx)?
+                .value() as u32;
+
+            let js_lang_set = grid_key.get(&mut cx, "lang_set")?;
+            let lang_set: u128 = langarray_to_langset(&mut cx, js_lang_set)?;
+
+            let key = GridKey { phrase_id, lang_set };
+
+            let mut this = cx.this();
+
+            let result = {
+                let lock = cx.lock();
+                let grid_store = this.borrow_mut(&lock);
+
+                grid_store.get(&key).map(|option| option.map(|iter| iter.collect::<Vec<_>>()))
+            };
+
+            match result {
+                Ok(Some(v)) => Ok(neon_serde::to_value(&mut cx, &v)?),
+                Ok(None) => Ok(JsUndefined::new().upcast()),
+                Err(e) => cx.throw_type_error(e.to_string())
+            }
+        }
     }
 
     pub class JsGridKeyStoreKeyIterator as JsGridKeyStoreKeyIterator for KeyIterator {
