@@ -310,7 +310,7 @@ pub const MAX_CONTEXTS: usize = 40;
 #[derive(Serialize, Deserialize, Debug, PartialOrd, PartialEq, Clone)]
 pub struct GridEntry {
     // these will be truncated to 4 bits apiece
-    pub relev: f32,
+    pub relev: f64,
     pub score: u8,
     pub x: u16,
     pub y: u16,
@@ -339,14 +339,14 @@ pub struct CoalesceEntry {
 #[derive(Serialize, Deserialize, Debug, PartialOrd, PartialEq)]
 pub struct CoalesceContext {
     pub mask: u32,
-    pub relev: f32,
+    pub relev: f64,
     pub entries: Vec<CoalesceEntry>,
 }
 
 #[derive(Debug, Clone)]
 pub struct PhrasematchSubquery<T: Borrow<GridStore> + Clone> {
     pub store: T,
-    pub weight: f32,
+    pub weight: f64,
     pub match_key: MatchKey,
     pub idx: u16,
     pub zoom: u16,
@@ -354,7 +354,7 @@ pub struct PhrasematchSubquery<T: Borrow<GridStore> + Clone> {
 }
 
 #[inline]
-pub fn relev_float_to_int(relev: f32) -> u8 {
+pub fn relev_float_to_int(relev: f64) -> u8 {
     if relev == 0.4 {
         0
     } else if relev == 0.6 {
@@ -367,7 +367,7 @@ pub fn relev_float_to_int(relev: f32) -> u8 {
 }
 
 #[inline]
-pub fn relev_int_to_float(relev: u8) -> f32 {
+pub fn relev_int_to_float(relev: u8) -> f64 {
     match relev {
         0 => 0.4,
         1 => 0.6,
