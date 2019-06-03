@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use byteorder::{LittleEndian, BigEndian, ReadBytesExt};
+use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
 use failure::Error;
 use flatbuffers;
 use itertools::Itertools;
@@ -342,7 +342,7 @@ impl GridStore {
         Ok(out)
     }
 
-    pub fn keys<'i>(&'i self) -> impl Iterator<Item=Result<GridKey, Error>> + 'i {
+    pub fn keys<'i>(&'i self) -> impl Iterator<Item = Result<GridKey, Error>> + 'i {
         let db_iter = self.db.iterator(IteratorMode::Start);
         db_iter.take_while(|(key, _)| key[0] == 0).map(|(key, _)| {
             let phrase_id = (&key[1..]).read_u32::<BigEndian>()?;
