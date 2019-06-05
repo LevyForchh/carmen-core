@@ -67,3 +67,6 @@ matrix:
 
       script:
         - yarn test
+
+      after_success:
+        - ./scripts/publish.sh --debug=false
