@@ -8,13 +8,13 @@ The latest stable version of Rust to build this project.
 
 To install rust, follow instructions at https://www.rust-lang.org/tools/install .
 
-To compile, run
+To compile, run:
 
 ```
 cargo build
 ```
 
-To run Rust tests, run
+To run Rust tests, run:
 
 ```
 cargo test
@@ -52,3 +52,13 @@ To run Javascript tests, run:
 ```
 yarn test
 ```
+
+## Publishing
+
+This project includes `script/publish.sh`, which publishes built binaries of the Javascript bindings of `carmen-core`. Generally, this script will be run automatically from Travis, and can be triggered with a special commit message.
+
+Once you're ready to publish a binary (either a release or a development version):
+* If a release-ready version, merge your branch into master
+* Update the version number in `package.json` (for development versions, add a `-[your-branch-name]-1` tag after the number)
+* Commit your changes with a commit message that includes `[publish binary]`
+* Push and wait for Travis to run; the Javascript builders should include information about publishing builds at the end of the build log
