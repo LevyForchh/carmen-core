@@ -90,10 +90,10 @@ fn coalesce_single<T: Borrow<GridStore> + Clone>(
 ) -> Result<Vec<CoalesceContext>, Error> {
     let grids = subquery.store.borrow().get_matching(&subquery.match_key, match_opts)?;
     let mut contexts: Vec<CoalesceContext> = Vec::new();
-    let mut max_relev: f32 = 0.;
+    let mut max_relev: f64 = 0.;
     // TODO: rename all of the last things to previous things
     let mut last_id: u32 = 0;
-    let mut last_relev: f32 = 0.;
+    let mut last_relev: f64 = 0.;
     let mut last_scoredist: f64 = 0.;
     let mut last_distance: f64 = 0.;
     let mut min_scoredist = std::f64::MAX;
@@ -169,7 +169,7 @@ fn coalesce_multi<T: Borrow<GridStore> + Clone>(
     let mut coalesced: HashMap<(u16, u16, u16), Vec<CoalesceContext>> = HashMap::new();
     let mut contexts: Vec<CoalesceContext> = Vec::new();
 
-    let mut max_relev: f32 = 0.;
+    let mut max_relev: f64 = 0.;
 
     for (i, subquery) in stack.iter().enumerate() {
         let compatible_zooms: Vec<u16> = stack
@@ -209,7 +209,7 @@ fn coalesce_multi<T: Borrow<GridStore> + Clone>(
 
                 if let Some(already_coalesced) = coalesced.get(&other_zxy) {
                     let mut prev_mask = 0;
-                    let mut prev_relev: f32 = 0.;
+                    let mut prev_relev: f64 = 0.;
                     for parent_context in already_coalesced {
                         for parent_entry in &parent_context.entries {
                             // this cover is functionally identical with previous and
