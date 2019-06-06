@@ -33,6 +33,11 @@ matrix:
       env: BUILDTYPE=release
       node_js: 10
 
+      cache:
+        directories:
+        - $HOME/.cargo
+        - $TRAVIS_BUILD_DIR/native/target
+
       install:
         - node -v
         - which node
@@ -47,12 +52,20 @@ matrix:
       script:
         - yarn coverage
 
+      after_success:
+        - ./scripts/publish.sh --debug=$([ "${BUILDTYPE}" == 'debug' ] && echo "true" || echo "false")
+
     - language: node_js
       sudo: false
       os: osx
       osx_image: xcode9.2
       env: BUILDTYPE=release
       node_js: 10
+
+      cache:
+        directories:
+        - $HOME/.cargo
+        - $TRAVIS_BUILD_DIR/native/target
 
       install:
         - node -v
@@ -69,4 +82,4 @@ matrix:
         - yarn test
 
       after_success:
-        - ./scripts/publish.sh --debug=false
+        - ./scripts/publish.sh --debug=$([ "${BUILDTYPE}" == 'debug' ] && echo "true" || echo "false")
