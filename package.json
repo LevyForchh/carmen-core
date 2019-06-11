@@ -1,6 +1,6 @@
 {
   "name": "node-carmen-core",
-  "version": "0.1.0",
+  "version": "0.1.0-dev-2",
   "description": "node bindings for carmen-core",
   "main": "index.js",
   "engines": {
@@ -12,15 +12,29 @@
   },
   "author": "Aarthy Chandrasekhar <kcaarthy@gmail.com>",
   "license": "MIT",
-  "dependencies": {},
+  "dependencies": {
+    "neon-cli": "^0.2.0",
+    "node-pre-gyp": "~0.13.0"
+  },
   "devDependencies": {
+    "@mapbox/cfn-config": "^2.15.0",
+    "@mapbox/cloudfriend": "^1.9.1",
     "codecov": "^3.3.0",
     "neon-cli": "^0.2.0",
-    "nyc": "^14.0.0"
+    "nyc": "^14.0.0",
+    "tape": "^4.10.2"
   },
   "scripts": {
-    "install": "neon build --release",
-    "test": "node -e \"require('.')\"",
+    "install": "node-pre-gyp install --fallback-to-build=false || neon build --release",
+    "build": "neon build --release",
+    "test": "tape ./test/bindings/*",
     "coverage": "nyc node -e \"require('.')\" && nyc report --reporter=text-lcov > coverage.lcov && codecov"
+  },
+  "binary": {
+    "module_name": "index",
+    "host": "https://mapbox-node-binary.s3.amazonaws.com",
+    "remote_path": "./{name}/v{version}/{configuration}/",
+    "package_name": "{node_abi}-{platform}-{arch}.tar.gz",
+    "module_path": "./native/"
   }
 }
