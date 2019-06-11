@@ -3,6 +3,8 @@ mod common;
 
 use common::*;
 
+const ALL_LANGUAGES: u128 = u128::max_value();
+
 #[test]
 fn coalesce_single_test_proximity_quadrants() {
     let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
@@ -516,7 +518,7 @@ fn coalesce_single_languages_test() {
         weight: 1.,
         match_key: MatchKey {
             match_phrase: MatchPhrase::Range { start: 1, end: 3 },
-            lang_set: u128::max_value(),
+            lang_set: ALL_LANGUAGES,
         },
         idx: 0,
         zoom: 6,
@@ -859,7 +861,7 @@ fn coalesce_multi_test() {
 fn coalesce_multi_languages_test() {
     // Store 1 with grids in all languages
     let store1 = create_store(vec![StoreEntryBuildingBlock {
-        grid_key: GridKey { phrase_id: 1, lang_set: u128::max_value() },
+        grid_key: GridKey { phrase_id: 1, lang_set: ALL_LANGUAGES },
         entries: vec![GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 1, source_phrase_hash: 0 }],
     }]);
 
@@ -899,7 +901,7 @@ fn coalesce_multi_languages_test() {
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
-                lang_set: u128::max_value(),
+                lang_set: ALL_LANGUAGES,
             },
             idx: 0,
             zoom: 1,
@@ -910,7 +912,7 @@ fn coalesce_multi_languages_test() {
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
-                lang_set: u128::max_value(),
+                lang_set: ALL_LANGUAGES,
             },
             idx: 1,
             // TODO: when would these have the same zoom?
@@ -949,7 +951,7 @@ fn coalesce_multi_languages_test() {
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
-                lang_set: u128::max_value(),
+                lang_set: ALL_LANGUAGES,
             },
             idx: 0,
             zoom: 1,
@@ -999,7 +1001,7 @@ fn coalesce_multi_languages_test() {
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
-                lang_set: u128::max_value(),
+                lang_set: ALL_LANGUAGES,
             },
             idx: 0,
             zoom: 1,
@@ -1120,14 +1122,14 @@ fn coalesce_multi_scoredist() {
 #[test]
 fn coalesce_multi_test_bbox() {
     let store1 = create_store(vec![StoreEntryBuildingBlock {
-        grid_key: GridKey { phrase_id: 1, lang_set: u128::max_value() },
+        grid_key: GridKey { phrase_id: 1, lang_set: ALL_LANGUAGES },
         entries: vec![
             GridEntry { id: 1, x: 0, y: 0, relev: 0.8, score: 1, source_phrase_hash: 0 },
             GridEntry { id: 2, x: 1, y: 1, relev: 1., score: 1, source_phrase_hash: 0 },
         ],
     }]);
     let store2 = create_store(vec![StoreEntryBuildingBlock {
-        grid_key: GridKey { phrase_id: 2, lang_set: u128::max_value() },
+        grid_key: GridKey { phrase_id: 2, lang_set: ALL_LANGUAGES },
         entries: vec![
             GridEntry { id: 3, x: 3, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },
             GridEntry { id: 4, x: 0, y: 3, relev: 1., score: 1, source_phrase_hash: 0 },
@@ -1136,7 +1138,7 @@ fn coalesce_multi_test_bbox() {
 
     // TODO: phrase_id should probably be different
     let store3 = create_store(vec![StoreEntryBuildingBlock {
-        grid_key: GridKey { phrase_id: 1, lang_set: u128::max_value() },
+        grid_key: GridKey { phrase_id: 1, lang_set: ALL_LANGUAGES },
         entries: vec![
             GridEntry { id: 5, x: 21, y: 7, relev: 1., score: 1, source_phrase_hash: 0 },
             GridEntry { id: 6, x: 21, y: 18, relev: 1., score: 1, source_phrase_hash: 0 },
@@ -1149,7 +1151,7 @@ fn coalesce_multi_test_bbox() {
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
-                lang_set: u128::max_value(),
+                lang_set: ALL_LANGUAGES,
             },
             idx: 0,
             zoom: 1,
@@ -1160,7 +1162,7 @@ fn coalesce_multi_test_bbox() {
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
-                lang_set: u128::max_value(),
+                lang_set: ALL_LANGUAGES,
             },
             idx: 1,
             zoom: 2,
@@ -1222,7 +1224,7 @@ fn coalesce_multi_test_bbox() {
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
-                lang_set: u128::max_value(),
+                lang_set: ALL_LANGUAGES,
             },
             idx: 1,
             zoom: 2,
@@ -1233,7 +1235,7 @@ fn coalesce_multi_test_bbox() {
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
-                lang_set: u128::max_value(),
+                lang_set: ALL_LANGUAGES,
             },
             idx: 2,
             zoom: 5,
