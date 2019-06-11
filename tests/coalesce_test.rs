@@ -1136,9 +1136,8 @@ fn coalesce_multi_test_bbox() {
         ],
     }]);
 
-    // TODO: phrase_id should probably be different
     let store3 = create_store(vec![StoreEntryBuildingBlock {
-        grid_key: GridKey { phrase_id: 1, lang_set: ALL_LANGUAGES },
+        grid_key: GridKey { phrase_id: 3, lang_set: ALL_LANGUAGES },
         entries: vec![
             GridEntry { id: 5, x: 21, y: 7, relev: 1., score: 1, source_phrase_hash: 0 },
             GridEntry { id: 6, x: 21, y: 18, relev: 1., score: 1, source_phrase_hash: 0 },
@@ -1223,7 +1222,7 @@ fn coalesce_multi_test_bbox() {
             store: &store2,
             weight: 0.5,
             match_key: MatchKey {
-                match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                match_phrase: MatchPhrase::Range { start: 1, end: 4 },
                 lang_set: ALL_LANGUAGES,
             },
             idx: 1,
@@ -1234,7 +1233,7 @@ fn coalesce_multi_test_bbox() {
             store: &store3,
             weight: 0.5,
             match_key: MatchKey {
-                match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                match_phrase: MatchPhrase::Range { start: 1, end: 4 },
                 lang_set: ALL_LANGUAGES,
             },
             idx: 2,
