@@ -5,6 +5,7 @@ authors = ["Aarthy Chandrasekhar <kcaarthy@gmail.com>"]
 license = "MIT"
 build = "build.rs"
 exclude = ["artifacts.json", "index.node"]
+edition = "2018"
 
 [lib]
 name = "node_carmen_core"
@@ -15,3 +16,7 @@ neon-build = "0.2.0"
 
 [dependencies]
 neon = "0.2.0"
+neon-serde = "0.1.1"
+failure = "0.1.5"
+owning_ref = "0.4"
+carmen-core = { path = "../" }

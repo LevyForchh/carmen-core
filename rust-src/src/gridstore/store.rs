@@ -1,9 +1,9 @@
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
-use std::error::Error;
 use std::path::Path;
 
-use byteorder::{LittleEndian, ReadBytesExt};
+use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
+use failure::Error;
 use flatbuffers;
 use itertools::Itertools;
 use morton::deinterleave_morton;
@@ -131,7 +131,7 @@ fn eager_test() {
 }
 
 impl GridStore {
-    pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn Error>> {
+    pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
         let path = path.as_ref().to_owned();
         let mut opts = Options::default();
         opts.set_read_only(true);
@@ -139,10 +139,7 @@ impl GridStore {
         Ok(GridStore { db })
     }
 
-    pub fn get(
-        &self,
-        key: &GridKey,
-    ) -> Result<Option<impl Iterator<Item = GridEntry>>, Box<Error>> {
+    pub fn get(&self, key: &GridKey) -> Result<Option<impl Iterator<Item = GridEntry>>, Error> {
         let mut db_key: Vec<u8> = Vec::new();
         key.write_to(0, &mut db_key)?;
 
@@ -198,7 +195,7 @@ impl GridStore {
         &self,
         match_key: &MatchKey,
         match_opts: &MatchOpts,
-    ) -> Result<impl Iterator<Item = MatchEntry>, Box<Error>> {
+    ) -> Result<impl Iterator<Item = MatchEntry>, Error> {
         let mut db_key: Vec<u8> = Vec::new();
         match_key.write_start_to(0, &mut db_key)?;
 
@@ -343,5 +340,25 @@ impl GridStore {
             })
         });
         Ok(out)
+    }
+
+    pub fn keys<'i>(&'i self) -> impl Iterator<Item = Result<GridKey, Error>> + 'i {
+        let db_iter = self.db.iterator(IteratorMode::Start);
+        db_iter.take_while(|(key, _)| key[0] == 0).map(|(key, _)| {
+            let phrase_id = (&key[1..]).read_u32::<BigEndian>()?;
+
+            let key_lang_partial = &key[5..];
+            let lang_set: u128 = if key_lang_partial.len() == 0 {
+                // 0-length language array is the shorthand for "matches everything"
+                std::u128::MAX
+            } else {
+                let mut key_lang_full = [0u8; 16];
+                key_lang_full[(16 - key_lang_partial.len())..].copy_from_slice(key_lang_partial);
+
+                (&key_lang_full[..]).read_u128::<BigEndian>()?
+            };
+
+            Ok(GridKey { phrase_id, lang_set })
+        })
     }
 }

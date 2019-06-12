@@ -1,7 +1,7 @@
-use std::collections::BTreeMap;
-use std::error::Error;
+use std::collections::{btree_map::Entry, BTreeMap};
 use std::path::{Path, PathBuf};
 
+use failure::{Error, Fail};
 use itertools::Itertools;
 use morton::interleave_morton;
 use rocksdb::DB;
@@ -36,12 +36,12 @@ fn extend_entries(builder_entry: &mut BuilderEntry, values: &[GridEntry]) -> () 
 
 impl GridStoreBuilder {
     /// Makes a new GridStoreBuilder with a particular filename.
-    pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn Error>> {
+    pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
         Ok(GridStoreBuilder { path: path.as_ref().to_owned(), data: BTreeMap::new() })
     }
 
     /// Inserts a new GridStore entry with the given values.
-    pub fn insert(&mut self, key: &GridKey, values: &[GridEntry]) -> Result<(), Box<dyn Error>> {
+    pub fn insert(&mut self, key: &GridKey, values: &[GridEntry]) -> Result<(), Error> {
         let mut to_insert = BuilderEntry::new();
         extend_entries(&mut to_insert, values);
         self.data.insert(key.to_owned(), to_insert);
@@ -49,14 +49,39 @@ impl GridStoreBuilder {
     }
 
     ///  Appends a values to and existing GridStore entry.
-    pub fn append(&mut self, key: &GridKey, values: &[GridEntry]) -> Result<(), Box<dyn Error>> {
+    pub fn append(&mut self, key: &GridKey, values: &[GridEntry]) -> Result<(), Error> {
         let mut to_append = self.data.entry(key.to_owned()).or_insert_with(|| BuilderEntry::new());
         extend_entries(&mut to_append, values);
         Ok(())
     }
 
-    /// [wip] Writes data to disk.
-    pub fn finish(mut self) -> Result<(), Box<Error>> {
+    /// In situations under which data has been inserted using temporary phrase IDs, renumber
+    /// the data in the index to use final phrase IDs, given a temporary-to-final-ID mapping
+    pub fn renumber(&mut self, tmp_phrase_ids_to_ids: &[u32]) -> Result<(), Error> {
+        let mut old_data: BTreeMap<GridKey, BuilderEntry> = BTreeMap::new();
+        std::mem::swap(&mut old_data, &mut self.data);
+
+        for (key, value) in old_data.into_iter() {
+            let new_phrase_id = tmp_phrase_ids_to_ids
+                .get(key.phrase_id as usize)
+                .ok_or_else(|| BuildError::OutOfBoundsRenumberEntry { tmp_id: key.phrase_id })?;
+            let new_key = GridKey { phrase_id: *new_phrase_id, ..key };
+            match self.data.entry(new_key) {
+                Entry::Vacant(v) => {
+                    v.insert(value);
+                }
+                Entry::Occupied(_) => {
+                    return Err(Error::from(BuildError::DuplicateRenumberEntry {
+                        target_id: *new_phrase_id,
+                    }))
+                }
+            };
+        }
+        Ok(())
+    }
+
+    /// Writes data to disk.
+    pub fn finish(mut self) -> Result<(), Error> {
         let db = DB::open_default(&self.path)?;
         let mut db_key: Vec<u8> = Vec::with_capacity(MAX_KEY_LENGTH);
         for (grid_key, value) in self.data.iter_mut() {
@@ -188,4 +213,12 @@ fn append_test() {
     assert_eq!(entry.unwrap().len(), 3, "Entry contains three grids");
 
     builder.finish().unwrap();
+}
+
+#[derive(Debug, Fail)]
+enum BuildError {
+    #[fail(display = "duplicate rename entry: {}", target_id)]
+    DuplicateRenumberEntry { target_id: u32 },
+    #[fail(display = "out of bounds: {}", tmp_id)]
+    OutOfBoundsRenumberEntry { tmp_id: u32 },
 }

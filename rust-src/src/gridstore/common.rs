@@ -1,6 +1,7 @@
-use std::error::Error;
+use std::borrow::Borrow;
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use failure::Error;
 use serde::{Deserialize, Serialize};
 
 use crate::gridstore::store::GridStore;
@@ -12,7 +13,7 @@ pub struct GridKey {
 }
 
 impl GridKey {
-    pub fn write_to(&self, type_marker: u8, db_key: &mut Vec<u8>) -> Result<(), Box<Error>> {
+    pub fn write_to(&self, type_marker: u8, db_key: &mut Vec<u8>) -> Result<(), Error> {
         db_key.push(type_marker);
         // next goes the ID
         db_key.write_u32::<BigEndian>(self.phrase_id)?;
@@ -45,7 +46,7 @@ pub struct MatchKey {
 }
 
 impl MatchKey {
-    pub fn write_start_to(&self, type_marker: u8, db_key: &mut Vec<u8>) -> Result<(), Box<Error>> {
+    pub fn write_start_to(&self, type_marker: u8, db_key: &mut Vec<u8>) -> Result<(), Error> {
         db_key.push(type_marker);
         // next goes the ID
         let start = match self.match_phrase {
@@ -56,7 +57,7 @@ impl MatchKey {
         Ok(())
     }
 
-    pub fn matches_key(&self, db_key: &[u8]) -> Result<bool, Box<Error>> {
+    pub fn matches_key(&self, db_key: &[u8]) -> Result<bool, Error> {
         let key_phrase = (&db_key[1..]).read_u32::<BigEndian>()?;
         Ok(match self.match_phrase {
             MatchPhrase::Exact(phrase_id) => phrase_id == key_phrase,
@@ -64,7 +65,7 @@ impl MatchKey {
         })
     }
 
-    pub fn matches_language(&self, db_key: &[u8]) -> Result<bool, Box<Error>> {
+    pub fn matches_language(&self, db_key: &[u8]) -> Result<bool, Error> {
         let key_lang_partial = &db_key[5..];
         if key_lang_partial.len() == 0 {
             // 0-length language array is the shorthand for "matches everything"
@@ -80,13 +81,13 @@ impl MatchKey {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Proximity {
     pub point: [u16; 2],
     pub radius: f64,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct MatchOpts {
     pub bbox: Option<[u16; 4]>,
     pub proximity: Option<Proximity>,
@@ -309,7 +310,7 @@ pub const MAX_CONTEXTS: usize = 40;
 #[derive(Serialize, Deserialize, Debug, PartialOrd, PartialEq, Clone)]
 pub struct GridEntry {
     // these will be truncated to 4 bits apiece
-    pub relev: f32,
+    pub relev: f64,
     pub score: u8,
     pub x: u16,
     pub y: u16,
@@ -338,14 +339,14 @@ pub struct CoalesceEntry {
 #[derive(Serialize, Deserialize, Debug, PartialOrd, PartialEq)]
 pub struct CoalesceContext {
     pub mask: u32,
-    pub relev: f32,
+    pub relev: f64,
     pub entries: Vec<CoalesceEntry>,
 }
 
 #[derive(Debug, Clone)]
-pub struct PhrasematchSubquery<'a> {
-    pub store: &'a GridStore,
-    pub weight: f32,
+pub struct PhrasematchSubquery<T: Borrow<GridStore> + Clone> {
+    pub store: T,
+    pub weight: f64,
     pub match_key: MatchKey,
     pub idx: u16,
     pub zoom: u16,
@@ -353,7 +354,7 @@ pub struct PhrasematchSubquery<'a> {
 }
 
 #[inline]
-pub fn relev_float_to_int(relev: f32) -> u8 {
+pub fn relev_float_to_int(relev: f64) -> u8 {
     if relev == 0.4 {
         0
     } else if relev == 0.6 {
@@ -366,7 +367,7 @@ pub fn relev_float_to_int(relev: f32) -> u8 {
 }
 
 #[inline]
-pub fn relev_int_to_float(relev: u8) -> f32 {
+pub fn relev_int_to_float(relev: u8) -> f64 {
     match relev {
         0 => 0.4,
         1 => 0.6,
