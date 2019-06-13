@@ -72,3 +72,92 @@ tape('GridStore reader', (t) => {
     t.deepEquals(list, [ { phrase_id: 0, lang_set: [ 0 ] }, { phrase_id: 1, lang_set: [ 0, 1, 2, 3 ] } ], 'GridStore is able to retrieve keys, reader works as expected');
     t.end();
 });
+
+tape('Coalesce tests', (t) => {
+    const tmpDir = tmp.dirSync();
+    const builder = new addon.GridStoreBuilder(tmpDir.name);
+    builder.insert({ phrase_id: 1, lang_set: [1] }, [{ id: 1, x: 2, y: 2, relev: 1., score: 1, source_phrase_hash: 0 }]);
+    builder.finish();
+
+    const reader = new addon.GridStore(tmpDir.name);
+
+    // no weight
+    const no_weight = [{
+        store: reader,
+        match_key: {
+            lang_set: [0],
+            match_phrase: {
+                "Range": {
+                    start: 1,
+                    end: 2
+                }
+            }
+        },
+        idx: 2,
+        zoom: 6,
+        mask: 1 << 1,
+    }];
+    t.throws(() => {addon.coalesce(no_weight, {}, () => {})}, 'no weight assigned in stack');
+
+    // invalid type for gridstore
+    const no_store = [{
+        store: 'x',
+        weight: 0.5,
+        match_key: {
+            lang_set: [0],
+            match_phrase: {
+                "Range": {
+                    start: 1,
+                    end: 2
+                }
+            }
+        },
+        idx: 2,
+        zoom: 6,
+        mask: 1 << 1,
+    }];
+    t.throws(() => {addon.coalesce(no_store, {}, () => {})}, /failed downcast to JsGridStore/, 'invalid stack');
+
+    const no_match_key = [{
+        store: reader,
+        weight: 0.5,
+        idx: 2,
+        zoom: 6,
+        mask: 1 << 1,
+    }];
+    t.throws(() => {addon.coalesce(no_match_key, {}, () => {})}, 'no match_key');
+
+    const no_idx = [{
+        store: reader,
+        weight: 0.5,
+        match_key: {
+            lang_set: [0],
+            match_phrase: {
+                "Range": {
+                    start: 1,
+                    end: 2
+                }
+            }
+        },
+        zoom: 6,
+        mask: 1 << 1,
+    }];
+    t.throws(() => {addon.coalesce(no_idx, {}, () => {})}, 'no idx');
+
+    const no_mask = [{
+        store: reader,
+        weight: 0.5,
+        match_key: {
+            lang_set: [0],
+            match_phrase: {
+                "Range": {
+                    start: 1,
+                    end: 2
+                }
+            }
+        },
+        zoom: 6,
+    }];
+    t.throws(() => {addon.coalesce(no_idx, {}, () => {})}, 'no mask');
+    t.end();
+});
