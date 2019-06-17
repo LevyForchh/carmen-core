@@ -205,140 +205,134 @@ impl GridStore {
             .db
             .iterator(IteratorMode::From(&db_key, Direction::Forward))
             .take_while(|(k, _)| match_key.matches_key(k).unwrap());
-        let mut lang_match_refs: Vec<(Box<[u8]>, &'static [u8])> = Vec::new();
-        let mut lang_mismatch_refs: Vec<(Box<[u8]>, &'static [u8])> = Vec::new();
+        let mut record_refs: Vec<(Box<[u8]>, &'static [u8], bool)> = Vec::new();
         for (key, value) in db_iter {
+            let matches_language = match_key.matches_language(&key).unwrap();
             let record_ref = {
                 let value_ref: &[u8] = value.as_ref();
                 // same approach as in get above -- maybe sketchy
                 let static_ref: &'static [u8] = unsafe { std::mem::transmute(value_ref) };
-                (value, static_ref)
+                (value, static_ref, matches_language)
             };
-            if match_key.matches_language(&key).unwrap() {
-                lang_match_refs.push(record_ref);
-            } else {
-                lang_mismatch_refs.push(record_ref);
+            record_refs.push(record_ref);
+        }
+
+        // eagerly bucket all the relev/score chunks from all the groups
+        // DB entries into a single set
+        let mut coords_for_rs = BTreeMap::new();
+        for record_ref in &record_refs {
+            let record = get_root_as_phrase_record(record_ref.1);
+            let rs_vec = get_vector::<RelevScore>(
+                record_ref.1,
+                &record._tab,
+                PhraseRecord::VT_RELEV_SCORES,
+            )
+            .unwrap();
+
+            let matches_language = record_ref.2;
+
+            for rs_obj in rs_vec {
+                let relev_score = rs_obj.relev_score();
+                let relev = relev_int_to_float(relev_score >> 4) * (if matches_language { 1f64 } else { 0.96f64 });
+                // mask for the least significant four bits
+                let score = relev_score & 15;
+
+                let coords_vec =
+                    get_vector::<Coord>(record_ref.1, &rs_obj._tab, RelevScore::VT_COORDS)
+                        .unwrap();
+                // TODO could this be a reference? The compiler was saying:
+                // "cannot move out of captured variable in an `FnMut` closure"
+                // "help: consider borrowing here: `&match_opts`rustc(E0507)""
+                let coords = match &match_opts {
+                    MatchOpts { bbox: None, proximity: None, zoom: 0...16 } => {
+                        Some(Box::new(coords_vec.into_iter().map(|c| (c, -1 * (c.coord() as i64)))) as Box<Iterator<Item = (Coord, i64)>>)
+                    }
+                    MatchOpts { bbox: Some(bbox), proximity: None, zoom: 0...16 } => {
+                        // TODO should the bbox argument be changed to a reference in bbox? The compiler was complaining
+                        match spatial::bbox_filter(coords_vec, *bbox) {
+                            Some(v) => Some(Box::new(v) as Box<Iterator<Item = (Coord, i64)>>),
+                            None => None,
+                        }
+                    }
+                    MatchOpts { bbox: None, proximity: Some(prox_pt), zoom: 0...16 } => {
+                        match spatial::proximity(coords_vec, prox_pt.point) {
+                            Some(v) => Some(Box::new(v) as Box<Iterator<Item = (Coord, i64)>>),
+                            None => None,
+                        }
+                    }
+                    MatchOpts { bbox: Some(bbox), proximity: Some(prox_pt), zoom: 0...16 } => {
+                        match spatial::bbox_proximity_filter(coords_vec, *bbox, prox_pt.point) {
+                            Some(v) => Some(Box::new(v) as Box<Iterator<Item = (Coord, i64)>>),
+                            None => None,
+                        }
+                    }
+                    // TODO: the linter was complaining that not all MatchOpts zooms are covered. The zoom isn't even used for get_matching.
+                    // Should we have separate matchopts structs for this vs coalesce?
+                    _ => None,
+                };
+
+                if coords.is_some() {
+                    let slot = coords_for_rs
+                        .entry((OrderedFloat(relev), score, matches_language))
+                        .or_insert_with(|| vec![]);
+                    slot.push(coords.unwrap());
+                }
             }
         }
 
-        let all_refs = vec![lang_match_refs, lang_mismatch_refs];
-        let out = all_refs.into_iter().enumerate().flat_map(move |(i, ref_set)| {
-            let matches_language = i == 0;
+        let out = coords_for_rs.into_iter().rev().flat_map(move |((relev, score, matches_language), coord_sets)| {
+            // this is necessitated by the unsafe hackery above: we need to grab a reference
+            // to ref_set so that it gets moved into the closure, so that its memory doesn't
+            // get freed before we're done with it
+            let _ref_set = &record_refs;
+            let relev = relev.into_inner();
+            // for each relev/score, lazily k-way-merge the child entities by z-order curve value
+            let merged = coord_sets
+                .into_iter()
+                .kmerge_by(|a, b| a.1.cmp(&b.1) == Ordering::Less)
+                .map(|coords_obj| (coords_obj.0.coord(), coords_obj.0));
 
-            // eagerly bucket all the relev/score chunks from all the groups
-            // DB entries into a single set
-            let mut coords_for_rs = BTreeMap::new();
-            for record_ref in &ref_set {
-                let record = get_root_as_phrase_record(record_ref.1);
-                let rs_vec = get_vector::<RelevScore>(
-                    record_ref.1,
-                    &record._tab,
-                    PhraseRecord::VT_RELEV_SCORES,
-                )
-                .unwrap();
+            // group together entries from different keys that have the same z-order coordinate
+            somewhat_eager_groupby(merged, |a| (*a).0).flat_map(
+                move |(coord, coords_obj_group)| {
+                    let (x, y) = deinterleave_morton(coord);
 
-                for rs_obj in rs_vec {
-                    let relev_score = rs_obj.relev_score();
-                    let relev = relev_int_to_float(relev_score >> 4);
-                    // mask for the least significant four bits
-                    let score = relev_score & 15;
-
-                    let coords_vec =
-                        get_vector::<Coord>(record_ref.1, &rs_obj._tab, RelevScore::VT_COORDS)
-                            .unwrap();
-                    // TODO could this be a reference? The compiler was saying:
-                    // "cannot move out of captured variable in an `FnMut` closure"
-                    // "help: consider borrowing here: `&match_opts`rustc(E0507)""
-                    let coords = match &match_opts {
-                        MatchOpts { bbox: None, proximity: None, zoom: 0...16 } => {
-                            Some(Box::new(coords_vec.into_iter()) as Box<Iterator<Item = Coord>>)
-                        }
-                        MatchOpts { bbox: Some(bbox), proximity: None, zoom: 0...16 } => {
-                            // TODO should the bbox argument be changed to a reference in bbox? The compiler was complaining
-                            match spatial::bbox_filter(coords_vec, *bbox) {
-                                Some(v) => Some(Box::new(v) as Box<Iterator<Item = Coord>>),
-                                None => None,
+                    // get all the feature IDs from all the entries with the same XY, and eagerly
+                    // combine them and sort descending if necessary (if there's only one entry,
+                    // it's already sorted)
+                    let all_ids: Vec<u32> = match coords_obj_group.len() {
+                        0 => Vec::new(),
+                        1 => coords_obj_group[0].1.ids().unwrap().iter().collect(),
+                        _ => {
+                            let mut ids = Vec::new();
+                            for (_, coords_obj) in coords_obj_group {
+                                ids.extend(coords_obj.ids().unwrap().iter());
                             }
+                            ids.sort_by(|a, b| b.cmp(a));
+                            ids.dedup();
+                            ids
                         }
-                        MatchOpts { bbox: None, proximity: Some(prox_pt), zoom: 0...16 } => {
-                            match spatial::proximity(coords_vec, prox_pt.point) {
-                                Some(v) => Some(Box::new(v) as Box<Iterator<Item = Coord>>),
-                                None => None,
-                            }
-                        }
-                        MatchOpts { bbox: Some(bbox), proximity: Some(prox_pt), zoom: 0...16 } => {
-                            match spatial::bbox_proximity_filter(coords_vec, *bbox, prox_pt.point) {
-                                Some(v) => Some(Box::new(v) as Box<Iterator<Item = Coord>>),
-                                None => None,
-                            }
-                        }
-                        // TODO: the linter was complaining that not all MatchOpts zooms are covered. The zoom isn't even used for get_matching.
-                        // Should we have separate matchopts structs for this vs coalesce?
-                        _ => None,
                     };
 
-                    if coords.is_some() {
-                        let slot = coords_for_rs
-                            .entry((OrderedFloat(relev), score))
-                            .or_insert_with(|| vec![]);
-                        slot.push(coords.unwrap());
-                    }
-                }
-            }
-
-            coords_for_rs.into_iter().rev().flat_map(move |((relev, score), coord_sets)| {
-                // this is necessitated by the unsafe hackery above: we need to grab a reference
-                // to ref_set so that it gets moved into the closure, so that its memory doesn't
-                // get freed before we're done with it
-                let _ref_set = &ref_set;
-                let relev = relev.into_inner();
-                // for each relev/score, lazily k-way-merge the child entities by z-order curve value
-                let merged = coord_sets
-                    .into_iter()
-                    .kmerge_by(|a, b| a.coord().cmp(&b.coord()) == Ordering::Greater)
-                    .map(|coords_obj| (coords_obj.coord(), coords_obj));
-
-                // group together entries from different keys that have the same z-order coordinate
-                somewhat_eager_groupby(merged, |a| (*a).0).flat_map(
-                    move |(coord, coords_obj_group)| {
-                        let (x, y) = deinterleave_morton(coord);
-
-                        // get all the feature IDs from all the entries with the same XY, and eagerly
-                        // combine them and sort descending if necessary (if there's only one entry,
-                        // it's already sorted)
-                        let all_ids: Vec<u32> = match coords_obj_group.len() {
-                            0 => Vec::new(),
-                            1 => coords_obj_group[0].1.ids().unwrap().iter().collect(),
-                            _ => {
-                                let mut ids = Vec::new();
-                                for (_, coords_obj) in coords_obj_group {
-                                    ids.extend(coords_obj.ids().unwrap().iter());
-                                }
-                                ids.sort_by(|a, b| b.cmp(a));
-                                ids.dedup();
-                                ids
-                            }
-                        };
-
-                        all_ids.into_iter().map(move |id_comp| {
-                            let id = id_comp >> 8;
-                            let source_phrase_hash = (id_comp & 255) as u8;
-                            MatchEntry {
-                                grid_entry: GridEntry {
-                                    relev,
-                                    score,
-                                    x,
-                                    y,
-                                    id,
-                                    source_phrase_hash,
-                                },
-                                matches_language: matches_language,
-                            }
-                        })
-                    },
-                )
-            })
+                    all_ids.into_iter().map(move |id_comp| {
+                        let id = id_comp >> 8;
+                        let source_phrase_hash = (id_comp & 255) as u8;
+                        MatchEntry {
+                            grid_entry: GridEntry {
+                                relev,
+                                score,
+                                x,
+                                y,
+                                id,
+                                source_phrase_hash,
+                            },
+                            matches_language: matches_language,
+                        }
+                    })
+                },
+            )
         });
+
         Ok(out)
     }
 

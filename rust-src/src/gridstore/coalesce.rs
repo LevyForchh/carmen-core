@@ -59,16 +59,16 @@ fn grid_to_coalesce_entry<T: Borrow<GridStore> + Clone>(
                 tile_dist(proximity_x, proximity_y, grid.grid_entry.x, grid.grid_entry.y);
             let scoredist = scoredist(match_opts.zoom, distance, grid.grid_entry.score, radius);
             // Don't do language penalty if feature is inside proximity/scaled radius
-            relev =
-                if !grid.matches_language && distance > proximity_radius(match_opts.zoom, radius) {
-                    relev * 0.96
-                } else {
-                    relev
-                };
+            // relev =
+            //     if !grid.matches_language && distance > proximity_radius(match_opts.zoom, radius) {
+            //         relev * 0.96
+            //     } else {
+            //         relev
+            //     };
             (distance, scoredist, relev)
         }
         None => {
-            let relev = if !grid.matches_language { relev * 0.96 } else { relev };
+            // let relev = if !grid.matches_language { relev * 0.96 } else { relev };
             (0., grid.grid_entry.score as f64, relev)
         }
     };
