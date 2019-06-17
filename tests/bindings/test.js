@@ -73,7 +73,7 @@ tape('GridStore reader', (t) => {
     t.end();
 });
 
-tape('Coalesce tests', (t) => {
+tape('Coalesce tests - invalid inputs', (t) => {
     t.throws(() => {
         addon.coalesce();
     }, 'throws, incorrect arguments');
@@ -196,4 +196,112 @@ tape('Coalesce tests', (t) => {
     }];
     t.throws(() => {addon.coalesce(no_idx, {}, () => {})}, 'no mask');
     t.end();
+});
+
+tape('Coalesce single valid stack - Valid inputs', (t) => {
+    const tmpDir = tmp.dirSync();
+    const builder = new addon.GridStoreBuilder(tmpDir.name);
+    builder.insert({ phrase_id: 1, lang_set: [1] },
+        [
+            { id: 1, x: 2, y: 2, relev: 1., score: 1, source_phrase_hash: 0 },
+            { id: 2, x: 2, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },
+            { id: 3, x: 0, y: 0, relev: 1., score: 1, source_phrase_hash: 0 }
+        ]
+    );
+    builder.finish();
+    const reader = new addon.GridStore(tmpDir.name);
+
+    const valid_stack = [{
+        store: reader,
+        weight: 1,
+        match_key: {
+            lang_set: [1],
+            match_phrase: {
+                "Range": {
+                    start: 1,
+                    end: 3
+                }
+            }
+        },
+        idx: 1,
+        zoom: 14,
+        mask: 1 << 0,
+    }];
+
+    addon.coalesce(valid_stack, { zoom: 14 }, (err, res) => {
+        t.deepEqual(res[0].entries,
+            [
+                { grid_entry:
+                    { relev: 1, score: 1, x: 2, y: 2, id: 1, source_phrase_hash: 0 },
+                    matches_language: true,
+                    idx: 1,
+                    tmp_id: 33554433,
+                    mask: 1,
+                    distance: 0,
+                    scoredist: 1
+                }
+            ], 'Ok, finds the right grid entry');
+        t.equal(res.length, 3, 'Result set has 3 grid entries');
+        t.end();
+    });
+});
+
+tape('Coalesce multi valid stack - Valid inputs', (t) => {
+    const tmpDir1 = tmp.dirSync();
+    const builder1 = new addon.GridStoreBuilder(tmpDir1.name);
+    builder1.insert({ phrase_id: 1, lang_set: [1] },
+        [
+            { id: 1, x: 1, y: 1, relev: 1., score: 1, source_phrase_hash: 0 }
+        ]
+    );
+    builder1.finish();
+    const reader1 = new addon.GridStore(tmpDir1.name);
+
+    const tmpDir2 = tmp.dirSync();
+    const builder2 = new addon.GridStoreBuilder(tmpDir2.name);
+    builder2.insert({ phrase_id: 2, lang_set: [1] },
+        [
+            { id: 1, x: 1, y: 1, relev: 1., score: 3, source_phrase_hash: 0 },
+            { id: 2, x: 2, y: 2, relev: 1., score: 3, source_phrase_hash: 0 }
+        ]
+    );
+    builder2.finish();
+    const reader2 = new addon.GridStore(tmpDir2.name);
+
+    const valid_coalesce_multi = [{
+        store: reader1,
+        weight: 0.5,
+        match_key: {
+            lang_set: [1],
+            match_phrase: {
+                "Range": {
+                    start: 1,
+                    end: 3
+                }
+            }
+        },
+        idx: 0,
+        zoom: 1,
+        mask: 1 << 1,
+    },{
+        store: reader2,
+        weight: 0.5,
+        match_key: {
+            lang_set: [1],
+            match_phrase: {
+                "Range": {
+                    start: 1,
+                    end: 3
+                }
+            }
+        },
+        idx: 1,
+        zoom: 2,
+        mask: 1 << 0,
+    }];
+    addon.coalesce(valid_coalesce_multi, { zoom: 2 }, (err, res) => {
+        t.deepEqual(res[0].entries[0].grid_entry, { relev: 0.5, score: 3, x: 2, y: 2, id: 2, source_phrase_hash: 0 }, '1st result highest score from the higher zoom index');
+        t.deepEqual(res[0].entries.length, 2, 'Result set has 2 grid entries');
+        t.end();
+    });
 });
