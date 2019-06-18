@@ -1,3 +1,4 @@
+extern crate carmen_core;
 use carmen_core::gridstore::*;
 
 // Util functions
