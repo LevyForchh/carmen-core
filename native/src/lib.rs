@@ -277,8 +277,13 @@ where
     if let Ok(lang_array) = maybe_lang_array.downcast::<JsArray>() {
         let mut out = 0u128;
         for i in 0..lang_array.len() {
+            let converted_lang_array = lang_array.get(cx, i)?.downcast::<JsNumber>().or_throw(cx)?.value() as usize;
+            if  converted_lang_array >= 128 {
+                continue;
+            } else {
             out = out
-                | (1 << lang_array.get(cx, i)?.downcast::<JsNumber>().or_throw(cx)?.value() as usize);
+                | (1 << converted_lang_array);
+            }
         }
         Ok(out)
     } else if let Ok(_) = maybe_lang_array.downcast::<JsNull>() {

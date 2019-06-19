@@ -305,3 +305,38 @@ tape('Coalesce multi valid stack - Valid inputs', (t) => {
         t.end();
     });
 });
+
+tape('lang_set >= 128', (t) => {
+    const tmpDir = tmp.dirSync();
+    const builder = new addon.GridStoreBuilder(tmpDir.name);
+    builder.insert({ phrase_id: 1, lang_set: [1] },
+        [
+            { id: 1, x: 2, y: 2, relev: 1., score: 1, source_phrase_hash: 0 }
+        ]
+    );
+    builder.finish();
+    const reader = new addon.GridStore(tmpDir.name);
+
+    const lang_set_stack = [{
+        store: reader,
+        weight: 1,
+        match_key: {
+            lang_set: [128],
+            match_phrase: {
+                "Range": {
+                    start: 1,
+                    end: 3
+                }
+            }
+        },
+        idx: 1,
+        zoom: 14,
+        mask: 1 << 0,
+    }];
+
+    addon.coalesce(lang_set_stack, { zoom: 14 }, (err, res) => {
+        t.deepEqual(res[0].entries[0].matches_language, false, 'does not match language - ignore lang_set > 128');
+        t.deepEqual(res[0].relev, 0.96, 'relevance penalised - ignore lang_set > 128');
+    });
+    t.end();
+});
