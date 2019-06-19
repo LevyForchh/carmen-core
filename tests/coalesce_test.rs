@@ -1,7 +1,5 @@
 use carmen_core::gridstore::*;
-mod common;
-
-use common::*;
+use test_utils::*;
 
 const ALL_LANGUAGES: u128 = u128::max_value();
 

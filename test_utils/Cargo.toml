@@ -1,0 +1,9 @@
+
+[package]
+name = "test_utils"
+version = "0.1.0"
+authors = ["Natalia Margolis <natalia.margolis@mapbox.com>"]
+
+[dependencies]
+tempfile = "3.0"
+carmen-core = { path = "../" }
