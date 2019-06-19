@@ -27,7 +27,7 @@
   "scripts": {
     "install": "node-pre-gyp install --fallback-to-build=false || neon build --release",
     "build": "neon build --release",
-    "test": "tape ./test/bindings/*",
+    "test": "tape ./tests/bindings/*",
     "coverage": "nyc node -e \"require('.')\" && nyc report --reporter=text-lcov > coverage.lcov && codecov"
   },
   "binary": {
