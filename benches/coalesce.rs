@@ -1,13 +1,12 @@
-#[macro_use]
-extern crate criterion;
-
-use criterion::black_box;
-use criterion::Criterion;
+use criterion::{Criterion, Fun, Bencher, black_box};
 
 use carmen_core::gridstore::*;
 use test_utils::*;
 
-fn criterion_benchmark(c: &mut Criterion) {
+pub fn benchmark(c: &mut Criterion) {
+    // make a vector to fill with closures to bench-test
+    let mut to_bench = Vec::new();
+
     let store = create_store(vec![StoreEntryBuildingBlock {
         grid_key: GridKey { phrase_id: 1, lang_set: 1 },
         entries: vec![
@@ -18,14 +17,8 @@ fn criterion_benchmark(c: &mut Criterion) {
         ],
     }]);
 
-    let match_opts = MatchOpts {
-        zoom: 14,
-        proximity: Some(Proximity { point: [2, 2], radius: 1. }),
-        ..MatchOpts::default()
-    };
-
-    c.bench_function("coalesce single 1", move |b| {
-        let subquery = PhrasematchSubquery {
+    to_bench.push(Fun::new("coalesce_single_proximity", move |b: &mut Bencher, _i| {
+         let subquery = PhrasematchSubquery {
             store: &store,
             weight: 1.,
             match_key: MatchKey {
@@ -37,9 +30,14 @@ fn criterion_benchmark(c: &mut Criterion) {
             mask: 1 << 0,
         };
         let stack = vec![subquery];
-        b.iter(|| coalesce(black_box(stack.clone()), black_box(&match_opts)))
-    });
-}
+        let match_opts = MatchOpts {
+            zoom: 14,
+            proximity: Some(Proximity { point: [2, 2], radius: 1. }),
+            ..MatchOpts::default()
+        };
+        //this is the part that is timed
 
-criterion_group!(benches, criterion_benchmark);
-criterion_main!(benches);
+        b.iter(|| coalesce(black_box(stack.clone()), black_box(&match_opts)))
+    }));
+    c.bench_functions("coalesce", to_bench, ());
+}

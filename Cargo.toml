@@ -25,7 +25,7 @@ test_utils = { path = "test_utils" }
 criterion = "0.2"
 
 [[bench]]
-name = "coalesce_benchmark"
+name = "benchmarks"
 harness = false
 
 # we're using a forked rocksdb for now because upstream rust-rocksdb doesn't yet
