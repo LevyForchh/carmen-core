@@ -5,7 +5,7 @@ use criterion::Criterion;
 
 mod coalesce;
 
-criterion_group!{
+criterion_group! {
     name = benches;
     config = Criterion::default();
     targets = coalesce::benchmark
