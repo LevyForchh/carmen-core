@@ -1,4 +1,6 @@
 use std::borrow::Borrow;
+use std::env;
+use std::fs;
 use std::rc::Rc;
 
 use criterion::{black_box, Bencher, Criterion, Fun};
@@ -9,15 +11,19 @@ use test_utils::*;
 pub fn benchmark(c: &mut Criterion) {
     // make a vector to fill with closures to bench-test
     let mut to_bench = Vec::new();
+    let path = env::current_dir().expect("Error getting current dir");
+    // TODO: this may not be necessary
+    let mut filepath = fs::canonicalize(&path).expect("Error getting cannonicalized current dir");
+
+    // TODO: don't hard-code this?
+    filepath.push("benches/data/decoded-coalesce-bench-multi-1965155344.json");
+
+    // TODO error handling
+    let grid_entries = load_grids_from_json(&filepath).unwrap();
 
     let store_rc = Rc::new(create_store(vec![StoreEntryBuildingBlock {
         grid_key: GridKey { phrase_id: 1, lang_set: 1 },
-        entries: vec![
-            GridEntry { id: 1, x: 200, y: 200, relev: 1., score: 1, source_phrase_hash: 0 }, // ne
-            GridEntry { id: 2, x: 200, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },   // se
-            GridEntry { id: 3, x: 0, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },     // sw
-            GridEntry { id: 4, x: 0, y: 200, relev: 1., score: 1, source_phrase_hash: 0 },   // nw
-        ],
+        entries: grid_entries,
     }]));
 
     let store = store_rc.clone();
@@ -35,7 +41,7 @@ pub fn benchmark(c: &mut Criterion) {
         };
         let stack = vec![subquery.clone()];
         let match_opts = MatchOpts { zoom: 14, ..MatchOpts::default() };
-        //this is the part that is timed
+        // this is the part that is timed
         b.iter(|| coalesce(black_box(stack.clone()), black_box(&match_opts)))
     }));
 
