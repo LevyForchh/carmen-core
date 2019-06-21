@@ -55,7 +55,7 @@ pub fn bbox_range<'a>(
 pub fn bbox_filter<'a>(
     coords: flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Coord<'a>>>,
     bbox: [u16; 4],
-) -> Option<impl Iterator<Item = (Coord<'a>, i64)>> {
+) -> Option<impl Iterator<Item = Coord<'a>>> {
     let len = coords.len();
     if len == 0 {
         return None;
@@ -64,10 +64,9 @@ pub fn bbox_filter<'a>(
     let range = bbox_range(coords, bbox)?;
     Some((range.0..=range.1).filter_map(move |idx| {
         let grid = coords.get(idx as usize);
-        let coord = grid.coord();
-        let (x, y) = deinterleave_morton(coord); // TODO capture this so we don't have to do it again.
+        let (x, y) = deinterleave_morton(grid.coord()); // TODO capture this so we don't have to do it again.
         if x >= bbox[0] && x <= bbox[2] && y >= bbox[1] && y <= bbox[3] {
-            return Some((grid, -1 * (coord as i64)));
+            return Some(grid);
         }
         None
     }))
@@ -80,7 +79,7 @@ pub fn bbox_filter<'a>(
 pub fn proximity<'a>(
     coords: flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Coord<'a>>>,
     proximity: [u16; 2],
-) -> Option<impl Iterator<Item = (Coord<'a>, i64)>> {
+) -> Option<impl Iterator<Item = Coord<'a>>> {
     let prox_pt = interleave_morton(proximity[0], proximity[1]) as i64;
     let len = coords.len() as u32;
     if len == 0 {
@@ -92,15 +91,13 @@ pub fn proximity<'a>(
         Err(_) => return None,
     };
 
-    let getter = move |i| {
-        let coord = coords.get(i as usize);
-        let coord_val = coord.coord();
-        (coord, (coord_val as i64 - prox_pt).abs())
-    };
-    let head = Box::new((0..prox_mid).rev().map(getter)) as Box<Iterator<Item = (Coord, i64)>>;
-    let tail = Box::new((prox_mid..len).map(getter)) as Box<Iterator<Item = (Coord, i64)>>;
-    let coord_sets = head.into_iter().merge_by(tail.into_iter(), move |a, b| {
-        a.1.cmp(&b.1) == Less
+    let getter = move |i| coords.get(i as usize);
+    let head = Box::new((0..prox_mid).rev().map(getter)) as Box<Iterator<Item = Coord>>;
+    let tail = Box::new((prox_mid..len).map(getter)) as Box<Iterator<Item = Coord>>;
+    let coord_sets = vec![head, tail].into_iter().kmerge_by(move |a, b| {
+        let d1 = (a.coord() as i64 - prox_pt) as i64;
+        let d2 = (b.coord() as i64 - prox_pt) as i64;
+        d1.abs().cmp(&d2.abs()) == Less
     });
 
     Some(coord_sets)
@@ -114,7 +111,7 @@ pub fn bbox_proximity_filter<'a>(
     coords: flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Coord<'a>>>,
     bbox: [u16; 4],
     proximity: [u16; 2],
-) -> Option<impl Iterator<Item = (Coord<'a>, i64)>> {
+) -> Option<impl Iterator<Item = Coord<'a>>> {
     let range = bbox_range(coords, bbox)?;
     let prox_pt = interleave_morton(proximity[0], proximity[1]) as i64;
     if coords.len() == 0 {
@@ -130,17 +127,20 @@ pub fn bbox_proximity_filter<'a>(
         let grid = coords.get(idx as usize);
         let (x, y) = deinterleave_morton(grid.coord()); // TODO capture this so we don't have to do it again.
         if x >= bbox[0] && x <= bbox[2] && y >= bbox[1] && y <= bbox[3] {
-            let coord_val = grid.coord();
-            Some((grid, (coord_val as i64 - prox_pt).abs()))
+            return Some(grid);
         } else {
-            None
-        }
+            return None;
+        };
     };
 
-    let head = (range.0..prox_mid).rev().filter_map(filtered_get);
-    let tail = (prox_mid..=range.1).filter_map(filtered_get);
-    let coord_sets = head.into_iter().merge_by(tail.into_iter(), move |a, b| {
-        a.1.cmp(&b.1) == Less
+    let head =
+        Box::new((range.0..prox_mid).rev().filter_map(filtered_get)) as Box<Iterator<Item = Coord>>;
+    let tail =
+        Box::new((prox_mid..=range.1).filter_map(filtered_get)) as Box<Iterator<Item = Coord>>;
+    let coord_sets = vec![head, tail].into_iter().kmerge_by(move |a, b| {
+        let d1 = (a.coord() as i64 - prox_pt) as i64;
+        let d2 = (b.coord() as i64 - prox_pt) as i64;
+        d1.abs().cmp(&d2.abs()) == Less
     });
 
     Some(coord_sets)
@@ -227,25 +227,25 @@ mod test {
         let buffer = flatbuffer_generator((0..4).rev());
         let rs = flatbuffers::get_root::<RelevScore>(&buffer);
         let coords = rs.coords().unwrap();
-        let result = bbox_filter(coords, [0, 0, 1, 1]).unwrap().map(|x| x.0).collect::<Vec<Coord>>();
+        let result = bbox_filter(coords, [0, 0, 1, 1]).unwrap().collect::<Vec<Coord>>();
         assert_eq!(result.len(), 4);
 
         let buffer = flatbuffer_generator((2..4).rev());
         let rs = flatbuffers::get_root::<RelevScore>(&buffer);
         let coords = rs.coords().unwrap();
-        let result = bbox_filter(coords, [0, 0, 1, 1]).unwrap().map(|x| x.0).collect::<Vec<Coord>>();
+        let result = bbox_filter(coords, [0, 0, 1, 1]).unwrap().collect::<Vec<Coord>>();
         assert_eq!(result.len(), 2, "starts before bbox and ends between the result set");
 
         let buffer = flatbuffer_generator((2..4).rev());
         let rs = flatbuffers::get_root::<RelevScore>(&buffer);
         let coords = rs.coords().unwrap();
-        let result = bbox_filter(coords, [1, 1, 3, 1]).unwrap().map(|x| x.0).collect::<Vec<Coord>>();
+        let result = bbox_filter(coords, [1, 1, 3, 1]).unwrap().collect::<Vec<Coord>>();
         assert_eq!(result.len(), 1, "starts in the bbox and ends after the result set");
 
         let buffer = flatbuffer_generator((1..4).rev());
         let rs = flatbuffers::get_root::<RelevScore>(&buffer);
         let coords = rs.coords().unwrap();
-        let result = bbox_filter(coords, [0, 1, 1, 1]).unwrap().map(|x| x.0).collect::<Vec<Coord>>();
+        let result = bbox_filter(coords, [0, 1, 1, 1]).unwrap().collect::<Vec<Coord>>();
         assert_eq!(result.len(), 2, "starts in the bbox and ends in the bbox");
 
         let buffer = flatbuffer_generator((5..7).rev());
@@ -266,20 +266,20 @@ mod test {
         let buffer = flatbuffer_generator(sparse.into_iter());
         let rs = flatbuffers::get_root::<RelevScore>(&buffer);
         let coords = rs.coords().unwrap();
-        let result = bbox_filter(coords, [3, 1, 4, 2]).unwrap().map(|x| x.0).collect::<Vec<Coord>>();
+        let result = bbox_filter(coords, [3, 1, 4, 2]).unwrap().collect::<Vec<Coord>>();
         assert_eq!(result.len(), 2, "sparse result set that spans z-order jumps");
 
         let buffer = flatbuffer_generator((7..24).rev());
         let rs = flatbuffers::get_root::<RelevScore>(&buffer);
         let coords = rs.coords().unwrap();
-        let result = bbox_filter(coords, [3, 1, 4, 2]).unwrap().map(|x| x.0).collect::<Vec<Coord>>();
+        let result = bbox_filter(coords, [3, 1, 4, 2]).unwrap().collect::<Vec<Coord>>();
         assert_eq!(result.len(), 3, "continuous result set that spans z-order jumps");
 
         let sparse: Vec<u32> = vec![8];
         let buffer = flatbuffer_generator(sparse.into_iter());
         let rs = flatbuffers::get_root::<RelevScore>(&buffer);
         let coords = rs.coords().unwrap();
-        let result = bbox_filter(coords, [3, 1, 4, 2]).unwrap().map(|x| x.0).collect::<Vec<Coord>>();
+        let result = bbox_filter(coords, [3, 1, 4, 2]).unwrap().collect::<Vec<Coord>>();
         assert_eq!(result.len(), 0, "result is on the z-order curve but not in the bbox");
     }
 
@@ -289,21 +289,21 @@ mod test {
         let rs = flatbuffers::get_root::<RelevScore>(&buffer);
         let coords = rs.coords().unwrap();
 
-        let result = proximity(coords, [3, 0]).unwrap().map(|x| x.0.coord()).collect::<Vec<u32>>();
+        let result = proximity(coords, [3, 0]).unwrap().map(|x| x.coord()).collect::<Vec<u32>>();
         assert_eq!(
             vec![5, 4, 6, 7, 3, 2, 8, 9, 1],
             result,
             "proximity point is in the middle of the result set - 5"
         );
 
-        let result = proximity(coords, [0, 3]).unwrap().map(|x| x.0.coord()).collect::<Vec<u32>>();
+        let result = proximity(coords, [0, 3]).unwrap().map(|x| x.coord()).collect::<Vec<u32>>();
         assert_eq!(
             vec![9, 8, 7, 6, 5, 4, 3, 2, 1],
             result,
             "proximity point is greater than the result set - 10"
         );
 
-        let result = proximity(coords, [1, 0]).unwrap().map(|x| x.0.coord()).collect::<Vec<u32>>();
+        let result = proximity(coords, [1, 0]).unwrap().map(|x| x.coord()).collect::<Vec<u32>>();
         assert_eq!(
             vec![1, 2, 3, 4, 5, 6, 7, 8, 9],
             result,
@@ -320,7 +320,7 @@ mod test {
         let buffer = flatbuffer_generator(sparse.into_iter());
         let rs = flatbuffers::get_root::<RelevScore>(&buffer);
         let coords = rs.coords().unwrap();
-        let result = proximity(coords, [3, 1]).unwrap().map(|x| x.0.coord()).collect::<Vec<u32>>();
+        let result = proximity(coords, [3, 1]).unwrap().map(|x| x.coord()).collect::<Vec<u32>>();
         assert_eq!(
             vec![7, 6, 8, 13, 1, 21, 24],
             result,
@@ -336,7 +336,7 @@ mod test {
         // bbox is from 1-7; proximity is 4
         let result = bbox_proximity_filter(coords, [1, 0, 3, 1], [2, 0])
             .unwrap()
-            .map(|x| x.0.coord())
+            .map(|x| x.coord())
             .collect::<Vec<u32>>();
         assert_eq!(
             vec![4, 3, 5, 6, 7, 1],
@@ -352,7 +352,7 @@ mod test {
 
         let result = bbox_proximity_filter(coords, [1, 0, 3, 1], [0, 0])
             .unwrap()
-            .map(|x| x.0.coord())
+            .map(|x| x.coord())
             .collect::<Vec<u32>>();
         assert_eq!(
             vec![1, 3, 4, 5, 6, 7],
@@ -365,7 +365,7 @@ mod test {
         let coords = rs.coords().unwrap();
         let result = bbox_proximity_filter(coords, [1, 1, 3, 1], [0, 0]) // bbox is 3-7; proximity is 0
             .unwrap()
-            .map(|x| x.0.coord())
+            .map(|x| x.coord())
             .collect::<Vec<u32>>();
         assert_eq!(
             vec![3],
@@ -380,7 +380,7 @@ mod test {
         // bbox is 7-23; proximity is 7
         let result = bbox_proximity_filter(coords, [3, 1, 7, 1], [3, 1])
             .unwrap()
-            .map(|x| x.0.coord())
+            .map(|x| x.coord())
             .collect::<Vec<u32>>();
         assert_eq!(
             vec![7, 23],

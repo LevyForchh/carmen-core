@@ -301,7 +301,7 @@ fn coalesce_multi<T: Borrow<GridStore> + Clone>(
 }
 
 /// Calculates the tile distance between a proximity x and y and a grid x and y
-fn tile_dist(proximity_x: u16, proximity_y: u16, grid_x: u16, grid_y: u16) -> f64 {
+pub fn tile_dist(proximity_x: u16, proximity_y: u16, grid_x: u16, grid_y: u16) -> f64 {
     let dx = (proximity_x as f64) - (grid_x as f64);
     let dy = (proximity_y as f64) - (grid_y as f64);
     ((dx * dx) + (dy * dy)).sqrt()
@@ -418,7 +418,7 @@ const E_POW: [f64; 8] = [
     1096.6331584284585,
 ];
 
-fn scoredist(mut zoom: u16, mut distance: f64, mut score: u8, radius: f64) -> f64 {
+pub fn scoredist(mut zoom: u16, mut distance: f64, mut score: u8, radius: f64) -> f64 {
     if zoom < 6 {
         zoom = 6;
     }

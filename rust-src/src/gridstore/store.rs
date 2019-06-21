@@ -13,6 +13,7 @@ use rocksdb::{Direction, IteratorMode, Options, DB};
 use crate::gridstore::common::*;
 use crate::gridstore::gridstore_generated::*;
 use crate::gridstore::spatial;
+use crate::gridstore::coalesce::{scoredist, tile_dist};
 
 #[derive(Debug)]
 pub struct GridStore {
@@ -219,7 +220,7 @@ impl GridStore {
 
         // eagerly bucket all the relev/score chunks from all the groups
         // DB entries into a single set
-        let mut coords_for_rs = BTreeMap::new();
+        let mut coords_for_relev = BTreeMap::new();
         for record_ref in &record_refs {
             let record = get_root_as_phrase_record(record_ref.1);
             let rs_vec = get_vector::<RelevScore>(
@@ -245,24 +246,24 @@ impl GridStore {
                 // "help: consider borrowing here: `&match_opts`rustc(E0507)""
                 let coords = match &match_opts {
                     MatchOpts { bbox: None, proximity: None, zoom: 0...16 } => {
-                        Some(Box::new(coords_vec.into_iter().map(|c| (c, -1 * (c.coord() as i64)))) as Box<Iterator<Item = (Coord, i64)>>)
+                        Some(Box::new(coords_vec.into_iter()) as Box<Iterator<Item = Coord>>)
                     }
                     MatchOpts { bbox: Some(bbox), proximity: None, zoom: 0...16 } => {
                         // TODO should the bbox argument be changed to a reference in bbox? The compiler was complaining
                         match spatial::bbox_filter(coords_vec, *bbox) {
-                            Some(v) => Some(Box::new(v) as Box<Iterator<Item = (Coord, i64)>>),
+                            Some(v) => Some(Box::new(v) as Box<Iterator<Item = Coord>>),
                             None => None,
                         }
                     }
                     MatchOpts { bbox: None, proximity: Some(prox_pt), zoom: 0...16 } => {
                         match spatial::proximity(coords_vec, prox_pt.point) {
-                            Some(v) => Some(Box::new(v) as Box<Iterator<Item = (Coord, i64)>>),
+                            Some(v) => Some(Box::new(v) as Box<Iterator<Item = Coord>>),
                             None => None,
                         }
                     }
                     MatchOpts { bbox: Some(bbox), proximity: Some(prox_pt), zoom: 0...16 } => {
                         match spatial::bbox_proximity_filter(coords_vec, *bbox, prox_pt.point) {
-                            Some(v) => Some(Box::new(v) as Box<Iterator<Item = (Coord, i64)>>),
+                            Some(v) => Some(Box::new(v) as Box<Iterator<Item = Coord>>),
                             None => None,
                         }
                     }
@@ -272,15 +273,16 @@ impl GridStore {
                 };
 
                 if coords.is_some() {
-                    let slot = coords_for_rs
-                        .entry((OrderedFloat(relev), score, matches_language))
+                    let slot = coords_for_relev
+                        .entry((OrderedFloat(relev), matches_language))
                         .or_insert_with(|| vec![]);
-                    slot.push(coords.unwrap());
+                    slot.push((score, coords.unwrap()));
                 }
             }
         }
 
-        let out = coords_for_rs.into_iter().rev().flat_map(move |((relev, score, matches_language), coord_sets)| {
+        let out = coords_for_relev.into_iter().rev().flat_map(move |((relev, matches_language), coord_sets)| {
+            let match_opts = match_opts.clone();
             // this is necessitated by the unsafe hackery above: we need to grab a reference
             // to ref_set so that it gets moved into the closure, so that its memory doesn't
             // get freed before we're done with it
@@ -289,23 +291,37 @@ impl GridStore {
             // for each relev/score, lazily k-way-merge the child entities by z-order curve value
             let merged = coord_sets
                 .into_iter()
-                .kmerge_by(|a, b| a.1.cmp(&b.1) == Ordering::Less)
-                .map(|coords_obj| (coords_obj.0.coord(), coords_obj.0));
+                .map(move |(score, coord_vec)| {
+                    let match_opts = match_opts.clone();
+                    coord_vec.map(move |coords| {
+                        let coord = coords.coord();
+                        let (x, y) = deinterleave_morton(coord);
+                        let (distance, scoredist) = match &match_opts {
+                            MatchOpts { proximity: Some(prox_pt), zoom, .. } => {
+                                let distance = tile_dist(prox_pt.point[0], prox_pt.point[1], x, y);
+                                (distance, scoredist(*zoom, distance, score, prox_pt.radius))
+                            },
+                            _ => {
+                                (0f64, score as f64)
+                            }
+                        };
+                        (coords, scoredist, x, y, score, distance)
+                    })
+                })
+                .kmerge_by(|a, b| a.1.partial_cmp(&b.1).unwrap() == Ordering::Greater);
 
-            // group together entries from different keys that have the same z-order coordinate
-            somewhat_eager_groupby(merged, |a| (*a).0).flat_map(
-                move |(coord, coords_obj_group)| {
-                    let (x, y) = deinterleave_morton(coord);
-
-                    // get all the feature IDs from all the entries with the same XY, and eagerly
+            // group together entries from different keys that have the same scoredist, x, and y
+            somewhat_eager_groupby(merged, |a| ((*a).1, (*a).2, (*a).3, (*a).4)).flat_map(
+                move |((scoredist, x, y, score), coords_obj_group)| {
+                    // get all the feature IDs from all the entries with the same scoredist/X/Y, and eagerly
                     // combine them and sort descending if necessary (if there's only one entry,
                     // it's already sorted)
                     let all_ids: Vec<u32> = match coords_obj_group.len() {
                         0 => Vec::new(),
-                        1 => coords_obj_group[0].1.ids().unwrap().iter().collect(),
+                        1 => coords_obj_group[0].0.ids().unwrap().iter().collect(),
                         _ => {
                             let mut ids = Vec::new();
-                            for (_, coords_obj) in coords_obj_group {
+                            for (coords_obj, _, _, _, _, _) in coords_obj_group {
                                 ids.extend(coords_obj.ids().unwrap().iter());
                             }
                             ids.sort_by(|a, b| b.cmp(a));
