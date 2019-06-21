@@ -311,16 +311,24 @@ impl GridStore {
                 .kmerge_by(|a, b| a.1.partial_cmp(&b.1).unwrap() == Ordering::Greater);
 
             // group together entries from different keys that have the same scoredist, x, and y
-            somewhat_eager_groupby(merged, |a| ((*a).1, (*a).2, (*a).3, (*a).4)).flat_map(
-                move |((scoredist, x, y, score), coords_obj_group)| {
+            somewhat_eager_groupby(merged, |a| ((*a).1, (*a).2, (*a).3)).flat_map(
+                move |((scoredist, x, y), coords_obj_group)| {
                     // get all the feature IDs from all the entries with the same scoredist/X/Y, and eagerly
                     // combine them and sort descending if necessary (if there's only one entry,
                     // it's already sorted)
+                    let mut distance = 0f64;
+                    let mut score = 0;
                     let all_ids: Vec<u32> = match coords_obj_group.len() {
                         0 => Vec::new(),
-                        1 => coords_obj_group[0].0.ids().unwrap().iter().collect(),
+                        1 => {
+                            score = coords_obj_group[0].4;
+                            distance = coords_obj_group[0].5;
+                            coords_obj_group[0].0.ids().unwrap().iter().collect()
+                        },
                         _ => {
                             let mut ids = Vec::new();
+                            score = coords_obj_group[0].4;
+                            distance = coords_obj_group[0].5;
                             for (coords_obj, _, _, _, _, _) in coords_obj_group {
                                 ids.extend(coords_obj.ids().unwrap().iter());
                             }
@@ -342,7 +350,9 @@ impl GridStore {
                                 id,
                                 source_phrase_hash,
                             },
-                            matches_language: matches_language,
+                            matches_language,
+                            distance,
+                            scoredist
                         }
                     })
                 },

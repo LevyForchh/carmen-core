@@ -323,6 +323,8 @@ pub struct GridEntry {
 pub struct MatchEntry {
     pub grid_entry: GridEntry,
     pub matches_language: bool,
+    pub distance: f64,
+    pub scoredist: f64,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialOrd, PartialEq, Clone)]

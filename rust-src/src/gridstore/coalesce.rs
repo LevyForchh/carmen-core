@@ -51,27 +51,6 @@ fn grid_to_coalesce_entry<T: Borrow<GridStore> + Clone>(
     debug_assert!(match_opts.zoom == subquery.zoom);
     // TODO: do we need to check for bbox here?
     let mut relev = grid.grid_entry.relev * subquery.weight;
-    // Calculate distance, scoredist, and language-adjusted relevance
-    let (distance, scoredist, relev) = match match_opts.proximity {
-        Some(Proximity { point: [proximity_x, proximity_y], radius }) => {
-            // TODO: skip calculations of distance and scoredist if all of the inputs are the same
-            let distance =
-                tile_dist(proximity_x, proximity_y, grid.grid_entry.x, grid.grid_entry.y);
-            let scoredist = scoredist(match_opts.zoom, distance, grid.grid_entry.score, radius);
-            // Don't do language penalty if feature is inside proximity/scaled radius
-            // relev =
-            //     if !grid.matches_language && distance > proximity_radius(match_opts.zoom, radius) {
-            //         relev * 0.96
-            //     } else {
-            //         relev
-            //     };
-            (distance, scoredist, relev)
-        }
-        None => {
-            // let relev = if !grid.matches_language { relev * 0.96 } else { relev };
-            (0., grid.grid_entry.score as f64, relev)
-        }
-    };
 
     CoalesceEntry {
         grid_entry: GridEntry { relev, ..grid.grid_entry },
@@ -79,8 +58,8 @@ fn grid_to_coalesce_entry<T: Borrow<GridStore> + Clone>(
         idx: subquery.idx,
         tmp_id: ((subquery.idx as u32) << 25) + grid.grid_entry.id,
         mask: subquery.mask,
-        distance: distance,
-        scoredist: scoredist,
+        distance: grid.distance,
+        scoredist: grid.scoredist,
     }
 }
 
