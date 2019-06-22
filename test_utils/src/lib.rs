@@ -5,7 +5,8 @@ extern crate serde_json;
 
 use carmen_core::gridstore::*;
 use failure::Error;
-use std::fs::File;
+use std::env;
+use std::fs::{self, File};
 use std::io::{self, BufRead};
 use std::path::Path;
 
@@ -46,8 +47,14 @@ pub fn create_store(store_entries: Vec<StoreEntryBuildingBlock>) -> GridStore {
 }
 
 /// Loads json from a file into a Vector of GridEntrys
-/// The input file should be a json array of
+/// The input file should be line-delimited JSON with all of the fields of a GridEntry
+///
+/// Example:
+/// {"relev": 1, "score": 1, "x": 1, "y": 2, "id": 1, "source_phrase_hash": 0}
 pub fn load_grids_from_json(path: &Path) -> Result<Vec<GridEntry>, Error> {
+    let dir = env::current_dir().expect("Error getting current dir");
+    let mut filepath = fs::canonicalize(&dir).expect("Error getting cannonicalized current dir");
+    filepath.push(path);
     let f = File::open(path).expect("Error opening file");
     let file = io::BufReader::new(f);
     let entries: Vec<GridEntry> = file
@@ -63,5 +70,4 @@ pub fn load_grids_from_json(path: &Path) -> Result<Vec<GridEntry>, Error> {
         .collect::<Vec<GridEntry>>();
 
     Ok(entries)
-    // TODO: error handling
 }
