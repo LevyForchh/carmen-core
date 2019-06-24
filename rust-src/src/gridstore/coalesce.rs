@@ -77,6 +77,7 @@ fn coalesce_single<T: Borrow<GridStore> + Clone>(
     let mut last_distance: f64 = 0.;
     let mut min_scoredist = std::f64::MAX;
     let mut feature_count: usize = 0;
+    let bigger_max = 2 * MAX_CONTEXTS;
 
     for grid in grids {
         let coalesce_entry = grid_to_coalesce_entry(&grid, subquery, match_opts);
@@ -86,7 +87,7 @@ fn coalesce_single<T: Borrow<GridStore> + Clone>(
             continue;
         }
 
-        if feature_count > MAX_CONTEXTS {
+        if feature_count > bigger_max {
             if coalesce_entry.scoredist < min_scoredist {
                 continue;
             } else if coalesce_entry.grid_entry.relev < last_relev {
@@ -112,7 +113,7 @@ fn coalesce_single<T: Borrow<GridStore> + Clone>(
         if last_id != coalesce_entry.grid_entry.id {
             feature_count += 1;
         }
-        if match_opts.proximity.is_none() && feature_count > MAX_CONTEXTS {
+        if match_opts.proximity.is_none() && feature_count > bigger_max {
             break;
         }
         if coalesce_entry.scoredist < min_scoredist {
@@ -128,10 +129,9 @@ fn coalesce_single<T: Borrow<GridStore> + Clone>(
         (
             Reverse(OrderedFloat(context.relev)),
             Reverse(OrderedFloat(context.entries[0].scoredist)),
-            // TODO: should id be the final tiebreaker, and have x and y before for a more obvious sort order?
-            context.entries[0].grid_entry.id,
             context.entries[0].grid_entry.x,
             context.entries[0].grid_entry.y,
+            context.entries[0].grid_entry.id
         )
     });
 
@@ -169,8 +169,7 @@ fn coalesce_multi<T: Borrow<GridStore> + Clone>(
         let grids =
             subquery.store.borrow().get_matching(&subquery.match_key, &adjusted_match_opts)?;
 
-        // TODO: limit how many grids we consume
-        for grid in grids {
+        for grid in grids.take(100_000) {
             let coalesce_entry = grid_to_coalesce_entry(&grid, subquery, &adjusted_match_opts);
 
             let zxy = (subquery.zoom, grid.grid_entry.x, grid.grid_entry.y);
