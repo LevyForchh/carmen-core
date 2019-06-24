@@ -1,8 +1,18 @@
 extern crate carmen_core;
+extern crate failure;
+extern crate serde;
+extern crate serde_json;
+
 use carmen_core::gridstore::*;
+use failure::Error;
+use std::env;
+use std::fs::{self, File};
+use std::io::{self, BufRead};
+use std::path::Path;
 
-// Util functions
+// Util functions for tests and benchmarks
 
+/// Round a float to a number of digits past the decimal point
 pub fn round(value: f64, digits: i32) -> f64 {
     let multiplier = 10.0_f64.powi(digits);
     (value * multiplier).round() / multiplier
@@ -34,4 +44,31 @@ pub fn create_store(store_entries: Vec<StoreEntryBuildingBlock>) -> GridStore {
     }
     builder.finish().unwrap();
     GridStore::new(directory.path()).unwrap()
+}
+
+/// Loads json from a file into a Vector of GridEntrys
+/// The input file should be line-delimited JSON with all of the fields of a GridEntry
+/// The path should be relative to the carmen-core directory
+///
+/// Example:
+/// {"relev": 1, "score": 1, "x": 1, "y": 2, "id": 1, "source_phrase_hash": 0}
+pub fn load_grids_from_json(path: &Path) -> Result<Vec<GridEntry>, Error> {
+    let dir = env::current_dir().expect("Error getting current dir");
+    let mut filepath = fs::canonicalize(&dir).expect("Error getting cannonicalized current dir");
+    filepath.push(path);
+    let f = File::open(path).expect("Error opening file");
+    let file = io::BufReader::new(f);
+    let entries: Vec<GridEntry> = file
+        .lines()
+        .filter_map(|l| match l.unwrap() {
+            ref t if t.len() == 0 => None,
+            t => {
+                let deserialized: GridEntry =
+                    serde_json::from_str(&t).expect("Error deserializing json from string");
+                Some(deserialized)
+            }
+        })
+        .collect::<Vec<GridEntry>>();
+
+    Ok(entries)
 }
