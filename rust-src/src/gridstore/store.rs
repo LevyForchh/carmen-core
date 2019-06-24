@@ -10,10 +10,10 @@ use morton::deinterleave_morton;
 use ordered_float::OrderedFloat;
 use rocksdb::{Direction, IteratorMode, Options, DB};
 
+use crate::gridstore::coalesce::{scoredist, tile_dist};
 use crate::gridstore::common::*;
 use crate::gridstore::gridstore_generated::*;
 use crate::gridstore::spatial;
-use crate::gridstore::coalesce::{scoredist, tile_dist};
 
 #[derive(Debug)]
 pub struct GridStore {
@@ -223,12 +223,9 @@ impl GridStore {
         let mut coords_for_relev = BTreeMap::new();
         for record_ref in &record_refs {
             let record = get_root_as_phrase_record(record_ref.1);
-            let rs_vec = get_vector::<RelevScore>(
-                record_ref.1,
-                &record._tab,
-                PhraseRecord::VT_RELEV_SCORES,
-            )
-            .unwrap();
+            let rs_vec =
+                get_vector::<RelevScore>(record_ref.1, &record._tab, PhraseRecord::VT_RELEV_SCORES)
+                    .unwrap();
 
             let matches_language = record_ref.2;
 
@@ -239,8 +236,7 @@ impl GridStore {
                 let score = relev_score & 15;
 
                 let coords_vec =
-                    get_vector::<Coord>(record_ref.1, &rs_obj._tab, RelevScore::VT_COORDS)
-                        .unwrap();
+                    get_vector::<Coord>(record_ref.1, &rs_obj._tab, RelevScore::VT_COORDS).unwrap();
                 // TODO could this be a reference? The compiler was saying:
                 // "cannot move out of captured variable in an `FnMut` closure"
                 // "help: consider borrowing here: `&match_opts`rustc(E0507)""
@@ -270,9 +266,8 @@ impl GridStore {
                 };
 
                 if coords.is_some() {
-                    let slot = coords_for_relev
-                        .entry(OrderedFloat(relev))
-                        .or_insert_with(|| vec![]);
+                    let slot =
+                        coords_for_relev.entry(OrderedFloat(relev)).or_insert_with(|| vec![]);
                     slot.push((score, matches_language, coords.unwrap()));
                 }
             }
@@ -286,7 +281,7 @@ impl GridStore {
             score: u8,
             distance: f64,
             matches_language: bool,
-            within_radius: bool
+            within_radius: bool,
         }
 
         let out = coords_for_relev.into_iter().rev().flat_map(move |(relev, coord_sets)| {
@@ -307,19 +302,38 @@ impl GridStore {
                         let (distance, within_radius, scoredist) = match &match_opts {
                             MatchOpts { proximity: Some(prox_pt), zoom, .. } => {
                                 let distance = tile_dist(prox_pt.point[0], prox_pt.point[1], x, y);
-                                (distance, distance <= prox_pt.radius, scoredist(*zoom, distance, score, prox_pt.radius))
-                            },
-                            _ => {
-                                (0f64, false, score as f64)
+                                (
+                                    distance,
+                                    distance <= prox_pt.radius,
+                                    scoredist(*zoom, distance, score, prox_pt.radius),
+                                )
                             }
+                            _ => (0f64, false, score as f64),
                         };
-                        SortGroup { coords, scoredist, x, y, score, distance, matches_language, within_radius }
+                        SortGroup {
+                            coords,
+                            scoredist,
+                            x,
+                            y,
+                            score,
+                            distance,
+                            matches_language,
+                            within_radius,
+                        }
                     })
                 })
-                .kmerge_by(|a, b| (a.matches_language || a.within_radius, a.scoredist).partial_cmp(&(b.matches_language || b.within_radius, b.scoredist)).unwrap() == Ordering::Greater);
+                .kmerge_by(|a, b| {
+                    (a.matches_language || a.within_radius, a.scoredist)
+                        .partial_cmp(&(b.matches_language || b.within_radius, b.scoredist))
+                        .unwrap()
+                        == Ordering::Greater
+                });
 
             // group together entries from different keys that have the same scoredist, x, and y
-            somewhat_eager_groupby(merged, |a| ((*a).scoredist, (*a).x, (*a).y, (*a).matches_language, (*a).within_radius)).flat_map(
+            somewhat_eager_groupby(merged, |a| {
+                ((*a).scoredist, (*a).x, (*a).y, (*a).matches_language, (*a).within_radius)
+            })
+            .flat_map(
                 move |((scoredist, x, y, matches_language, within_radius), coords_obj_group)| {
                     // get all the feature IDs from all the entries with the same scoredist/X/Y, and eagerly
                     // combine them and sort descending if necessary (if there's only one entry,
@@ -332,7 +346,7 @@ impl GridStore {
                             score = coords_obj_group[0].score;
                             distance = coords_obj_group[0].distance;
                             coords_obj_group[0].coords.ids().unwrap().iter().collect()
-                        },
+                        }
                         _ => {
                             let mut ids = Vec::new();
                             score = coords_obj_group[0].score;
@@ -351,7 +365,12 @@ impl GridStore {
                         let source_phrase_hash = (id_comp & 255) as u8;
                         MatchEntry {
                             grid_entry: GridEntry {
-                                relev: relev * (if matches_language || within_radius { 1f64 } else { 0.96f64 }),
+                                relev: relev
+                                    * (if matches_language || within_radius {
+                                        1f64
+                                    } else {
+                                        0.96f64
+                                    }),
                                 score,
                                 x,
                                 y,
@@ -360,7 +379,7 @@ impl GridStore {
                             },
                             matches_language,
                             distance,
-                            scoredist
+                            scoredist,
                         }
                     })
                 },

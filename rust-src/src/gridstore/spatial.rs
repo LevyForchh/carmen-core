@@ -213,6 +213,7 @@ fn flatbuffer_generator<T: Iterator<Item = u32>>(val: T) -> Vec<u8> {
     Vec::from(data)
 }
 
+#[cfg(test)]
 mod test {
     use super::*;
 

@@ -50,7 +50,7 @@ fn grid_to_coalesce_entry<T: Borrow<GridStore> + Clone>(
     // Zoom has been adjusted in coalesce_multi, or correct zoom has been passed in for coalesce_single
     debug_assert!(match_opts.zoom == subquery.zoom);
     // TODO: do we need to check for bbox here?
-    let mut relev = grid.grid_entry.relev * subquery.weight;
+    let relev = grid.grid_entry.relev * subquery.weight;
 
     CoalesceEntry {
         grid_entry: GridEntry { relev, ..grid.grid_entry },
@@ -74,7 +74,6 @@ fn coalesce_single<T: Borrow<GridStore> + Clone>(
     let mut last_id: u32 = 0;
     let mut last_relev: f64 = 0.;
     let mut last_scoredist: f64 = 0.;
-    let mut last_distance: f64 = 0.;
     let mut min_scoredist = std::f64::MAX;
     let mut feature_count: usize = 0;
     let bigger_max = 2 * MAX_CONTEXTS;
@@ -122,7 +121,6 @@ fn coalesce_single<T: Borrow<GridStore> + Clone>(
         last_id = coalesce_entry.grid_entry.id;
         last_relev = coalesce_entry.grid_entry.relev;
         last_scoredist = coalesce_entry.scoredist;
-        last_distance = coalesce_entry.distance;
     }
 
     contexts.sort_by_key(|context| {
@@ -131,7 +129,7 @@ fn coalesce_single<T: Borrow<GridStore> + Clone>(
             Reverse(OrderedFloat(context.entries[0].scoredist)),
             context.entries[0].grid_entry.x,
             context.entries[0].grid_entry.y,
-            context.entries[0].grid_entry.id
+            context.entries[0].grid_entry.id,
         )
     });
 
