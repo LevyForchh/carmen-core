@@ -245,31 +245,28 @@ impl GridStore {
                 // "cannot move out of captured variable in an `FnMut` closure"
                 // "help: consider borrowing here: `&match_opts`rustc(E0507)""
                 let coords = match &match_opts {
-                    MatchOpts { bbox: None, proximity: None, zoom: 0...16 } => {
+                    MatchOpts { bbox: None, proximity: None, .. } => {
                         Some(Box::new(coords_vec.into_iter()) as Box<Iterator<Item = Coord>>)
                     }
-                    MatchOpts { bbox: Some(bbox), proximity: None, zoom: 0...16 } => {
+                    MatchOpts { bbox: Some(bbox), proximity: None, .. } => {
                         // TODO should the bbox argument be changed to a reference in bbox? The compiler was complaining
                         match spatial::bbox_filter(coords_vec, *bbox) {
                             Some(v) => Some(Box::new(v) as Box<Iterator<Item = Coord>>),
                             None => None,
                         }
                     }
-                    MatchOpts { bbox: None, proximity: Some(prox_pt), zoom: 0...16 } => {
+                    MatchOpts { bbox: None, proximity: Some(prox_pt), .. } => {
                         match spatial::proximity(coords_vec, prox_pt.point) {
                             Some(v) => Some(Box::new(v) as Box<Iterator<Item = Coord>>),
                             None => None,
                         }
                     }
-                    MatchOpts { bbox: Some(bbox), proximity: Some(prox_pt), zoom: 0...16 } => {
+                    MatchOpts { bbox: Some(bbox), proximity: Some(prox_pt), .. } => {
                         match spatial::bbox_proximity_filter(coords_vec, *bbox, prox_pt.point) {
                             Some(v) => Some(Box::new(v) as Box<Iterator<Item = Coord>>),
                             None => None,
                         }
                     }
-                    // TODO: the linter was complaining that not all MatchOpts zooms are covered. The zoom isn't even used for get_matching.
-                    // Should we have separate matchopts structs for this vs coalesce?
-                    _ => None,
                 };
 
                 if coords.is_some() {
@@ -279,6 +276,17 @@ impl GridStore {
                     slot.push((score, matches_language, coords.unwrap()));
                 }
             }
+        }
+
+        struct SortGroup<'a> {
+            coords: Coord<'a>,
+            scoredist: f64,
+            x: u16,
+            y: u16,
+            score: u8,
+            distance: f64,
+            matches_language: bool,
+            within_radius: bool
         }
 
         let out = coords_for_relev.into_iter().rev().flat_map(move |(relev, coord_sets)| {
@@ -305,13 +313,13 @@ impl GridStore {
                                 (0f64, false, score as f64)
                             }
                         };
-                        (coords, scoredist, x, y, score, distance, matches_language, within_radius)
+                        SortGroup { coords, scoredist, x, y, score, distance, matches_language, within_radius }
                     })
                 })
-                .kmerge_by(|a, b| (a.6 || a.7, a.1).partial_cmp(&(b.6 || b.7, b.1)).unwrap() == Ordering::Greater);
+                .kmerge_by(|a, b| (a.matches_language || a.within_radius, a.scoredist).partial_cmp(&(b.matches_language || b.within_radius, b.scoredist)).unwrap() == Ordering::Greater);
 
             // group together entries from different keys that have the same scoredist, x, and y
-            somewhat_eager_groupby(merged, |a| ((*a).1, (*a).2, (*a).3, (*a).6, (*a).7)).flat_map(
+            somewhat_eager_groupby(merged, |a| ((*a).scoredist, (*a).x, (*a).y, (*a).matches_language, (*a).within_radius)).flat_map(
                 move |((scoredist, x, y, matches_language, within_radius), coords_obj_group)| {
                     // get all the feature IDs from all the entries with the same scoredist/X/Y, and eagerly
                     // combine them and sort descending if necessary (if there's only one entry,
@@ -321,16 +329,16 @@ impl GridStore {
                     let all_ids: Vec<u32> = match coords_obj_group.len() {
                         0 => Vec::new(),
                         1 => {
-                            score = coords_obj_group[0].4;
-                            distance = coords_obj_group[0].5;
-                            coords_obj_group[0].0.ids().unwrap().iter().collect()
+                            score = coords_obj_group[0].score;
+                            distance = coords_obj_group[0].distance;
+                            coords_obj_group[0].coords.ids().unwrap().iter().collect()
                         },
                         _ => {
                             let mut ids = Vec::new();
-                            score = coords_obj_group[0].4;
-                            distance = coords_obj_group[0].5;
-                            for (coords_obj, _, _, _, _, _, _, _) in coords_obj_group {
-                                ids.extend(coords_obj.ids().unwrap().iter());
+                            score = coords_obj_group[0].score;
+                            distance = coords_obj_group[0].distance;
+                            for group in coords_obj_group {
+                                ids.extend(group.coords.ids().unwrap().iter());
                             }
                             ids.sort_by(|a, b| b.cmp(a));
                             ids.dedup();
