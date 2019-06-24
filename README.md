@@ -62,3 +62,16 @@ Once you're ready to publish a binary (either a release or a development version
 * Update the version number in `package.json` (for development versions, add a `-[your-branch-name]-1` tag after the number)
 * Commit your changes with a commit message that includes `[publish binary]`
 * Push and wait for Travis to run; the Javascript builders should include information about publishing builds at the end of the build log
+
+## Benching
+This project uses [Criterion](http://bheisler.github.io/criterion.rs/criterion/) benchmarks. Criterion is a statistics-driven benchmarking library that generates visual reports with [gnuplot](http://www.gnuplot.info/index.html). To enable the report generation, make sure you have gnuplot installed (`brew install gnuplot` on a mac).
+
+To run benchmarks:
+```
+cargo bench
+```
+
+Html reports will be generated in `target/criterion/report/index.html`
+
+Criterion will measure the statistical significance of the difference between two different bench runs, so to measure the impact of a change, you can checkout master, run a bench, and then check out a feature branch and run a bench. Note: the results are sensitive to other resource usage on your machine. For more accurate results, run in an isolated environment.
+
