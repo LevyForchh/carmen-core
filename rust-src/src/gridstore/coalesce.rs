@@ -127,9 +127,9 @@ fn coalesce_single<T: Borrow<GridStore> + Clone>(
         (
             Reverse(OrderedFloat(context.relev)),
             Reverse(OrderedFloat(context.entries[0].scoredist)),
+            context.entries[0].grid_entry.id,
             context.entries[0].grid_entry.x,
             context.entries[0].grid_entry.y,
-            context.entries[0].grid_entry.id,
         )
     });
 

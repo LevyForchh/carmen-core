@@ -125,7 +125,7 @@ fn coalesce_single_test_proximity_basic() {
         result.iter().map(|context| context.entries[0].grid_entry.id).collect();
     assert_eq!(
         result_ids,
-        [1, 4, 2, 3],
+        [1, 2, 4, 3],
         "Results with the same relev and score should be ordered by distance"
     );
 
