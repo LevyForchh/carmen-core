@@ -48,6 +48,7 @@ pub fn create_store(store_entries: Vec<StoreEntryBuildingBlock>) -> GridStore {
 
 /// Loads json from a file into a Vector of GridEntrys
 /// The input file should be line-delimited JSON with all of the fields of a GridEntry
+/// The path should be relative to the carmen-core directory
 ///
 /// Example:
 /// {"relev": 1, "score": 1, "x": 1, "y": 2, "id": 1, "source_phrase_hash": 0}
