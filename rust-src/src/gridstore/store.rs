@@ -234,7 +234,7 @@ impl GridStore {
 
             for rs_obj in rs_vec {
                 let relev_score = rs_obj.relev_score();
-                let relev = relev_int_to_float(relev_score >> 4) * (if matches_language { 1f64 } else { 0.96f64 });
+                let relev = relev_int_to_float(relev_score >> 4);
                 // mask for the least significant four bits
                 let score = relev_score & 15;
 
@@ -274,14 +274,14 @@ impl GridStore {
 
                 if coords.is_some() {
                     let slot = coords_for_relev
-                        .entry((OrderedFloat(relev), matches_language))
+                        .entry(OrderedFloat(relev))
                         .or_insert_with(|| vec![]);
-                    slot.push((score, coords.unwrap()));
+                    slot.push((score, matches_language, coords.unwrap()));
                 }
             }
         }
 
-        let out = coords_for_relev.into_iter().rev().flat_map(move |((relev, matches_language), coord_sets)| {
+        let out = coords_for_relev.into_iter().rev().flat_map(move |(relev, coord_sets)| {
             let match_opts = match_opts.clone();
             // this is necessitated by the unsafe hackery above: we need to grab a reference
             // to ref_set so that it gets moved into the closure, so that its memory doesn't
@@ -291,28 +291,28 @@ impl GridStore {
             // for each relev/score, lazily k-way-merge the child entities by z-order curve value
             let merged = coord_sets
                 .into_iter()
-                .map(move |(score, coord_vec)| {
+                .map(move |(score, matches_language, coord_vec)| {
                     let match_opts = match_opts.clone();
                     coord_vec.map(move |coords| {
                         let coord = coords.coord();
                         let (x, y) = deinterleave_morton(coord);
-                        let (distance, scoredist) = match &match_opts {
+                        let (distance, within_radius, scoredist) = match &match_opts {
                             MatchOpts { proximity: Some(prox_pt), zoom, .. } => {
                                 let distance = tile_dist(prox_pt.point[0], prox_pt.point[1], x, y);
-                                (distance, scoredist(*zoom, distance, score, prox_pt.radius))
+                                (distance, distance <= prox_pt.radius, scoredist(*zoom, distance, score, prox_pt.radius))
                             },
                             _ => {
-                                (0f64, score as f64)
+                                (0f64, false, score as f64)
                             }
                         };
-                        (coords, scoredist, x, y, score, distance)
+                        (coords, scoredist, x, y, score, distance, matches_language, within_radius)
                     })
                 })
-                .kmerge_by(|a, b| a.1.partial_cmp(&b.1).unwrap() == Ordering::Greater);
+                .kmerge_by(|a, b| (a.6 || a.7, a.1).partial_cmp(&(b.6 || b.7, b.1)).unwrap() == Ordering::Greater);
 
             // group together entries from different keys that have the same scoredist, x, and y
-            somewhat_eager_groupby(merged, |a| ((*a).1, (*a).2, (*a).3)).flat_map(
-                move |((scoredist, x, y), coords_obj_group)| {
+            somewhat_eager_groupby(merged, |a| ((*a).1, (*a).2, (*a).3, (*a).6, (*a).7)).flat_map(
+                move |((scoredist, x, y, matches_language, within_radius), coords_obj_group)| {
                     // get all the feature IDs from all the entries with the same scoredist/X/Y, and eagerly
                     // combine them and sort descending if necessary (if there's only one entry,
                     // it's already sorted)
@@ -329,7 +329,7 @@ impl GridStore {
                             let mut ids = Vec::new();
                             score = coords_obj_group[0].4;
                             distance = coords_obj_group[0].5;
-                            for (coords_obj, _, _, _, _, _) in coords_obj_group {
+                            for (coords_obj, _, _, _, _, _, _, _) in coords_obj_group {
                                 ids.extend(coords_obj.ids().unwrap().iter());
                             }
                             ids.sort_by(|a, b| b.cmp(a));
@@ -343,7 +343,7 @@ impl GridStore {
                         let source_phrase_hash = (id_comp & 255) as u8;
                         MatchEntry {
                             grid_entry: GridEntry {
-                                relev,
+                                relev: relev * (if matches_language || within_radius { 1f64 } else { 0.96f64 }),
                                 score,
                                 x,
                                 y,

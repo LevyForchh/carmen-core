@@ -224,8 +224,8 @@ mod tests {
                 MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 42, y: 1, id: 22, source_phrase_hash: 0 }, matches_language: true, distance: 0.0, scoredist: 7.0 },
                 MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 41, y: 1, id: 23, source_phrase_hash: 0 }, matches_language: true, distance: 0.0, scoredist: 7.0 },
                 MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 41, y: 1, id: 21, source_phrase_hash: 0 }, matches_language: true, distance: 0.0, scoredist: 7.0 },
-                MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 1, x: 40, y: 1, id: 20, source_phrase_hash: 0 }, matches_language: true, distance: 0.0, scoredist: 1.0 },
                 MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 1, x: 56, y: 1, id: 28, source_phrase_hash: 0 }, matches_language: true, distance: 0.0, scoredist: 1.0 },
+                MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 1, x: 40, y: 1, id: 20, source_phrase_hash: 0 }, matches_language: true, distance: 0.0, scoredist: 1.0 },
                 MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 26, y: 1, id: 14, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 7.0 },
                 MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 25, y: 1, id: 15, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 7.0 },
                 MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 25, y: 1, id: 13, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 7.0 },
@@ -268,14 +268,14 @@ mod tests {
                 MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 25, y: 1, id: 15, source_phrase_hash: 0 }, matches_language: true, distance: 0.0, scoredist: 7.0 },
                 MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 25, y: 1, id: 13, source_phrase_hash: 0 }, matches_language: true, distance: 0.0, scoredist: 7.0 },
                 MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 1, x: 24, y: 1, id: 12, source_phrase_hash: 0 }, matches_language: true, distance: 0.0, scoredist: 1.0 },
-                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 58, y: 1, id: 30, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 7.0 },
-                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 57, y: 1, id: 31, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 7.0 },
-                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 57, y: 1, id: 29, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 7.0 },
                 MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 42, y: 1, id: 22, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 7.0 },
                 MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 41, y: 1, id: 23, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 7.0 },
                 MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 41, y: 1, id: 21, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 7.0 },
-                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 1, x: 40, y: 1, id: 20, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 1.0 },
-                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 1, x: 56, y: 1, id: 28, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 1.0 }
+                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 58, y: 1, id: 30, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 7.0 },
+                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 57, y: 1, id: 31, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 7.0 },
+                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 57, y: 1, id: 29, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 7.0 },
+                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 1, x: 56, y: 1, id: 28, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 1.0 },
+                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 1, x: 40, y: 1, id: 20, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 1.0 }
             ]
         );
 
@@ -384,14 +384,14 @@ mod tests {
                 MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 25, y: 1, id: 15, source_phrase_hash: 0 }, matches_language: true, distance: 1.0, scoredist: 12600.000000000002 },
                 MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 25, y: 1, id: 13, source_phrase_hash: 0 }, matches_language: true, distance: 1.0, scoredist: 12600.000000000002 },
                 MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 1, x: 24, y: 1, id: 12, source_phrase_hash: 0 }, matches_language: true, distance: 2.0, scoredist: 913.3852617539986 },
-                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 41, y: 1, id: 23, source_phrase_hash: 0 }, matches_language: false, distance: 15.0, scoredist: 840.0000000000002 },
-                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 41, y: 1, id: 21, source_phrase_hash: 0 }, matches_language: false, distance: 15.0, scoredist: 840.0000000000002 },
-                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 42, y: 1, id: 22, source_phrase_hash: 0 }, matches_language: false, distance: 16.0, scoredist: 787.5000000000001 },
-                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 57, y: 1, id: 31, source_phrase_hash: 0 }, matches_language: false, distance: 31.0, scoredist: 406.4516129032259 },
-                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 57, y: 1, id: 29, source_phrase_hash: 0 }, matches_language: false, distance: 31.0, scoredist: 406.4516129032259 },
-                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 58, y: 1, id: 30, source_phrase_hash: 0 }, matches_language: false, distance: 32.0, scoredist: 393.75000000000006 },
-                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 1, x: 40, y: 1, id: 20, source_phrase_hash: 0 }, matches_language: false, distance: 14.0, scoredist: 130.48360882199978 },
-                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 1, x: 56, y: 1, id: 28, source_phrase_hash: 0 }, matches_language: false, distance: 30.0, scoredist: 60.89235078359991 }
+                MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 41, y: 1, id: 23, source_phrase_hash: 0 }, matches_language: false, distance: 15.0, scoredist: 840.0000000000002 },
+                MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 41, y: 1, id: 21, source_phrase_hash: 0 }, matches_language: false, distance: 15.0, scoredist: 840.0000000000002 },
+                MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 42, y: 1, id: 22, source_phrase_hash: 0 }, matches_language: false, distance: 16.0, scoredist: 787.5000000000001 },
+                MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 57, y: 1, id: 31, source_phrase_hash: 0 }, matches_language: false, distance: 31.0, scoredist: 406.4516129032259 },
+                MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 57, y: 1, id: 29, source_phrase_hash: 0 }, matches_language: false, distance: 31.0, scoredist: 406.4516129032259 },
+                MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 58, y: 1, id: 30, source_phrase_hash: 0 }, matches_language: false, distance: 32.0, scoredist: 393.75000000000006 },
+                MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 1, x: 40, y: 1, id: 20, source_phrase_hash: 0 }, matches_language: false, distance: 14.0, scoredist: 130.48360882199978 },
+                MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 1, x: 56, y: 1, id: 28, source_phrase_hash: 0 }, matches_language: false, distance: 30.0, scoredist: 60.89235078359991 }
             ]
         );
 
@@ -416,9 +416,9 @@ mod tests {
                 MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 25, y: 1, id: 15, source_phrase_hash: 0 }, matches_language: true, distance: 1.0, scoredist: 12600.000000000002 },
                 MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 25, y: 1, id: 13, source_phrase_hash: 0 }, matches_language: true, distance: 1.0, scoredist: 12600.000000000002 },
                 MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 1, x: 24, y: 1, id: 12, source_phrase_hash: 0 }, matches_language: true, distance: 2.0, scoredist: 913.3852617539986 },
-                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 41, y: 1, id: 23, source_phrase_hash: 0 }, matches_language: false, distance: 15.0, scoredist: 840.0000000000002 },
-                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 41, y: 1, id: 21, source_phrase_hash: 0 }, matches_language: false, distance: 15.0, scoredist: 840.0000000000002 },
-                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 1, x: 40, y: 1, id: 20, source_phrase_hash: 0 }, matches_language: false, distance: 14.0, scoredist: 130.48360882199978 }
+                MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 41, y: 1, id: 23, source_phrase_hash: 0 }, matches_language: false, distance: 15.0, scoredist: 840.0000000000002 },
+                MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 41, y: 1, id: 21, source_phrase_hash: 0 }, matches_language: false, distance: 15.0, scoredist: 840.0000000000002 },
+                MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 1, x: 40, y: 1, id: 20, source_phrase_hash: 0 }, matches_language: false, distance: 14.0, scoredist: 130.48360882199978 }
             ]
         );
 
