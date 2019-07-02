@@ -167,6 +167,9 @@ fn coalesce_multi<T: Borrow<GridStore> + Clone>(
         let grids =
             subquery.store.borrow().get_matching(&subquery.match_key, &adjusted_match_opts)?;
 
+        // limit to 100,000 records -- we may want to experiment with this number; it was 500k in
+        // carmen-cache, but hopefully we're sorting more intelligently on the way in here so
+        // shouldn't need as many records. Still, we should limit it somehow.
         for grid in grids.take(100_000) {
             let coalesce_entry = grid_to_coalesce_entry(&grid, subquery, &adjusted_match_opts);
 
