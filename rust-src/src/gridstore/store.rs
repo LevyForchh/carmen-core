@@ -10,7 +10,6 @@ use morton::deinterleave_morton;
 use ordered_float::OrderedFloat;
 use rocksdb::{Direction, IteratorMode, Options, DB};
 
-use crate::gridstore::coalesce::{scoredist, tile_dist};
 use crate::gridstore::common::*;
 use crate::gridstore::gridstore_generated::*;
 use crate::gridstore::spatial;
@@ -301,11 +300,11 @@ impl GridStore {
                         let (x, y) = deinterleave_morton(coord);
                         let (distance, within_radius, scoredist) = match &match_opts {
                             MatchOpts { proximity: Some(prox_pt), zoom, .. } => {
-                                let distance = tile_dist(prox_pt.point[0], prox_pt.point[1], x, y);
+                                let distance = spatial::tile_dist(prox_pt.point[0], prox_pt.point[1], x, y);
                                 (
                                     distance,
                                     distance <= prox_pt.radius,
-                                    scoredist(*zoom, distance, score, prox_pt.radius),
+                                    spatial::scoredist(*zoom, distance, score, prox_pt.radius),
                                 )
                             }
                             _ => (0f64, false, score as f64),
