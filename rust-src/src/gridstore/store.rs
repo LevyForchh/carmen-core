@@ -300,7 +300,8 @@ impl GridStore {
                         let (x, y) = deinterleave_morton(coord);
                         let (distance, within_radius, scoredist) = match &match_opts {
                             MatchOpts { proximity: Some(prox_pt), zoom, .. } => {
-                                let distance = spatial::tile_dist(prox_pt.point[0], prox_pt.point[1], x, y);
+                                let distance =
+                                    spatial::tile_dist(prox_pt.point[0], prox_pt.point[1], x, y);
                                 (
                                     distance,
                                     distance <= prox_pt.radius,
