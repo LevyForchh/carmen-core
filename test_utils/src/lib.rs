@@ -5,9 +5,11 @@ extern crate serde_json;
 
 use carmen_core::gridstore::*;
 use failure::Error;
+use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs::{self, File};
-use std::io::{self, BufRead};
+use std::io::Write;
+use std::io::{self, BufRead, BufWriter};
 use std::path::Path;
 
 // Util functions for tests and benchmarks
@@ -28,6 +30,7 @@ pub fn langarray_to_langfield(array: &[u32]) -> u128 {
 }
 
 /// Mapping of GridKey to all of the grid entries to insert into a store for that GridKey
+#[derive(Serialize, Deserialize, Debug)]
 pub struct StoreEntryBuildingBlock {
     pub grid_key: GridKey,
     pub entries: Vec<GridEntry>,
@@ -71,4 +74,30 @@ pub fn load_grids_from_json(path: &Path) -> Result<Vec<GridEntry>, Error> {
         .collect::<Vec<GridEntry>>();
 
     Ok(entries)
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GridKeyEntry {
+    key: GridKey,
+    entry: GridEntry,
+}
+
+/// Takes an absolute path to a rocksdb dir, reads the data from the db,
+/// writes a json representation of the data to a file, and outputs the path to that file
+pub fn dump_db_to_json(path: &Path) -> Result<&Path, Error> {
+    let reader = GridStore::new(path).unwrap();
+    // TODO: generate output file name based on the input file path
+    let output_file = File::create("output.json")?;
+    let mut writer = BufWriter::new(output_file);
+    let keys = reader.keys();
+    for key in keys {
+        let grid_key = key.unwrap();
+        let record: Vec<_> = reader.get(&grid_key).unwrap().unwrap().collect();
+        let key_record_pair = StoreEntryBuildingBlock { grid_key: grid_key, entries: record };
+        let line =
+            serde_json::to_string(&key_record_pair).expect("Unable to serialize record") + "\n";
+        let bytes = line.as_bytes();
+        writer.write(&bytes).unwrap();
+    }
+    Ok(path)
 }
