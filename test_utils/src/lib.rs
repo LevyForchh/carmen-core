@@ -10,7 +10,7 @@ use std::env;
 use std::fs::{self, File};
 use std::io::Write;
 use std::io::{self, BufRead, BufWriter};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 // Util functions for tests and benchmarks
 
@@ -49,45 +49,49 @@ pub fn create_store(store_entries: Vec<StoreEntryBuildingBlock>) -> GridStore {
     GridStore::new(directory.path()).unwrap()
 }
 
+pub fn get_absolute_path(relative_path: &Path) -> Result<PathBuf, Error> {
+    let dir = env::current_dir().expect("Error getting current dir");
+    let mut filepath = fs::canonicalize(&dir).expect("Error getting cannonicalized current dir");
+    filepath.push(relative_path);
+    Ok(filepath)
+}
+
 /// Loads json from a file into a Vector of GridEntrys
 /// The input file should be line-delimited JSON with all of the fields of a GridEntry
 /// The path should be relative to the carmen-core directory
 ///
 /// Example:
 /// {"relev": 1, "score": 1, "x": 1, "y": 2, "id": 1, "source_phrase_hash": 0}
-pub fn load_grids_from_json(path: &Path) -> Result<Vec<GridEntry>, Error> {
-    let dir = env::current_dir().expect("Error getting current dir");
-    let mut filepath = fs::canonicalize(&dir).expect("Error getting cannonicalized current dir");
-    filepath.push(path);
-    let f = File::open(path).expect("Error opening file");
+pub fn load_grids_from_json_to_store(path: &Path) -> Result<GridStore, Error> {
+    // Open json file
+    let abs_path = get_absolute_path(path).unwrap();
+    let f = File::open(abs_path).expect("Error opening file");
     let file = io::BufReader::new(f);
-    let entries: Vec<GridEntry> = file
-        .lines()
-        .filter_map(|l| match l.unwrap() {
-            ref t if t.len() == 0 => None,
-            t => {
-                let deserialized: GridEntry =
-                    serde_json::from_str(&t).expect("Error deserializing json from string");
-                Some(deserialized)
-            }
-        })
-        .collect::<Vec<GridEntry>>();
 
-    Ok(entries)
+    // Set up new gridstore
+    let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
+    let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
+    file.lines().for_each(|l| {
+        let record = l.unwrap();
+        if !record.is_empty() {
+            let deserialized: StoreEntryBuildingBlock =
+                serde_json::from_str(&record).expect("Error deserializing json from string");
+            builder
+                .insert(&deserialized.grid_key, &deserialized.entries)
+                .expect("Unable to insert");
+        }
+    });
+    builder.finish().unwrap();
+    Ok(GridStore::new(directory.path()).unwrap())
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct GridKeyEntry {
-    key: GridKey,
-    entry: GridEntry,
-}
-
-/// Takes an absolute path to a rocksdb dir, reads the data from the db,
-/// writes a json representation of the data to a file, and outputs the path to that file
-pub fn dump_db_to_json(path: &Path) -> Result<&Path, Error> {
-    let reader = GridStore::new(path).unwrap();
+/// Takes an absolute path to a rocksdb dir, and a relative path for the output file (relative to carmen-core),
+/// reads the data from the db, and writes a json representation of the data to a file
+pub fn dump_db_to_json(input_path: &Path, output_path: &Path) {
+    let reader = GridStore::new(input_path).unwrap();
+    let output_abs_path = get_absolute_path(output_path).unwrap();
     // TODO: generate output file name based on the input file path
-    let output_file = File::create("output.json")?;
+    let output_file = File::create(&output_abs_path).unwrap();
     let mut writer = BufWriter::new(output_file);
     let keys = reader.keys();
     for key in keys {
@@ -99,5 +103,4 @@ pub fn dump_db_to_json(path: &Path) -> Result<&Path, Error> {
         let bytes = line.as_bytes();
         writer.write(&bytes).unwrap();
     }
-    Ok(path)
 }
