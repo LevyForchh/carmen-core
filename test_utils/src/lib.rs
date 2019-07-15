@@ -49,6 +49,7 @@ pub fn create_store(store_entries: Vec<StoreEntryBuildingBlock>) -> GridStore {
     GridStore::new(directory.path()).unwrap()
 }
 
+// Gets the absolute path for a path relative to the carmen-core dir
 pub fn get_absolute_path(relative_path: &Path) -> Result<PathBuf, Error> {
     let dir = env::current_dir().expect("Error getting current dir");
     let mut filepath = fs::canonicalize(&dir).expect("Error getting cannonicalized current dir");
@@ -58,14 +59,14 @@ pub fn get_absolute_path(relative_path: &Path) -> Result<PathBuf, Error> {
 
 /// Loads json from a file into a Vector of GridEntrys
 /// The input file should be line-delimited JSON with all of the fields of a GridEntry
-/// The path should be relative to the carmen-core directory
+/// The path should be an absolute path
 ///
 /// Example:
 /// {"relev": 1, "score": 1, "x": 1, "y": 2, "id": 1, "source_phrase_hash": 0}
-pub fn load_grids_from_json_to_store(path: &Path) -> Result<GridStore, Error> {
+pub fn load_grids_from_json_to_store(path_name: &String) -> Result<GridStore, Error> {
     // Open json file
-    let abs_path = get_absolute_path(path).unwrap();
-    let f = File::open(abs_path).expect("Error opening file");
+    let path = Path::new(path_name);
+    let f = File::open(path).expect("Error opening file");
     let file = io::BufReader::new(f);
 
     // Set up new gridstore
@@ -85,13 +86,11 @@ pub fn load_grids_from_json_to_store(path: &Path) -> Result<GridStore, Error> {
     Ok(GridStore::new(directory.path()).unwrap())
 }
 
-/// Takes an absolute path to a rocksdb dir, and a relative path for the output file (relative to carmen-core),
+/// Takes an absolute path (in string form) to a rocksdb dir, and an absolute path for the output file,
 /// reads the data from the db, and writes a json representation of the data to a file
-pub fn dump_db_to_json(input_path: &Path, output_path: &Path) {
+pub fn dump_db_to_json(input_path: &String, output_path: &String) {
     let reader = GridStore::new(input_path).unwrap();
-    let output_abs_path = get_absolute_path(output_path).unwrap();
-    // TODO: generate output file name based on the input file path
-    let output_file = File::create(&output_abs_path).unwrap();
+    let output_file = File::create(output_path).unwrap();
     let mut writer = BufWriter::new(output_file);
     let keys = reader.keys();
     for key in keys {
