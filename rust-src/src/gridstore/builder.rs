@@ -34,6 +34,52 @@ fn extend_entries(builder_entry: &mut BuilderEntry, values: &[GridEntry]) -> () 
     }
 }
 
+fn copy_entries(source_entry: &BuilderEntry, destination_entry: &mut BuilderEntry) -> () {
+    for (rs, values) in source_entry.iter()
+    {
+        let rs_entry = destination_entry.entry(*rs).or_insert_with(|| BTreeMap::new());
+        for (zcoord, values) in values.iter()
+        {
+            let zcoord_entry = rs_entry.entry(*zcoord).or_insert_with(|| Vec::new());
+            zcoord_entry.extend(values.iter());
+        }
+    }
+}
+
+fn get_fb_value(value: &mut BuilderEntry) -> Result<Vec<u8>, Error> {
+
+    let mut fb_builder = flatbuffers::FlatBufferBuilder::new();
+    let mut rses: Vec<_> = Vec::new();
+    for (rs, coord_group) in value.iter_mut().rev() {
+        let mut coords: Vec<_> = Vec::new();
+        for (coord, ids) in coord_group.iter_mut().rev() {
+            // reverse sort
+            ids.sort_by(|a, b| b.cmp(a));
+            ids.dedup();
+
+            let fb_ids = fb_builder.create_vector(&ids);
+            let fb_coord = Coord::create(
+                &mut fb_builder,
+                &CoordArgs { coord: *coord, ids: Some(fb_ids) },
+            );
+            coords.push(fb_coord);
+        }
+        let fb_coords = fb_builder.create_vector(&coords);
+        let fb_rs = RelevScore::create(
+            &mut fb_builder,
+            &RelevScoreArgs { relev_score: *rs, coords: Some(fb_coords) },
+        );
+        rses.push(fb_rs);
+    }
+    let fb_rses = fb_builder.create_vector(&rses);
+    let record = PhraseRecord::create(
+        &mut fb_builder,
+        &PhraseRecordArgs { relev_scores: Some(fb_rses) },
+    );
+    fb_builder.finish(record, None);
+    Ok(fb_builder.finished_data().to_owned())
+}
+
 impl GridStoreBuilder {
     /// Makes a new GridStoreBuilder with a particular filename.
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
@@ -84,47 +130,32 @@ impl GridStoreBuilder {
     pub fn finish(mut self) -> Result<(), Error> {
         let db = DB::open_default(&self.path)?;
         let mut db_key: Vec<u8> = Vec::with_capacity(MAX_KEY_LENGTH);
-        for (grid_key, value) in self.data.iter_mut() {
-            // figure out the key
-            db_key.clear();
-            // type marker is 0 -- regular entry
-            grid_key.write_to(0, &mut db_key)?;
 
-            // figure out the value
-            let mut fb_builder = flatbuffers::FlatBufferBuilder::new();
-            let mut rses: Vec<_> = Vec::new();
-            for (rs, coord_group) in value.iter_mut().rev() {
-                let mut coords: Vec<_> = Vec::new();
-                for (coord, ids) in coord_group.iter_mut().rev() {
-                    // reverse sort
-                    ids.sort_by(|a, b| b.cmp(a));
-                    ids.dedup();
-
-                    let fb_ids = fb_builder.create_vector(&ids);
-                    let fb_coord = Coord::create(
-                        &mut fb_builder,
-                        &CoordArgs { coord: *coord, ids: Some(fb_ids) },
-                    );
-                    coords.push(fb_coord);
-                }
-                let fb_coords = fb_builder.create_vector(&coords);
-                let fb_rs = RelevScore::create(
-                    &mut fb_builder,
-                    &RelevScoreArgs { relev_score: *rs, coords: Some(fb_coords) },
-                );
-                rses.push(fb_rs);
+        let grouped = self.data.iter_mut().group_by(|(key, _value)| {
+            GridKey {
+                phrase_id: (key.phrase_id >> 10) << 10,
+                ..**key
             }
-            let fb_rses = fb_builder.create_vector(&rses);
-            let record = PhraseRecord::create(
-                &mut fb_builder,
-                &PhraseRecordArgs { relev_scores: Some(fb_rses) },
-            );
-            fb_builder.finish(record, None);
+        });
 
-            let db_data = fb_builder.finished_data();
+        for (group_key, group_value) in grouped.into_iter() {
+            let mut grouped_entry = BuilderEntry::new();
+            for (grid_key, value) in group_value {
+                // figure out the key
+                db_key.clear();
+                // type marker is 0 -- regular entry
+                grid_key.write_to(0, &mut db_key)?;
 
-            db.put(&db_key, &db_data)?;
+                copy_entries(&value, &mut grouped_entry);
+                // figure out the value
+                let db_data = get_fb_value(value)?;
+                db.put(&db_key, &db_data)?;
+            }
+            group_key.write_to(1, &mut db_key)?;
+            let grouped_db_data = get_fb_value(&mut grouped_entry)?;
+            //db.put(&db_key, &grouped_db_data);
         }
+
         drop(db);
         Ok(())
     }

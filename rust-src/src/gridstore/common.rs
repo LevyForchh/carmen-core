@@ -59,6 +59,9 @@ impl MatchKey {
 
     pub fn matches_key(&self, db_key: &[u8]) -> Result<bool, Error> {
         let key_phrase = (&db_key[1..]).read_u32::<BigEndian>()?;
+        if db_key[0] != 0 {
+            return Ok(false);
+        }
         Ok(match self.match_phrase {
             MatchPhrase::Exact(phrase_id) => phrase_id == key_phrase,
             MatchPhrase::Range { start, end } => start <= key_phrase && key_phrase < end,
