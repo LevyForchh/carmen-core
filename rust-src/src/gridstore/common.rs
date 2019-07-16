@@ -57,9 +57,9 @@ impl MatchKey {
         Ok(())
     }
 
-    pub fn matches_key(&self, db_key: &[u8]) -> Result<bool, Error> {
+    pub fn matches_key(&self, type_marker: u8, db_key: &[u8]) -> Result<bool, Error> {
         let key_phrase = (&db_key[1..]).read_u32::<BigEndian>()?;
-        if db_key[0] != 0 {
+        if db_key[0] != type_marker {
             return Ok(false);
         }
         Ok(match self.match_phrase {
