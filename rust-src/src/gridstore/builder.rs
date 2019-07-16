@@ -151,9 +151,10 @@ impl GridStoreBuilder {
                 let db_data = get_fb_value(value)?;
                 db.put(&db_key, &db_data)?;
             }
+            db_key.clear();
             group_key.write_to(1, &mut db_key)?;
             let grouped_db_data = get_fb_value(&mut grouped_entry)?;
-            //db.put(&db_key, &grouped_db_data);
+            db.put(&db_key, &grouped_db_data);
         }
 
         drop(db);
