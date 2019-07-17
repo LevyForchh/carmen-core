@@ -70,7 +70,7 @@ fn get_fb_value(value: &mut BuilderEntry) -> Result<Vec<u8>, Error> {
     let record =
         PhraseRecord::create(&mut fb_builder, &PhraseRecordArgs { relev_scores: Some(fb_rses) });
     fb_builder.finish(record, None);
-    Ok(fb_builder.finished_data().to_owned())
+    Ok(fb_builder.finished_data().to_vec())
 }
 
 impl GridStoreBuilder {
