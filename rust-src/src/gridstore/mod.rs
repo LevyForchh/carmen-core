@@ -428,4 +428,120 @@ mod tests {
         orig_keys.dedup();
         assert_eq!(listed_keys.unwrap(), orig_keys);
     }
+
+    #[test]
+    fn prefix_test() {
+        let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
+        let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
+
+        for i in 0..=2400 {
+            let key = GridKey { phrase_id: i, lang_set: 1 };
+            let entries = vec![GridEntry {
+                id: i,
+                x: i as u16,
+                y: 1,
+                relev: 1.,
+                score: 1,
+                source_phrase_hash: 0,
+            }];
+            builder.insert(&key, &entries).expect("Unable to insert record");
+        }
+
+        builder.finish().unwrap();
+
+        let reader = GridStore::new(directory.path()).unwrap();
+        let search_key =
+            MatchKey { match_phrase: MatchPhrase::Range { start: 800, end: 2049 }, lang_set: 1 };
+        let mut records: Vec<_> =
+            reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
+        records.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let mut expected = Vec::new();
+        for i in 800..=2048 {
+            expected.push(MatchEntry {
+                grid_entry: GridEntry {
+                    relev: 1.0,
+                    score: 1,
+                    x: i as u16,
+                    y: 1,
+                    id: i,
+                    source_phrase_hash: 0,
+                },
+                matches_language: true,
+                distance: 0.0,
+                scoredist: 1.0,
+            })
+        }
+        assert_eq!(records, expected);
+
+        let search_key =
+            MatchKey { match_phrase: MatchPhrase::Range { start: 1024, end: 2049 }, lang_set: 1 };
+        let mut records: Vec<_> =
+            reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
+        records.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+        let mut expected = Vec::new();
+        for i in 1024..=2048 {
+            expected.push(MatchEntry {
+                grid_entry: GridEntry {
+                    relev: 1.0,
+                    score: 1,
+                    x: i as u16,
+                    y: 1,
+                    id: i,
+                    source_phrase_hash: 0,
+                },
+                matches_language: true,
+                distance: 0.0,
+                scoredist: 1.0,
+            })
+        }
+        assert_eq!(records, expected);
+
+        let search_key =
+            MatchKey { match_phrase: MatchPhrase::Range { start: 1000, end: 2024 }, lang_set: 1 };
+        let mut records: Vec<_> =
+            reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
+
+        records.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let mut expected = Vec::new();
+        for i in 1000..=2023 {
+            expected.push(MatchEntry {
+                grid_entry: GridEntry {
+                    relev: 1.0,
+                    score: 1,
+                    x: i as u16,
+                    y: 1,
+                    id: i,
+                    source_phrase_hash: 0,
+                },
+                matches_language: true,
+                distance: 0.0,
+                scoredist: 1.0,
+            })
+        }
+        assert_eq!(records, expected);
+
+        let search_key =
+            MatchKey { match_phrase: MatchPhrase::Range { start: 1024, end: 2048 }, lang_set: 1 };
+        let mut records: Vec<_> =
+            reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
+        records.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let mut expected = Vec::new();
+        for i in 1024..=2047 {
+            expected.push(MatchEntry {
+                grid_entry: GridEntry {
+                    relev: 1.0,
+                    score: 1,
+                    x: i as u16,
+                    y: 1,
+                    id: i,
+                    source_phrase_hash: 0,
+                },
+                matches_language: true,
+                distance: 0.0,
+                scoredist: 1.0,
+            })
+        }
+        assert_eq!(records, expected);
+    }
 }
