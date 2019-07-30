@@ -521,7 +521,7 @@ fn tiles_per_mile_by_zoom_test() {
 
 /// Convert proximity radius from miles into scaled number of tiles
 #[inline]
-fn proximity_radius(zoom: u16, radius: f64) -> f64 {
+pub fn proximity_radius(zoom: u16, radius: f64) -> f64 {
     debug_assert!(zoom <= 16);
     // In carmen-cache, there's an array of pre-calculated values for zooms 6-14, otherwise it does the exact same calculation as zoomTileRadius (now tiles_per_mile)
     // Does this even need to be a function?
