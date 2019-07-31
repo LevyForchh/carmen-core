@@ -1,5 +1,6 @@
 use std::borrow::Borrow;
 use std::cmp::Reverse;
+use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 
 use failure::Error;
@@ -68,7 +69,6 @@ fn coalesce_single<T: Borrow<GridStore> + Clone>(
     match_opts: &MatchOpts,
 ) -> Result<Vec<CoalesceContext>, Error> {
     let grids = subquery.store.borrow().get_matching(&subquery.match_key, match_opts)?;
-    let mut contexts: Vec<CoalesceContext> = Vec::new();
     let mut max_relev: f64 = 0.;
     // TODO: rename all of the last things to previous things
     let mut last_id: u32 = 0;
@@ -77,6 +77,8 @@ fn coalesce_single<T: Borrow<GridStore> + Clone>(
     let mut min_scoredist = std::f64::MAX;
     let mut feature_count: usize = 0;
     let bigger_max = 2 * MAX_CONTEXTS;
+
+    let mut coalesced: HashMap<(u32), CoalesceEntry> = HashMap::new();
 
     for grid in grids {
         let coalesce_entry = grid_to_coalesce_entry(&grid, subquery, match_opts);
@@ -102,26 +104,48 @@ fn coalesce_single<T: Borrow<GridStore> + Clone>(
         if coalesce_entry.grid_entry.relev > max_relev {
             max_relev = coalesce_entry.grid_entry.relev;
         }
-        // For coalesce single, there is only one coalesce entry per context
-        contexts.push(CoalesceContext {
-            mask: coalesce_entry.mask,
-            relev: coalesce_entry.grid_entry.relev,
-            entries: vec![coalesce_entry.clone()],
-        });
 
-        if last_id != coalesce_entry.grid_entry.id {
+        // Save current values before mocing into coalesced
+        let current_id = coalesce_entry.grid_entry.id;
+        let current_relev = coalesce_entry.grid_entry.relev;
+        let current_scoredist = coalesce_entry.scoredist;
+
+        // If it's the same feature as one that's been added before, but a higher scoredist, update the entry
+        match coalesced.entry(current_id) {
+            Entry::Occupied(mut already_coalesced) => {
+                if current_scoredist > already_coalesced.get().scoredist
+                    && current_relev >= already_coalesced.get().grid_entry.relev
+                {
+                    already_coalesced.insert(coalesce_entry);
+                }
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(coalesce_entry);
+            }
+        }
+
+        if last_id != current_id {
             feature_count += 1;
         }
         if match_opts.proximity.is_none() && feature_count > bigger_max {
             break;
         }
-        if coalesce_entry.scoredist < min_scoredist {
-            min_scoredist = coalesce_entry.scoredist;
+        if current_scoredist < min_scoredist {
+            min_scoredist = current_scoredist;
         }
-        last_id = coalesce_entry.grid_entry.id;
-        last_relev = coalesce_entry.grid_entry.relev;
-        last_scoredist = coalesce_entry.scoredist;
+        last_id = current_id;
+        last_relev = current_relev;
+        last_scoredist = current_scoredist;
     }
+
+    let mut contexts: Vec<CoalesceContext> = coalesced
+        .iter()
+        .map(|(_, entry)| CoalesceContext {
+            entries: vec![entry.clone()],
+            mask: entry.mask,
+            relev: entry.grid_entry.relev,
+        })
+        .collect();
 
     contexts.sort_by_key(|context| {
         (
@@ -133,7 +157,6 @@ fn coalesce_single<T: Borrow<GridStore> + Clone>(
         )
     });
 
-    contexts.dedup_by_key(|context| context.entries[0].grid_entry.id);
     contexts.truncate(MAX_CONTEXTS);
     Ok(contexts)
 }

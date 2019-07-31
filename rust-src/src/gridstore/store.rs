@@ -330,7 +330,9 @@ impl GridStore {
                                     spatial::tile_dist(prox_pt.point[0], prox_pt.point[1], x, y);
                                 (
                                     distance,
-                                    distance <= prox_pt.radius,
+                                    // The proximity radius calculation is also done in scoredist
+                                    // There could be an opportunity to optimize by doing it once
+                                    distance <= spatial::proximity_radius(*zoom, prox_pt.radius),
                                     spatial::scoredist(*zoom, distance, score, prox_pt.radius),
                                 )
                             }
