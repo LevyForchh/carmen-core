@@ -130,6 +130,50 @@ fn eager_test() {
     );
 }
 
+#[inline]
+fn decode_value<T: AsRef<[u8]>>(value: T) -> impl Iterator<Item = GridEntry> {
+    let record_ref = {
+        let value_ref: &[u8] = value.as_ref();
+        // this is pretty sketch: we're opting out of compiler lifetime protection
+        // for this reference. This usage should be safe though, because we'll move the
+        // reference and the underlying owned object around together as a unit (the
+        // tuple below) so that when we pull the reference into the inner closures,
+        // we'll drag the owned object along, and won't drop it until the whole
+        // nest of closures is deleted
+        let static_ref: &'static [u8] = unsafe { std::mem::transmute(value_ref) };
+        (value, static_ref)
+    };
+    let record = get_root_as_phrase_record(record_ref.1);
+    let rs_vec = get_vector::<RelevScore>(
+        record_ref.1,
+        &record._tab,
+        PhraseRecord::VT_RELEV_SCORES,
+    )
+    .unwrap();
+
+    let iter = rs_vec.iter().flat_map(move |rs_obj| {
+        let relev_score = rs_obj.relev_score();
+        let relev = relev_int_to_float(relev_score >> 4);
+        // mask for the least significant four bits
+        let score = relev_score & 15;
+
+        let coords =
+            get_vector::<Coord>(record_ref.1, &rs_obj._tab, RelevScore::VT_COORDS)
+                .unwrap();
+
+        coords.into_iter().flat_map(move |coords_obj| {
+            let (x, y) = deinterleave_morton(coords_obj.coord());
+
+            coords_obj.ids().unwrap().iter().map(move |id_comp| {
+                let id = id_comp >> 8;
+                let source_phrase_hash = (id_comp & 255) as u8;
+                GridEntry { relev, score, x, y, id, source_phrase_hash }
+            })
+        })
+    });
+    iter
+}
+
 impl GridStore {
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
         let path = path.as_ref().to_owned();
@@ -145,46 +189,7 @@ impl GridStore {
 
         Ok(match self.db.get(&db_key)? {
             Some(value) => {
-                let record_ref = {
-                    let value_ref: &[u8] = value.as_ref();
-                    // this is pretty sketch: we're opting out of compiler lifetime protection
-                    // for this reference. This usage should be safe though, because we'll move the
-                    // reference and the underlying owned object around together as a unit (the
-                    // tuple below) so that when we pull the reference into the inner closures,
-                    // we'll drag the owned object along, and won't drop it until the whole
-                    // nest of closures is deleted
-                    let static_ref: &'static [u8] = unsafe { std::mem::transmute(value_ref) };
-                    (value, static_ref)
-                };
-                let record = get_root_as_phrase_record(record_ref.1);
-                let rs_vec = get_vector::<RelevScore>(
-                    record_ref.1,
-                    &record._tab,
-                    PhraseRecord::VT_RELEV_SCORES,
-                )
-                .unwrap();
-
-                let iter = rs_vec.iter().flat_map(move |rs_obj| {
-                    let relev_score = rs_obj.relev_score();
-                    let relev = relev_int_to_float(relev_score >> 4);
-                    // mask for the least significant four bits
-                    let score = relev_score & 15;
-
-                    let coords =
-                        get_vector::<Coord>(record_ref.1, &rs_obj._tab, RelevScore::VT_COORDS)
-                            .unwrap();
-
-                    coords.into_iter().flat_map(move |coords_obj| {
-                        let (x, y) = deinterleave_morton(coords_obj.coord());
-
-                        coords_obj.ids().unwrap().iter().map(move |id_comp| {
-                            let id = id_comp >> 8;
-                            let source_phrase_hash = (id_comp & 255) as u8;
-                            GridEntry { relev, score, x, y, id, source_phrase_hash }
-                        })
-                    })
-                });
-                Some(iter)
+                Some(decode_value(value))
             }
             None => None,
         })
@@ -434,6 +439,28 @@ impl GridStore {
             };
 
             Ok(GridKey { phrase_id, lang_set })
+        })
+    }
+
+    pub fn iter<'i>(&'i self) -> impl Iterator<Item = Result<(GridKey, Vec<GridEntry>), Error>> + 'i {
+        let db_iter = self.db.iterator(IteratorMode::Start);
+        db_iter.take_while(|(key, _)| key[0] == 0).map(|(key, value)| {
+            let phrase_id = (&key[1..]).read_u32::<BigEndian>()?;
+
+            let key_lang_partial = &key[5..];
+            let lang_set: u128 = if key_lang_partial.len() == 0 {
+                // 0-length language array is the shorthand for "matches everything"
+                std::u128::MAX
+            } else {
+                let mut key_lang_full = [0u8; 16];
+                key_lang_full[(16 - key_lang_partial.len())..].copy_from_slice(key_lang_partial);
+
+                (&key_lang_full[..]).read_u128::<BigEndian>()?
+            };
+
+            let entries: Vec<_> = decode_value(value).collect();
+
+            Ok((GridKey { phrase_id, lang_set }, entries))
         })
     }
 }

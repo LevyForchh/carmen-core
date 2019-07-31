@@ -63,15 +63,15 @@ pub fn get_absolute_path(relative_path: &Path) -> Result<PathBuf, Error> {
 ///
 /// Example:
 /// {"relev": 1, "score": 1, "x": 1, "y": 2, "id": 1, "source_phrase_hash": 0}
-pub fn load_grids_from_json_to_store(path_name: &String) -> Result<GridStore, Error> {
+pub fn load_db_from_json(json_path: &str, store_path: &str) {
     // Open json file
-    let path = Path::new(path_name);
+    let path = Path::new(json_path);
     let f = File::open(path).expect("Error opening file");
     let file = io::BufReader::new(f);
 
     // Set up new gridstore
-    let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
-    let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
+    let directory = Path::new(store_path);
+    let mut builder = GridStoreBuilder::new(directory).unwrap();
     file.lines().for_each(|l| {
         let record = l.unwrap();
         if !record.is_empty() {
@@ -83,23 +83,20 @@ pub fn load_grids_from_json_to_store(path_name: &String) -> Result<GridStore, Er
         }
     });
     builder.finish().unwrap();
-    Ok(GridStore::new(directory.path()).unwrap())
 }
 
 /// Takes an absolute path (in string form) to a rocksdb dir, and an absolute path for the output file,
 /// reads the data from the db, and writes a json representation of the data to a file
-pub fn dump_db_to_json(input_path: &String, output_path: &String) {
-    let reader = GridStore::new(input_path).unwrap();
-    let output_file = File::create(output_path).unwrap();
+pub fn dump_db_to_json(store_path: &str, json_path: &str) {
+    let reader = GridStore::new(store_path).unwrap();
+    let output_file = File::create(json_path).unwrap();
     let mut writer = BufWriter::new(output_file);
-    let keys = reader.keys();
-    for key in keys {
-        let grid_key = key.unwrap();
-        let record: Vec<_> = reader.get(&grid_key).unwrap().unwrap().collect();
-        let key_record_pair = StoreEntryBuildingBlock { grid_key: grid_key, entries: record };
-        let line =
-            serde_json::to_string(&key_record_pair).expect("Unable to serialize record") + "\n";
+    for item in reader.iter() {
+        let (grid_key, entries) = item.unwrap();
+        let key_record_pair = StoreEntryBuildingBlock { grid_key, entries };
+        let line = serde_json::to_string(&key_record_pair).expect("Unable to serialize record");
         let bytes = line.as_bytes();
         writer.write(&bytes).unwrap();
+        writer.write(b"\n").unwrap();
     }
 }
