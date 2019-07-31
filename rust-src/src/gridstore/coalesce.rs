@@ -1,5 +1,6 @@
 use std::borrow::Borrow;
 use std::cmp::Reverse;
+use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 
 use failure::Error;
@@ -110,16 +111,16 @@ fn coalesce_single<T: Borrow<GridStore> + Clone>(
         let current_scoredist = coalesce_entry.scoredist;
 
         // If it's the same feature as one that's been added before, but a higher scoredist, update the entry
-        match coalesced.get(&current_id) {
-            Some(already_coalesced) => {
-                if current_scoredist > already_coalesced.scoredist
-                    && current_relev >= already_coalesced.grid_entry.relev
+        match coalesced.entry(current_id) {
+            Entry::Occupied(mut already_coalesced) => {
+                if current_scoredist > already_coalesced.get().scoredist
+                    && current_relev >= already_coalesced.get().grid_entry.relev
                 {
-                    coalesced.insert(current_id, coalesce_entry);
+                    already_coalesced.insert(coalesce_entry);
                 }
             }
-            None => {
-                coalesced.insert(current_id, coalesce_entry);
+            Entry::Vacant(entry) => {
+                entry.insert(coalesce_entry);
             }
         }
 
