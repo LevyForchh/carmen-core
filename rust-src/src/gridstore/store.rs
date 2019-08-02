@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
 use failure::Error;
@@ -17,6 +17,7 @@ use crate::gridstore::spatial;
 #[derive(Debug)]
 pub struct GridStore {
     db: DB,
+    pub path: PathBuf,
 }
 
 // this is a bit of a hack -- it constructs a flatbuffers vector bounded by the lifetime
@@ -180,7 +181,7 @@ impl GridStore {
         let mut opts = Options::default();
         opts.set_read_only(true);
         let db = DB::open(&opts, &path)?;
-        Ok(GridStore { db })
+        Ok(GridStore { db, path })
     }
 
     pub fn get(&self, key: &GridKey) -> Result<Option<impl Iterator<Item = GridEntry>>, Error> {
