@@ -4,13 +4,19 @@ extern crate serde;
 extern crate serde_json;
 
 use carmen_core::gridstore::*;
+
 use failure::Error;
+use lz4::Decoder;
+use rusoto_core::Region;
+use rusoto_s3::{GetObjectRequest, S3Client, S3};
 use serde::{Deserialize, Serialize};
+
 use std::env;
+use std::collections::HashMap;
 use std::fs::{self, File};
-use std::io::Write;
-use std::io::{self, BufRead, BufWriter};
+use std::io::{self, Read, Write, BufRead, BufWriter};
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 // Util functions for tests and benchmarks
 
@@ -69,10 +75,14 @@ pub fn load_db_from_json(json_path: &str, store_path: &str) {
     let f = File::open(path).expect("Error opening file");
     let file = io::BufReader::new(f);
 
+    load_db_from_json_reader(file, store_path);
+}
+
+fn load_db_from_json_reader<T: BufRead>(json_source: T, store_path: &str) {
     // Set up new gridstore
     let directory = Path::new(store_path);
     let mut builder = GridStoreBuilder::new(directory).unwrap();
-    file.lines().for_each(|l| {
+    json_source.lines().for_each(|l| {
         let record = l.unwrap();
         if !record.is_empty() {
             let deserialized: StoreEntryBuildingBlock =
@@ -99,4 +109,102 @@ pub fn dump_db_to_json(store_path: &str, json_path: &str) {
         writer.write(&bytes).unwrap();
         writer.write(b"\n").unwrap();
     }
+}
+
+pub fn ensure_downloaded(datafile: &str) -> PathBuf {
+    let tmp = std::env::temp_dir().join("carmen_core_data/downloads");
+    std::fs::create_dir_all(&tmp);
+    let path = tmp.join(Path::new(datafile));
+    if !path.exists() {
+        let client = S3Client::new(Region::UsEast1);
+        let request = GetObjectRequest {
+            bucket: "mapbox".to_owned(),
+            key: ("playground/apendleton/gridstore_bench/".to_owned() + datafile),
+            ..Default::default()
+        };
+
+        let result = client.get_object(request).sync().unwrap();
+
+        let stream = result.body.unwrap();
+        let mut body: Vec<u8> = Vec::new();
+        stream.into_blocking_read().read_to_end(&mut body).unwrap();
+
+        let mut file = File::create(&path).expect("create failed");
+        file.write_all(&body).expect("failed to write body");
+    }
+
+    path
+}
+
+pub fn ensure_store(datafile: &str) -> PathBuf {
+    let tmp = std::env::temp_dir().join("carmen_core_data/indexes");
+    std::fs::create_dir_all(&tmp);
+    let idx_path = tmp.join(Path::new(&datafile.replace(".dat.lz4", ".rocksdb")));
+    if !idx_path.exists() {
+        let dl_path = ensure_downloaded(datafile);
+        let decoder = Decoder::new(File::open(dl_path).unwrap()).unwrap();
+        let file = io::BufReader::new(decoder);
+        load_db_from_json_reader(file, idx_path.to_str().unwrap());
+    }
+
+    idx_path
+}
+
+#[derive(Deserialize, Debug)]
+struct SubqueryPlaceholder {
+    store: String,
+    weight: f64,
+    match_key: MatchKey,
+    idx: u16,
+    zoom: u16,
+    mask: u32,
+}
+
+pub fn prepare_coalesce_stacks(datafile: &str) ->
+    Vec<(Vec<PhrasematchSubquery<Rc<GridStore>>>, MatchOpts)>
+{
+    let path = ensure_downloaded(datafile);
+    let decoder = Decoder::new(File::open(path).unwrap()).unwrap();
+    let file = io::BufReader::new(decoder);
+    let mut stores: HashMap<String, Rc<GridStore>> = HashMap::new();
+    let out: Vec<(Vec<PhrasematchSubquery<Rc<GridStore>>>, MatchOpts)> = file.lines().filter_map(|l| {
+        let record = l.unwrap();
+        if !record.is_empty() {
+            let deserialized: (Vec<SubqueryPlaceholder>, MatchOpts) =
+                serde_json::from_str(&record).expect("Error deserializing json from string");
+            let stack: Vec<_> = deserialized.0.iter().map(|placeholder| {
+                let store = stores.entry(placeholder.store.clone()).or_insert_with(|| {
+                    let store_name = placeholder.store
+                        .rsplit("/").next().unwrap()
+                        .replace(".rocksdb", ".dat.lz4");
+                    let store_path = ensure_store(&store_name);
+                    let gs = GridStore::new(store_path).unwrap();
+                    Rc::new(gs)
+                });
+                PhrasematchSubquery {
+                    store: store.clone(),
+                    weight: placeholder.weight,
+                    match_key: placeholder.match_key.clone(),
+                    idx: placeholder.idx,
+                    zoom: placeholder.zoom,
+                    mask: placeholder.mask,
+                }
+            }).collect();
+
+            Some((stack, deserialized.1))
+        } else {
+            None
+        }
+    }).collect();
+    out
+}
+
+#[test]
+fn store_test() {
+    ensure_store("gb-district-both-fa373b8b5d-d775d2eb65.gridstore.dat.lz4");
+}
+
+#[test]
+fn subq_test() {
+    prepare_coalesce_stacks("gb_address_global.ljson.lz4");
 }
