@@ -63,12 +63,7 @@ pub fn get_absolute_path(relative_path: &Path) -> Result<PathBuf, Error> {
     Ok(filepath)
 }
 
-/// Loads json from a file into a Vector of GridEntrys
-/// The input file should be line-delimited JSON with all of the fields of a GridEntry
-/// The path should be an absolute path
-///
-/// Example:
-/// {"relev": 1, "score": 1, "x": 1, "y": 2, "id": 1, "source_phrase_hash": 0}
+/// Load grid data from a local JSON path
 pub fn load_db_from_json(json_path: &str, store_path: &str) {
     // Open json file
     let path = Path::new(json_path);
@@ -199,12 +194,29 @@ pub fn prepare_coalesce_stacks(datafile: &str) ->
     out
 }
 
-#[test]
-fn store_test() {
-    ensure_store("gb-district-both-fa373b8b5d-d775d2eb65.gridstore.dat.lz4");
-}
+/// Loads json from a file into a Vector of GridEntrys
+/// The input file should be line-delimited JSON with all of the fields of a GridEntry
+/// The path should be relative to the carmen-core directory
+///
+/// Example:
+/// {"relev": 1, "score": 1, "x": 1, "y": 2, "id": 1, "source_phrase_hash": 0}
+pub fn load_simple_grids_from_json(path: &Path) -> Result<Vec<GridEntry>, Error> {
+    let dir = env::current_dir().expect("Error getting current dir");
+    let mut filepath = fs::canonicalize(&dir).expect("Error getting cannonicalized current dir");
+    filepath.push(path);
+    let f = File::open(path).expect("Error opening file");
+    let file = io::BufReader::new(f);
+    let entries: Vec<GridEntry> = file
+        .lines()
+        .filter_map(|l| match l.unwrap() {
+            ref t if t.len() == 0 => None,
+            t => {
+                let deserialized: GridEntry =
+                    serde_json::from_str(&t).expect("Error deserializing json from string");
+                Some(deserialized)
+            }
+        })
+        .collect::<Vec<GridEntry>>();
 
-#[test]
-fn subq_test() {
-    prepare_coalesce_stacks("gb_address_global.ljson.lz4");
+    Ok(entries)
 }
