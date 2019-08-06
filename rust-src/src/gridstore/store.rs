@@ -8,7 +8,7 @@ use flatbuffers;
 use itertools::Itertools;
 use morton::deinterleave_morton;
 use ordered_float::OrderedFloat;
-use rocksdb::{Direction, IteratorMode, Options, DB};
+use rocksdb::{Direction, IteratorMode, Options, DB, DBCompressionType};
 
 use crate::gridstore::common::*;
 use crate::gridstore::gridstore_generated::*;
@@ -180,6 +180,7 @@ impl GridStore {
         let path = path.as_ref().to_owned();
         let mut opts = Options::default();
         opts.set_read_only(true);
+        opts.set_compression_type(DBCompressionType::Lz4hc);
         let db = DB::open(&opts, &path)?;
         Ok(GridStore { db, path })
     }

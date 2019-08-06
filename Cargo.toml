@@ -38,4 +38,4 @@ harness = false
 git = "https://github.com/apendleton/rust-rocksdb.git"
 rev = "f6a9d278262f090790578dbf435e591748c4622e"
 default-features = false
-features = []
+features = ["lz4"]
