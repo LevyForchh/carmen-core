@@ -1,5 +1,5 @@
-use std::collections::{btree_map::Entry, BTreeMap, HashMap};
 use std::collections::hash_map::Entry as HmEntry;
+use std::collections::{btree_map::Entry, BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 
 use failure::{Error, Fail};
@@ -21,22 +21,27 @@ pub struct GridStoreBuilder {
 
 /// Extends a BuildEntry with the given values.
 fn extend_entries(builder_entry: &mut BuilderEntry, mut values: Vec<GridEntry>) -> () {
-    values.sort_unstable_by_key(|value| (OrderedFloat(value.relev), value.score, value.x, value.y, value.id));
+    values.sort_unstable_by_key(|value| {
+        (OrderedFloat(value.relev), value.score, value.x, value.y, value.id)
+    });
 
-    for (rs, rs_values) in
-        somewhat_eager_groupby(
-            values.into_iter(),
-            |value| (relev_float_to_int(value.relev) << 4) | value.score
-        )
-    {
-        let rs_entry = builder_entry.entry(rs).or_insert_with(|| HashMap::with_capacity(rs_values.len()));
+    for (rs, rs_values) in somewhat_eager_groupby(values.into_iter(), |value| {
+        (relev_float_to_int(value.relev) << 4) | value.score
+    }) {
+        let rs_entry =
+            builder_entry.entry(rs).or_insert_with(|| HashMap::with_capacity(rs_values.len()));
         for (zcoord, zc_values) in
             &rs_values.into_iter().group_by(|value| interleave_morton(value.x, value.y))
         {
-            let id_phrases = zc_values.map(|value| (value.id << 8) | (value.source_phrase_hash as u32));
+            let id_phrases =
+                zc_values.map(|value| (value.id << 8) | (value.source_phrase_hash as u32));
             match rs_entry.entry(zcoord) {
-                HmEntry::Vacant(e) => { e.insert(id_phrases.collect()); },
-                HmEntry::Occupied(mut e) => { e.get_mut().extend(id_phrases); },
+                HmEntry::Vacant(e) => {
+                    e.insert(id_phrases.collect());
+                }
+                HmEntry::Occupied(mut e) => {
+                    e.get_mut().extend(id_phrases);
+                }
             }
         }
     }
@@ -146,10 +151,9 @@ impl GridStoreBuilder {
         let db = DB::open(&opts, &self.path)?;
         let mut db_key: Vec<u8> = Vec::with_capacity(MAX_KEY_LENGTH);
 
-        let grouped = somewhat_eager_groupby(
-            self.data.into_iter(),
-            |(key, _value)| (key.phrase_id >> 10) << 10
-        );
+        let grouped = somewhat_eager_groupby(self.data.into_iter(), |(key, _value)| {
+            (key.phrase_id >> 10) << 10
+        });
 
         for (group_id, group_value) in grouped {
             let mut lang_set_map: HashMap<u128, BuilderEntry> = HashMap::new();
