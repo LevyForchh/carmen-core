@@ -354,7 +354,7 @@ fn serialize_path<S: Serializer, T: Borrow<GridStore>>(store: &T, s: S) -> Resul
 
 #[derive(Serialize, Debug, Clone)]
 pub struct PhrasematchSubquery<T: Borrow<GridStore> + Clone> {
-    #[serde(serialize_with="serialize_path")]
+    #[serde(serialize_with = "serialize_path")]
     pub store: T,
     pub weight: f64,
     pub match_key: MatchKey,

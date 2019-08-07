@@ -8,7 +8,7 @@ use flatbuffers;
 use itertools::Itertools;
 use morton::deinterleave_morton;
 use ordered_float::OrderedFloat;
-use rocksdb::{Direction, IteratorMode, Options, DB, DBCompressionType};
+use rocksdb::{DBCompressionType, Direction, IteratorMode, Options, DB};
 
 use crate::gridstore::common::*;
 use crate::gridstore::gridstore_generated::*;
@@ -52,12 +52,9 @@ fn decode_value<T: AsRef<[u8]>>(value: T) -> impl Iterator<Item = GridEntry> {
         (value, static_ref)
     };
     let record = get_root_as_phrase_record(record_ref.1);
-    let rs_vec = get_vector::<RelevScore>(
-        record_ref.1,
-        &record._tab,
-        PhraseRecord::VT_RELEV_SCORES,
-    )
-    .unwrap();
+    let rs_vec =
+        get_vector::<RelevScore>(record_ref.1, &record._tab, PhraseRecord::VT_RELEV_SCORES)
+            .unwrap();
 
     let iter = rs_vec.iter().flat_map(move |rs_obj| {
         let relev_score = rs_obj.relev_score();
@@ -66,8 +63,7 @@ fn decode_value<T: AsRef<[u8]>>(value: T) -> impl Iterator<Item = GridEntry> {
         let score = relev_score & 15;
 
         let coords =
-            get_vector::<Coord>(record_ref.1, &rs_obj._tab, RelevScore::VT_COORDS)
-                .unwrap();
+            get_vector::<Coord>(record_ref.1, &rs_obj._tab, RelevScore::VT_COORDS).unwrap();
 
         coords.into_iter().flat_map(move |coords_obj| {
             let (x, y) = deinterleave_morton(coords_obj.coord());
@@ -98,9 +94,7 @@ impl GridStore {
         key.write_to(0, &mut db_key)?;
 
         Ok(match self.db.get(&db_key)? {
-            Some(value) => {
-                Some(decode_value(value))
-            }
+            Some(value) => Some(decode_value(value)),
             None => None,
         })
     }
@@ -352,7 +346,9 @@ impl GridStore {
         })
     }
 
-    pub fn iter<'i>(&'i self) -> impl Iterator<Item = Result<(GridKey, Vec<GridEntry>), Error>> + 'i {
+    pub fn iter<'i>(
+        &'i self,
+    ) -> impl Iterator<Item = Result<(GridKey, Vec<GridEntry>), Error>> + 'i {
         let db_iter = self.db.iterator(IteratorMode::Start);
         db_iter.take_while(|(key, _)| key[0] == 0).map(|(key, value)| {
             let phrase_id = (&key[1..]).read_u32::<BigEndian>()?;
