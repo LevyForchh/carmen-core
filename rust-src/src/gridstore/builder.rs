@@ -21,10 +21,6 @@ pub struct GridStoreBuilder {
 
 /// Extends a BuildEntry with the given values.
 fn extend_entries(builder_entry: &mut BuilderEntry, mut values: Vec<GridEntry>) -> () {
-    values.sort_unstable_by_key(|value| {
-        (OrderedFloat(value.relev), value.score, value.x, value.y, value.id)
-    });
-
     for (rs, rs_values) in somewhat_eager_groupby(values.into_iter(), |value| {
         (relev_float_to_int(value.relev) << 4) | value.score
     }) {
