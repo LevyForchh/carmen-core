@@ -87,7 +87,7 @@ pub fn benchmark(c: &mut Criterion) {
                 builder.replace(GridStoreBuilder::new(dir.as_mut().unwrap().path()).unwrap());
             }
             let record = &eur_records[i];
-            builder.as_mut().unwrap().insert(&record.grid_key, &record.entries).unwrap();
+            builder.as_mut().unwrap().insert(&record.grid_key, record.entries.clone()).unwrap();
 
             i = (i + 1) % (eur_records.len());
         })
@@ -123,7 +123,7 @@ pub fn benchmark(c: &mut Criterion) {
                 builder.replace(GridStoreBuilder::new(dir.as_mut().unwrap().path()).unwrap());
             }
             let record = &asi_records[i];
-            builder.as_mut().unwrap().append(&record.0, &record.1).unwrap();
+            builder.as_mut().unwrap().append(&record.0, record.1.clone()).unwrap();
 
             i = (i + 1) % (asi_records.len());
         }, BatchSize::NumIterations(100_000))

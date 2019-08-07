@@ -68,7 +68,7 @@ declare_types! {
                 let mut gridstore = this.borrow_mut(&lock);
                 match gridstore.as_mut() {
                     Some(builder) => {
-                        builder.insert(&key, &values).map_err(|e| e.to_string())
+                        builder.insert(&key, values).map_err(|e| e.to_string())
                     }
                     None => {
                         Err("unable to insert()".to_string())
@@ -94,7 +94,7 @@ declare_types! {
                 let mut gridstore = this.borrow_mut(&lock);
                 match gridstore.as_mut() {
                     Some(builder) => {
-                        builder.append(&key, &values).map_err(|e| e.to_string())
+                        builder.append(&key, values).map_err(|e| e.to_string())
                     }
                     None => {
                         Err("unable to insert()".to_string())
