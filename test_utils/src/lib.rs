@@ -11,10 +11,10 @@ use rusoto_core::Region;
 use rusoto_s3::{GetObjectRequest, S3Client, S3};
 use serde::{Deserialize, Serialize};
 
-use std::env;
 use std::collections::HashMap;
+use std::env;
 use std::fs::{self, File};
-use std::io::{self, Read, Write, BufRead, BufWriter};
+use std::io::{self, BufRead, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
@@ -82,9 +82,7 @@ fn load_db_from_json_reader<T: BufRead>(json_source: T, store_path: &str) {
         if !record.is_empty() {
             let deserialized: StoreEntryBuildingBlock =
                 serde_json::from_str(&record).expect("Error deserializing json from string");
-            builder
-                .insert(&deserialized.grid_key, deserialized.entries)
-                .expect("Unable to insert");
+            builder.insert(&deserialized.grid_key, deserialized.entries).expect("Unable to insert");
         }
     });
     builder.finish().unwrap();
@@ -155,42 +153,52 @@ struct SubqueryPlaceholder {
     mask: u32,
 }
 
-pub fn prepare_coalesce_stacks(datafile: &str) ->
-    Vec<(Vec<PhrasematchSubquery<Rc<GridStore>>>, MatchOpts)>
-{
+pub fn prepare_coalesce_stacks(
+    datafile: &str,
+) -> Vec<(Vec<PhrasematchSubquery<Rc<GridStore>>>, MatchOpts)> {
     let path = ensure_downloaded(datafile);
     let decoder = Decoder::new(File::open(path).unwrap()).unwrap();
     let file = io::BufReader::new(decoder);
     let mut stores: HashMap<String, Rc<GridStore>> = HashMap::new();
-    let out: Vec<(Vec<PhrasematchSubquery<Rc<GridStore>>>, MatchOpts)> = file.lines().filter_map(|l| {
-        let record = l.unwrap();
-        if !record.is_empty() {
-            let deserialized: (Vec<SubqueryPlaceholder>, MatchOpts) =
-                serde_json::from_str(&record).expect("Error deserializing json from string");
-            let stack: Vec<_> = deserialized.0.iter().map(|placeholder| {
-                let store = stores.entry(placeholder.store.clone()).or_insert_with(|| {
-                    let store_name = placeholder.store
-                        .rsplit("/").next().unwrap()
-                        .replace(".rocksdb", ".dat.lz4");
-                    let store_path = ensure_store(&store_name);
-                    let gs = GridStore::new(store_path).unwrap();
-                    Rc::new(gs)
-                });
-                PhrasematchSubquery {
-                    store: store.clone(),
-                    weight: placeholder.weight,
-                    match_key: placeholder.match_key.clone(),
-                    idx: placeholder.idx,
-                    zoom: placeholder.zoom,
-                    mask: placeholder.mask,
-                }
-            }).collect();
+    let out: Vec<(Vec<PhrasematchSubquery<Rc<GridStore>>>, MatchOpts)> = file
+        .lines()
+        .filter_map(|l| {
+            let record = l.unwrap();
+            if !record.is_empty() {
+                let deserialized: (Vec<SubqueryPlaceholder>, MatchOpts) =
+                    serde_json::from_str(&record).expect("Error deserializing json from string");
+                let stack: Vec<_> = deserialized
+                    .0
+                    .iter()
+                    .map(|placeholder| {
+                        let store = stores.entry(placeholder.store.clone()).or_insert_with(|| {
+                            let store_name = placeholder
+                                .store
+                                .rsplit("/")
+                                .next()
+                                .unwrap()
+                                .replace(".rocksdb", ".dat.lz4");
+                            let store_path = ensure_store(&store_name);
+                            let gs = GridStore::new(store_path).unwrap();
+                            Rc::new(gs)
+                        });
+                        PhrasematchSubquery {
+                            store: store.clone(),
+                            weight: placeholder.weight,
+                            match_key: placeholder.match_key.clone(),
+                            idx: placeholder.idx,
+                            zoom: placeholder.zoom,
+                            mask: placeholder.mask,
+                        }
+                    })
+                    .collect();
 
-            Some((stack, deserialized.1))
-        } else {
-            None
-        }
-    }).collect();
+                Some((stack, deserialized.1))
+            } else {
+                None
+            }
+        })
+        .collect();
     out
 }
 
