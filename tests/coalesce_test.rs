@@ -16,7 +16,7 @@ fn coalesce_single_test_proximity_quadrants() {
         GridEntry { id: 3, x: 0, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },     // sw
         GridEntry { id: 4, x: 0, y: 200, relev: 1., score: 1, source_phrase_hash: 0 },   // nw
     ];
-    builder.insert(&key, &entries).expect("Unable to insert record");
+    builder.insert(&key, entries).expect("Unable to insert record");
 
     builder.finish().unwrap();
 
@@ -101,7 +101,7 @@ fn coalesce_single_test_proximity_basic() {
         GridEntry { id: 3, x: 0, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },
         GridEntry { id: 4, x: 0, y: 2, relev: 1., score: 1, source_phrase_hash: 0 },
     ];
-    builder.insert(&key, &entries).expect("Unable to insert record");
+    builder.insert(&key, entries).expect("Unable to insert record");
 
     builder.finish().unwrap();
 
@@ -151,7 +151,7 @@ fn coalesce_single_test_language_penalty() {
         GridEntry { id: 3, x: 0, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },
         GridEntry { id: 4, x: 0, y: 2, relev: 1., score: 1, source_phrase_hash: 0 },
     ];
-    builder.insert(&key, &entries).expect("Unable to insert record");
+    builder.insert(&key, entries).expect("Unable to insert record");
     builder.finish().unwrap();
 
     let store = GridStore::new(directory.path()).unwrap();
@@ -504,7 +504,7 @@ fn coalesce_single_languages_test() {
         let key = GridKey { phrase_id: 1, lang_set };
         let grid_entry =
             GridEntry { id: i as u32, x: 1, y: 1, relev: 1., score: 0, source_phrase_hash: 0 };
-        builder.insert(&key, &[grid_entry]).expect("Unable to insert record");
+        builder.insert(&key, vec![grid_entry]).expect("Unable to insert record");
     }
     builder.finish().unwrap();
 

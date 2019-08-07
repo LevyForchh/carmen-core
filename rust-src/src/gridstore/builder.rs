@@ -1,15 +1,18 @@
 use std::collections::{btree_map::Entry, BTreeMap, HashMap};
+use std::collections::hash_map::Entry as HmEntry;
 use std::path::{Path, PathBuf};
 
 use failure::{Error, Fail};
 use itertools::Itertools;
 use morton::interleave_morton;
+use ordered_float::OrderedFloat;
 use rocksdb::{DBCompressionType, Options, DB};
+use smallvec::SmallVec;
 
 use crate::gridstore::common::*;
 use crate::gridstore::gridstore_generated::*;
 
-type BuilderEntry = HashMap<u8, HashMap<u32, Vec<u32>>>;
+type BuilderEntry = HashMap<u8, HashMap<u32, SmallVec<[u32; 4]>>>;
 
 pub struct GridStoreBuilder {
     path: PathBuf,
@@ -17,20 +20,23 @@ pub struct GridStoreBuilder {
 }
 
 /// Extends a BuildEntry with the given values.
-fn extend_entries(builder_entry: &mut BuilderEntry, values: &[GridEntry]) -> () {
-    let l = values.len();
+fn extend_entries(builder_entry: &mut BuilderEntry, mut values: Vec<GridEntry>) -> () {
+    values.sort_unstable_by_key(|value| (OrderedFloat(value.relev), value.score, value.x, value.y, value.id));
 
-    for (rs, values) in
-        &values.into_iter().group_by(|value| (relev_float_to_int(value.relev) << 4) | value.score)
+    for (rs, rs_values) in
+        somewhat_eager_groupby(
+            values.into_iter(),
+            |value| (relev_float_to_int(value.relev) << 4) | value.score
+        )
     {
-        let rs_entry = builder_entry.entry(rs).or_insert_with(|| HashMap::with_capacity(l));
-        for (zcoord, values) in
-            &values.into_iter().group_by(|value| interleave_morton(value.x, value.y))
+        let rs_entry = builder_entry.entry(rs).or_insert_with(|| HashMap::with_capacity(rs_values.len()));
+        for (zcoord, zc_values) in
+            &rs_values.into_iter().group_by(|value| interleave_morton(value.x, value.y))
         {
-            let zcoord_entry = rs_entry.entry(zcoord).or_insert_with(|| Vec::new());
-            for value in values {
-                let id_phrase: u32 = (value.id << 8) | (value.source_phrase_hash as u32);
-                zcoord_entry.push(id_phrase);
+            let id_phrases = zc_values.map(|value| (value.id << 8) | (value.source_phrase_hash as u32));
+            match rs_entry.entry(zcoord) {
+                HmEntry::Vacant(e) => { e.insert(id_phrases.collect()); },
+                HmEntry::Occupied(mut e) => { e.get_mut().extend(id_phrases); },
             }
         }
     }
@@ -40,34 +46,39 @@ fn copy_entries(source_entry: &BuilderEntry, destination_entry: &mut BuilderEntr
     for (rs, values) in source_entry.iter() {
         let rs_entry = destination_entry.entry(*rs).or_insert_with(|| HashMap::new());
         for (zcoord, values) in values.iter() {
-            let zcoord_entry = rs_entry.entry(*zcoord).or_insert_with(|| Vec::new());
-            zcoord_entry.extend(values.iter());
+            let zcoord_entry = rs_entry.entry(*zcoord).or_insert_with(|| SmallVec::new());
+            zcoord_entry.extend(values.iter().cloned());
         }
     }
 }
 
-fn get_fb_value(value: &mut BuilderEntry) -> Result<Vec<u8>, Error> {
+fn get_fb_value(value: BuilderEntry) -> Result<Vec<u8>, Error> {
     let mut fb_builder = flatbuffers::FlatBufferBuilder::new();
-    let mut rses: Vec<_> = Vec::new();
-    let hm: HashMap<u8, HashMap<u32, Vec<u32>>> = value.clone();
-    let mut items: Vec<(_, _)> = hm.into_iter().collect();
+
+    let mut items: Vec<(_, _)> = value.into_iter().collect();
     items.sort_by(|a, b| b.0.cmp(&a.0));
 
-    for (rs, coord_group) in items.iter_mut() {
-        let mut coords: Vec<_> = Vec::new();
-        for (coord, ids) in coord_group.iter_mut() {
+    let mut rses: Vec<_> = Vec::with_capacity(items.len());
+
+    for (rs, coord_group) in items.into_iter() {
+        let mut inner_items: Vec<(_, _)> = coord_group.into_iter().collect();
+        inner_items.sort_by(|a, b| b.0.cmp(&a.0));
+
+        let mut coords: Vec<_> = Vec::with_capacity(inner_items.len());
+
+        for (coord, mut ids) in inner_items.into_iter() {
             // reverse sort
-            ids.sort_by(|a, b| a.cmp(b));
+            ids.sort_by(|a, b| b.cmp(a));
             ids.dedup();
             let fb_ids = fb_builder.create_vector(&ids);
             let fb_coord =
-                Coord::create(&mut fb_builder, &CoordArgs { coord: *coord, ids: Some(fb_ids) });
+                Coord::create(&mut fb_builder, &CoordArgs { coord: coord, ids: Some(fb_ids) });
             coords.push(fb_coord);
         }
         let fb_coords = fb_builder.create_vector(&coords);
         let fb_rs = RelevScore::create(
             &mut fb_builder,
-            &RelevScoreArgs { relev_score: *rs, coords: Some(fb_coords) },
+            &RelevScoreArgs { relev_score: rs, coords: Some(fb_coords) },
         );
         rses.push(fb_rs);
     }
@@ -86,7 +97,7 @@ impl GridStoreBuilder {
     }
 
     /// Inserts a new GridStore entry with the given values.
-    pub fn insert(&mut self, key: &GridKey, values: &[GridEntry]) -> Result<(), Error> {
+    pub fn insert(&mut self, key: &GridKey, values: Vec<GridEntry>) -> Result<(), Error> {
         let mut to_insert = BuilderEntry::new();
         extend_entries(&mut to_insert, values);
         self.data.insert(key.to_owned(), to_insert);
@@ -94,7 +105,7 @@ impl GridStoreBuilder {
     }
 
     ///  Appends a values to and existing GridStore entry.
-    pub fn append(&mut self, key: &GridKey, values: &[GridEntry]) -> Result<(), Error> {
+    pub fn append(&mut self, key: &GridKey, values: Vec<GridEntry>) -> Result<(), Error> {
         let mut to_append = self.data.entry(key.to_owned()).or_insert_with(|| BuilderEntry::new());
         extend_entries(&mut to_append, values);
         Ok(())
@@ -126,7 +137,7 @@ impl GridStoreBuilder {
     }
 
     /// Writes data to disk.
-    pub fn finish(mut self) -> Result<(), Error> {
+    pub fn finish(self) -> Result<(), Error> {
         let mut opts = Options::default();
         opts.set_disable_auto_compactions(true);
         opts.set_compression_type(DBCompressionType::Lz4hc);
@@ -135,12 +146,15 @@ impl GridStoreBuilder {
         let db = DB::open(&opts, &self.path)?;
         let mut db_key: Vec<u8> = Vec::with_capacity(MAX_KEY_LENGTH);
 
-        let grouped = self.data.iter_mut().group_by(|(key, _value)| (key.phrase_id >> 10) << 10);
+        let grouped = somewhat_eager_groupby(
+            self.data.into_iter(),
+            |(key, _value)| (key.phrase_id >> 10) << 10
+        );
 
-        for (group_id, group_value) in grouped.into_iter() {
+        for (group_id, group_value) in grouped {
             let mut lang_set_map: HashMap<u128, BuilderEntry> = HashMap::new();
 
-            for (grid_key, value) in group_value {
+            for (grid_key, value) in group_value.into_iter() {
                 // figure out the key
                 db_key.clear();
                 // type marker is 0 -- regular entry
@@ -153,11 +167,11 @@ impl GridStoreBuilder {
                 let db_data = get_fb_value(value)?;
                 db.put(&db_key, &db_data)?;
             }
-            for (lang_set, mut builder_entry) in lang_set_map.into_iter() {
+            for (lang_set, builder_entry) in lang_set_map.into_iter() {
                 db_key.clear();
                 let group_key = GridKey { phrase_id: group_id, lang_set };
                 group_key.write_to(1, &mut db_key)?;
-                let grouped_db_data = get_fb_value(&mut builder_entry)?;
+                let grouped_db_data = get_fb_value(builder_entry)?;
                 db.put(&db_key, &grouped_db_data)?;
             }
         }
@@ -177,7 +191,7 @@ fn extend_entry_test() {
 
     extend_entries(
         &mut entry,
-        &vec![GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 7, source_phrase_hash: 2 }],
+        vec![GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 7, source_phrase_hash: 2 }],
     );
 
     // relev 3 (0011) with score 7 (0111) -> 55
@@ -201,7 +215,7 @@ fn insert_test() {
     builder
         .insert(
             &key,
-            &vec![
+            vec![
                 GridEntry { id: 2, x: 2, y: 2, relev: 0.8, score: 3, source_phrase_hash: 0 },
                 GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 1, source_phrase_hash: 1 },
                 GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 7, source_phrase_hash: 2 },
@@ -229,14 +243,14 @@ fn append_test() {
     builder
         .insert(
             &key,
-            &vec![GridEntry { id: 2, x: 2, y: 2, relev: 0.8, score: 3, source_phrase_hash: 0 }],
+            vec![GridEntry { id: 2, x: 2, y: 2, relev: 0.8, score: 3, source_phrase_hash: 0 }],
         )
         .expect("Unable to insert record");
 
     builder
         .append(
             &key,
-            &vec![
+            vec![
                 GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 1, source_phrase_hash: 1 },
                 GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 7, source_phrase_hash: 2 },
             ],

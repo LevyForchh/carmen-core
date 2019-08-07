@@ -160,7 +160,7 @@ pub fn benchmark(c: &mut Criterion) {
                 builder.replace(GridStoreBuilder::new(dir.as_mut().unwrap().path()).unwrap());
             }
             let record = &eur_records[i];
-            builder.as_mut().unwrap().insert(&record.grid_key, &record.entries).unwrap();
+            builder.as_mut().unwrap().insert(&record.grid_key, record.entries.clone()).unwrap();
 
             i = (i + 1) % (eur_records.len());
         })
@@ -191,22 +191,18 @@ pub fn benchmark(c: &mut Criterion) {
         let mut builder: Option<GridStoreBuilder> = None;
         let mut i = 0;
 
-        b.iter_batched(
-            || {},
-            |_| {
-                if i == 0 {
-                    // every time we're at the beginning of the list, start a new builder
-                    // and throw away the old one
-                    dir.replace(tempfile::tempdir().unwrap());
-                    builder.replace(GridStoreBuilder::new(dir.as_mut().unwrap().path()).unwrap());
-                }
-                let record = &asi_records[i];
-                builder.as_mut().unwrap().append(&record.0, &record.1).unwrap();
+        b.iter_batched(|| {}, |_| {
+            if i == 0 {
+                // every time we're at the beginning of the list, start a new builder
+                // and throw away the old one
+                dir.replace(tempfile::tempdir().unwrap());
+                builder.replace(GridStoreBuilder::new(dir.as_mut().unwrap().path()).unwrap());
+            }
+            let record = &asi_records[i];
+            builder.as_mut().unwrap().append(&record.0, record.1.clone()).unwrap();
 
-                i = (i + 1) % (asi_records.len());
-            },
-            BatchSize::NumIterations(100_000),
-        )
+            i = (i + 1) % (asi_records.len());
+        }, BatchSize::NumIterations(100_000))
     }));
 
     c.bench_functions("prod_data", to_bench, ());

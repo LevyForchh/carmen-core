@@ -26,7 +26,7 @@ mod tests {
             GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 1, source_phrase_hash: 1 },
             GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 7, source_phrase_hash: 2 },
         ];
-        builder.insert(&key, &entries).expect("Unable to insert record");
+        builder.insert(&key, entries.clone()).expect("Unable to insert record");
 
         builder.finish().unwrap();
 
@@ -68,7 +68,7 @@ mod tests {
         ];
 
         for (key, val) in items {
-            builder.insert(&key, &vec![val]).expect("Unable to insert record");
+            builder.insert(&key, vec![val]).expect("Unable to insert record");
         }
         builder.renumber(&vec![2, 1, 0]).unwrap();
         // after renumbering, the IDs should match
@@ -95,7 +95,7 @@ mod tests {
             GridEntry { id: 1, x: 1, y: 1, relev: 0.6, score: 1, source_phrase_hash: 2 },
             GridEntry { id: 1, x: 1, y: 1, relev: 0.4, score: 1, source_phrase_hash: 3 },
         ];
-        builder.insert(&key, &entries).expect("Unable to insert record");
+        builder.insert(&key, entries.clone()).expect("Unable to insert record");
 
         builder.finish().unwrap();
 
@@ -121,7 +121,7 @@ mod tests {
             GridEntry { id: 1, x: 1, y: 2, relev: 1., score: 1, source_phrase_hash: 0 },
             GridEntry { id: 1, x: 2, y: 1, relev: 1., score: 1, source_phrase_hash: 0 },
         ];
-        builder.insert(&key, &entries).expect("Unable to insert record");
+        builder.insert(&key, entries.clone()).expect("Unable to insert record");
 
         builder.finish().unwrap();
 
@@ -145,7 +145,7 @@ mod tests {
             GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 1, source_phrase_hash: 0 },
             GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 7, source_phrase_hash: 0 },
         ];
-        builder.insert(&key, &entries).expect("Unable to insert record");
+        builder.insert(&key, entries.clone()).expect("Unable to insert record");
 
         builder.finish().unwrap();
 
@@ -183,7 +183,7 @@ mod tests {
                 ];
                 i += 4;
 
-                builder.insert(key, &entries).expect("Unable to insert record");
+                builder.insert(key, entries).expect("Unable to insert record");
             }
         }
 
@@ -444,7 +444,7 @@ mod tests {
                 score: 1,
                 source_phrase_hash: 0,
             }];
-            builder.insert(&key, &entries).expect("Unable to insert record");
+            builder.insert(&key, entries).expect("Unable to insert record");
         }
 
         builder.finish().unwrap();

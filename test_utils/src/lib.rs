@@ -49,7 +49,7 @@ pub fn create_store(store_entries: Vec<StoreEntryBuildingBlock>) -> GridStore {
     let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
     let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
     for build_block in store_entries {
-        builder.insert(&build_block.grid_key, &build_block.entries).expect("Unable to insert");
+        builder.insert(&build_block.grid_key, build_block.entries).expect("Unable to insert");
     }
     builder.finish().unwrap();
     GridStore::new(directory.path()).unwrap()
@@ -83,7 +83,7 @@ fn load_db_from_json_reader<T: BufRead>(json_source: T, store_path: &str) {
             let deserialized: StoreEntryBuildingBlock =
                 serde_json::from_str(&record).expect("Error deserializing json from string");
             builder
-                .insert(&deserialized.grid_key, &deserialized.entries)
+                .insert(&deserialized.grid_key, deserialized.entries)
                 .expect("Unable to insert");
         }
     });
@@ -108,7 +108,7 @@ pub fn dump_db_to_json(store_path: &str, json_path: &str) {
 
 pub fn ensure_downloaded(datafile: &str) -> PathBuf {
     let tmp = std::env::temp_dir().join("carmen_core_data/downloads");
-    std::fs::create_dir_all(&tmp);
+    std::fs::create_dir_all(&tmp).unwrap();
     let path = tmp.join(Path::new(datafile));
     if !path.exists() {
         let client = S3Client::new(Region::UsEast1);
@@ -134,7 +134,7 @@ pub fn ensure_downloaded(datafile: &str) -> PathBuf {
 
 pub fn ensure_store(datafile: &str) -> PathBuf {
     let tmp = std::env::temp_dir().join("carmen_core_data/indexes");
-    std::fs::create_dir_all(&tmp);
+    std::fs::create_dir_all(&tmp).unwrap();
     let idx_path = tmp.join(Path::new(&datafile.replace(".dat.lz4", ".rocksdb")));
     if !idx_path.exists() {
         let dl_path = ensure_downloaded(datafile);
