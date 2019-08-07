@@ -4,12 +4,12 @@ use std::path::{Path, PathBuf};
 use failure::{Error, Fail};
 use itertools::Itertools;
 use morton::interleave_morton;
-use rocksdb::{DB, DBCompressionType, Options};
+use rocksdb::{DBCompressionType, Options, DB};
 
 use crate::gridstore::common::*;
 use crate::gridstore::gridstore_generated::*;
 
-type BuilderEntry = BTreeMap<u8, BTreeMap<u32, Vec<u32>>>;
+type BuilderEntry = HashMap<u8, HashMap<u32, Vec<u32>>>;
 
 pub struct GridStoreBuilder {
     path: PathBuf,
@@ -18,10 +18,12 @@ pub struct GridStoreBuilder {
 
 /// Extends a BuildEntry with the given values.
 fn extend_entries(builder_entry: &mut BuilderEntry, values: &[GridEntry]) -> () {
+    let l = values.len();
+
     for (rs, values) in
         &values.into_iter().group_by(|value| (relev_float_to_int(value.relev) << 4) | value.score)
     {
-        let rs_entry = builder_entry.entry(rs).or_insert_with(|| BTreeMap::new());
+        let rs_entry = builder_entry.entry(rs).or_insert_with(|| HashMap::with_capacity(l));
         for (zcoord, values) in
             &values.into_iter().group_by(|value| interleave_morton(value.x, value.y))
         {
@@ -36,7 +38,7 @@ fn extend_entries(builder_entry: &mut BuilderEntry, values: &[GridEntry]) -> () 
 
 fn copy_entries(source_entry: &BuilderEntry, destination_entry: &mut BuilderEntry) -> () {
     for (rs, values) in source_entry.iter() {
-        let rs_entry = destination_entry.entry(*rs).or_insert_with(|| BTreeMap::new());
+        let rs_entry = destination_entry.entry(*rs).or_insert_with(|| HashMap::new());
         for (zcoord, values) in values.iter() {
             let zcoord_entry = rs_entry.entry(*zcoord).or_insert_with(|| Vec::new());
             zcoord_entry.extend(values.iter());
@@ -47,13 +49,16 @@ fn copy_entries(source_entry: &BuilderEntry, destination_entry: &mut BuilderEntr
 fn get_fb_value(value: &mut BuilderEntry) -> Result<Vec<u8>, Error> {
     let mut fb_builder = flatbuffers::FlatBufferBuilder::new();
     let mut rses: Vec<_> = Vec::new();
-    for (rs, coord_group) in value.iter_mut().rev() {
-        let mut coords: Vec<_> = Vec::new();
-        for (coord, ids) in coord_group.iter_mut().rev() {
-            // reverse sort
-            ids.sort_by(|a, b| b.cmp(a));
-            ids.dedup();
+    let hm: HashMap<u8, HashMap<u32, Vec<u32>>> = value.clone();
+    let mut items: Vec<(_, _)> = hm.into_iter().collect();
+    items.sort_by(|a, b| b.0.cmp(&a.0));
 
+    for (rs, coord_group) in items.iter_mut() {
+        let mut coords: Vec<_> = Vec::new();
+        for (coord, ids) in coord_group.iter_mut() {
+            // reverse sort
+            ids.sort_by(|a, b| a.cmp(b));
+            ids.dedup();
             let fb_ids = fb_builder.create_vector(&ids);
             let fb_coord =
                 Coord::create(&mut fb_builder, &CoordArgs { coord: *coord, ids: Some(fb_ids) });
@@ -66,6 +71,7 @@ fn get_fb_value(value: &mut BuilderEntry) -> Result<Vec<u8>, Error> {
         );
         rses.push(fb_rs);
     }
+
     let fb_rses = fb_builder.create_vector(&rses);
     let record =
         PhraseRecord::create(&mut fb_builder, &PhraseRecordArgs { relev_scores: Some(fb_rses) });
