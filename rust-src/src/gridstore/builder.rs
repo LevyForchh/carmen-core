@@ -20,7 +20,7 @@ pub struct GridStoreBuilder {
 }
 
 /// Extends a BuildEntry with the given values.
-fn extend_entries(builder_entry: &mut BuilderEntry, mut values: Vec<GridEntry>) -> () {
+fn extend_entries(builder_entry: &mut BuilderEntry, values: Vec<GridEntry>) -> () {
     for (rs, rs_values) in somewhat_eager_groupby(values.into_iter(), |value| {
         (relev_float_to_int(value.relev) << 4) | value.score
     }) {
