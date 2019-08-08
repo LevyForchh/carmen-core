@@ -1,5 +1,4 @@
 use itertools::Itertools;
-use std::collections::hash_map::Entry as HmEntry;
 use std::collections::{btree_map::Entry, BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 
@@ -9,7 +8,7 @@ use failure::{Error, Fail};
 use morton::interleave_morton;
 use ordered_float::OrderedFloat;
 use rocksdb::{DBCompressionType, Options, DB};
-use smallvec::{smallvec, SmallVec};
+use smallvec::SmallVec;
 
 type BuilderEntry = HashMap<(u8, u32), SmallVec<[u32; 4]>>;
 
@@ -26,17 +25,9 @@ fn extend_entries(builder_entry: &mut BuilderEntry, mut values: Vec<GridEntry>) 
     for (rsc, rsc_values) in somewhat_eager_groupby(values.into_iter(), |value| {
         ((relev_float_to_int(value.relev) << 4) | value.score, interleave_morton(value.x, value.y))
     }) {
-        builder_entry.entry(rsc).or_insert_with(|| SmallVec::new());
+        let rsc_entry = builder_entry.entry(rsc).or_insert_with(|| SmallVec::new());
         for value in rsc_values.into_iter() {
-            let id_phrases = smallvec![(value.id << 8) | (value.source_phrase_hash as u32)];
-            match builder_entry.entry(rsc) {
-                HmEntry::Vacant(e) => {
-                    e.insert(id_phrases);
-                }
-                HmEntry::Occupied(mut e) => {
-                    e.get_mut().extend(id_phrases);
-                }
-            }
+            rsc_entry.push((value.id << 8) | (value.source_phrase_hash as u32));
         }
     }
 }
@@ -51,19 +42,16 @@ fn copy_entries(source_entry: &BuilderEntry, destination_entry: &mut BuilderEntr
 fn get_fb_value(value: BuilderEntry) -> Result<Vec<u8>, Error> {
     let mut fb_builder = flatbuffers::FlatBufferBuilder::new();
     let mut items: Vec<(_, _)> = value.into_iter().collect();
-    items.sort_by(|a, b| b.0.cmp(&a.0));
+    items.sort_by(|a, b| b.cmp(&a));
 
     let mut rses: Vec<_> = Vec::with_capacity(items.len());
 
     let grouped = items.clone().into_iter().group_by(|(key, _value)| key.0);
 
     for (rs, coord_group) in grouped.into_iter() {
-        let mut inner_items: Vec<(_, _)> = coord_group.into_iter().collect();
-        inner_items.sort_by(|a, b| b.0.cmp(&a.0));
+        let mut coords: Vec<_> = Vec::new();
 
-        let mut coords: Vec<_> = Vec::with_capacity(inner_items.len());
-
-        for (coord, mut ids) in inner_items.into_iter() {
+        for (coord, mut ids) in coord_group.into_iter() {
             // reverse sort
             ids.sort_by(|a, b| b.cmp(a));
             ids.dedup();
