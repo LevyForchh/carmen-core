@@ -5,9 +5,8 @@ use std::path::{Path, PathBuf};
 use failure::{Error, Fail};
 use itertools::Itertools;
 use morton::interleave_morton;
-use ordered_float::OrderedFloat;
 use rocksdb::{DBCompressionType, Options, DB};
-use smallvec::SmallVec;
+use smallvec::{smallvec, SmallVec};
 
 use crate::gridstore::common::*;
 use crate::gridstore::gridstore_generated::*;
@@ -20,7 +19,7 @@ pub struct GridStoreBuilder {
 }
 
 /// Extends a BuildEntry with the given values.
-fn extend_entries(builder_entry: &mut BuilderEntry, mut values: Vec<GridEntry>) -> () {
+fn extend_entries(builder_entry: &mut BuilderEntry, values: Vec<GridEntry>) -> () {
     for (rs, rs_values) in somewhat_eager_groupby(values.into_iter(), |value| {
         (relev_float_to_int(value.relev) << 4) | value.score
     }) {
@@ -110,6 +109,25 @@ impl GridStoreBuilder {
         let mut to_append = self.data.entry(key.to_owned()).or_insert_with(|| BuilderEntry::new());
         extend_entries(&mut to_append, values);
         Ok(())
+    }
+
+    pub fn compact_append(&mut self, key: &GridKey, relev: f64, score: u8, id: u32, source_phrase_hash: u8, coords: &[(u16, u16)]) {
+        let to_append = self.data.entry(key.to_owned()).or_insert_with(|| BuilderEntry::with_capacity(1));
+
+        let relev_score = (relev_float_to_int(relev) << 4) | score;
+        let id_hash = smallvec![(id << 8) | (source_phrase_hash as u32)];
+        let rs_entry = to_append.entry(relev_score).or_insert_with(|| HashMap::with_capacity(coords.len()));
+        for pair in coords {
+            let zcoord = interleave_morton(pair.0, pair.1);
+            match rs_entry.entry(zcoord) {
+                HmEntry::Vacant(e) => {
+                    e.insert(id_hash.clone());
+                }
+                HmEntry::Occupied(mut e) => {
+                    e.get_mut().extend_from_slice(&id_hash);
+                }
+            }
+        }
     }
 
     /// In situations under which data has been inserted using temporary phrase IDs, renumber
