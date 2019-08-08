@@ -232,7 +232,6 @@ mod tests {
                 MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 1, x: 24, y: 1, id: 12, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 1.0 }
             ]
         );
-
         let search_key =
             MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 0 };
         let records: Vec<_> =

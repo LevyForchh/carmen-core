@@ -1,18 +1,17 @@
+use itertools::Itertools;
 use std::collections::hash_map::Entry as HmEntry;
 use std::collections::{btree_map::Entry, BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 
+use crate::gridstore::common::*;
+use crate::gridstore::gridstore_generated::*;
 use failure::{Error, Fail};
-use itertools::Itertools;
 use morton::interleave_morton;
 use ordered_float::OrderedFloat;
 use rocksdb::{DBCompressionType, Options, DB};
-use smallvec::SmallVec;
+use smallvec::{smallvec, SmallVec};
 
-use crate::gridstore::common::*;
-use crate::gridstore::gridstore_generated::*;
-
-type BuilderEntry = HashMap<u8, HashMap<u32, SmallVec<[u32; 4]>>>;
+type BuilderEntry = HashMap<(u8, u32), SmallVec<[u32; 4]>>;
 
 pub struct GridStoreBuilder {
     path: PathBuf,
@@ -20,20 +19,19 @@ pub struct GridStoreBuilder {
 }
 
 /// Extends a BuildEntry with the given values.
-fn extend_entries(builder_entry: &mut BuilderEntry, values: Vec<GridEntry>) -> () {
-    for (rs, rs_values) in somewhat_eager_groupby(values.into_iter(), |value| {
-        (relev_float_to_int(value.relev) << 4) | value.score
+fn extend_entries(builder_entry: &mut BuilderEntry, mut values: Vec<GridEntry>) -> () {
+    values.sort_unstable_by_key(|value| {
+        (OrderedFloat(value.relev), value.score, value.x, value.y, value.id)
+    });
+    for (rsc, rsc_values) in somewhat_eager_groupby(values.into_iter(), |value| {
+        ((relev_float_to_int(value.relev) << 4) | value.score, interleave_morton(value.x, value.y))
     }) {
-        let rs_entry =
-            builder_entry.entry(rs).or_insert_with(|| HashMap::with_capacity(rs_values.len()));
-        for (zcoord, zc_values) in
-            &rs_values.into_iter().group_by(|value| interleave_morton(value.x, value.y))
-        {
-            let id_phrases =
-                zc_values.map(|value| (value.id << 8) | (value.source_phrase_hash as u32));
-            match rs_entry.entry(zcoord) {
+        builder_entry.entry(rsc).or_insert_with(|| SmallVec::new());
+        for value in rsc_values.into_iter() {
+            let id_phrases = smallvec![(value.id << 8) | (value.source_phrase_hash as u32)];
+            match builder_entry.entry(rsc) {
                 HmEntry::Vacant(e) => {
-                    e.insert(id_phrases.collect());
+                    e.insert(id_phrases);
                 }
                 HmEntry::Occupied(mut e) => {
                     e.get_mut().extend(id_phrases);
@@ -44,24 +42,22 @@ fn extend_entries(builder_entry: &mut BuilderEntry, values: Vec<GridEntry>) -> (
 }
 
 fn copy_entries(source_entry: &BuilderEntry, destination_entry: &mut BuilderEntry) -> () {
-    for (rs, values) in source_entry.iter() {
-        let rs_entry = destination_entry.entry(*rs).or_insert_with(|| HashMap::new());
-        for (zcoord, values) in values.iter() {
-            let zcoord_entry = rs_entry.entry(*zcoord).or_insert_with(|| SmallVec::new());
-            zcoord_entry.extend(values.iter().cloned());
-        }
+    for (rsc, values) in source_entry.iter() {
+        let rsc_entry = destination_entry.entry(*rsc).or_insert_with(|| SmallVec::new());
+        rsc_entry.extend(values.iter().cloned());
     }
 }
 
 fn get_fb_value(value: BuilderEntry) -> Result<Vec<u8>, Error> {
     let mut fb_builder = flatbuffers::FlatBufferBuilder::new();
-
     let mut items: Vec<(_, _)> = value.into_iter().collect();
     items.sort_by(|a, b| b.0.cmp(&a.0));
 
     let mut rses: Vec<_> = Vec::with_capacity(items.len());
 
-    for (rs, coord_group) in items.into_iter() {
+    let grouped = items.clone().into_iter().group_by(|(key, _value)| key.0);
+
+    for (rs, coord_group) in grouped.into_iter() {
         let mut inner_items: Vec<(_, _)> = coord_group.into_iter().collect();
         inner_items.sort_by(|a, b| b.0.cmp(&a.0));
 
@@ -73,7 +69,7 @@ fn get_fb_value(value: BuilderEntry) -> Result<Vec<u8>, Error> {
             ids.dedup();
             let fb_ids = fb_builder.create_vector(&ids);
             let fb_coord =
-                Coord::create(&mut fb_builder, &CoordArgs { coord: coord, ids: Some(fb_ids) });
+                Coord::create(&mut fb_builder, &CoordArgs { coord: coord.1, ids: Some(fb_ids) });
             coords.push(fb_coord);
         }
         let fb_coords = fb_builder.create_vector(&coords);
@@ -83,11 +79,11 @@ fn get_fb_value(value: BuilderEntry) -> Result<Vec<u8>, Error> {
         );
         rses.push(fb_rs);
     }
-
     let fb_rses = fb_builder.create_vector(&rses);
     let record =
         PhraseRecord::create(&mut fb_builder, &PhraseRecordArgs { relev_scores: Some(fb_rses) });
     fb_builder.finish(record, None);
+
     Ok(fb_builder.finished_data().to_vec())
 }
 
@@ -195,14 +191,16 @@ fn extend_entry_test() {
     );
 
     // relev 3 (0011) with score 7 (0111) -> 55
-    let grids = entry.get(&55);
+    let grids = entry.get(&(55, 3));
     assert_ne!(grids, None, "Retrieve grids based on relev and score");
 
     // x:1, y:1 -> z-order 3
-    let vals = grids.unwrap().get(&3);
-    assert_ne!(vals, None, "Retrieve entries based on z-order");
+    let vals = grids.unwrap();
+    assert!(!vals.is_empty());
     // id 1 (1 << 8 == 256) with phrase 2 => 258
-    assert_eq!(vals.unwrap()[0], 258, "TODO");
+    let mut v = SmallVec::<[u32; 4]>::new();
+    v.push(258);
+    assert_eq!(*vals, v, "TODO");
 }
 
 #[test]
