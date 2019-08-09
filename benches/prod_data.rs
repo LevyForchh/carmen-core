@@ -1,10 +1,12 @@
 use std::fs::File;
 use std::io::{self, BufRead};
+use std::sync::Arc;
 
 use criterion::{BatchSize, Bencher, Criterion, Fun};
 use lz4::Decoder;
 use once_cell::unsync::Lazy;
 use serde_json;
+use rayon::prelude::*;
 use tempfile;
 
 use carmen_core::gridstore::*;
@@ -54,6 +56,73 @@ pub fn benchmark(c: &mut Criterion) {
         b.iter(|| {
             let (stack, opts) = cycle.next().unwrap();
             coalesce(stack.clone(), opts).unwrap();
+        })
+    }));
+
+    to_bench.push(Fun::new("coalesce_grouped_st", move |b: &mut Bencher, _i| {
+        let stack_groups = prepare_grouped_stacks("gb_address_grouped_global.ljson.lz4");
+
+        let mut cycle = stack_groups.iter().cycle();
+
+        b.iter(|| {
+            let group = cycle.next().unwrap();
+            for (stack, opts) in group.iter() {
+                coalesce(stack.clone(), opts).unwrap();
+            }
+        })
+    }));
+
+    to_bench.push(Fun::new("coalesce_grouped_mt", move |b: &mut Bencher, _i| {
+        let stack_groups = prepare_grouped_stacks("gb_address_grouped_global.ljson.lz4");
+
+        let mut cycle = stack_groups.iter().cycle();
+
+        b.iter(|| {
+            let group = cycle.next().unwrap();
+            group.par_iter().for_each(|(stack, opts)| {
+                coalesce(stack.clone(), opts).unwrap();
+            });
+        })
+    }));
+
+    to_bench.push(Fun::new("parallel_coalesce_grouped", move |b: &mut Bencher, _i| {
+        let stack_groups = prepare_grouped_stacks("gb_address_grouped_global.ljson.lz4");
+
+        let mut cycle = stack_groups.iter().cycle();
+
+        b.iter(|| {
+            let group = cycle.next().unwrap();
+            parallel_coalesce(group);
+        })
+    }));
+
+    let grouped_ac = Arc::new(Lazy::new(|| {
+        prepare_grouped_stacks("gb_address_ac_grouped_global.ljson.lz4")
+    }));
+
+    let stacked_groups = grouped_ac.clone();
+    to_bench.push(Fun::new("coalesce_grouped_ac_mt", move |b: &mut Bencher, _i| {
+        Lazy::force(&stacked_groups);
+
+        let mut cycle = stacked_groups.iter().cycle();
+
+        b.iter(|| {
+            let group = cycle.next().unwrap();
+            group.par_iter().for_each(|(stack, opts)| {
+                coalesce(stack.clone(), opts).unwrap();
+            });
+        })
+    }));
+
+    let stacked_groups = grouped_ac.clone();
+    to_bench.push(Fun::new("parallel_coalesce_grouped_ac", move |b: &mut Bencher, _i| {
+        Lazy::force(&stacked_groups);
+
+        let mut cycle = stacked_groups.iter().cycle();
+
+        b.iter(|| {
+            let group = cycle.next().unwrap();
+            parallel_coalesce(group);
         })
     }));
 

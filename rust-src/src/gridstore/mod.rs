@@ -6,7 +6,7 @@ mod spatial;
 mod store;
 
 pub use builder::*;
-pub use coalesce::coalesce;
+pub use coalesce::{coalesce, parallel_coalesce};
 pub use common::*;
 pub use store::*;
 

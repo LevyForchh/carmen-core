@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{self, Read, Write, BufRead, BufWriter};
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
+use std::sync::Arc;
 
 // Util functions for tests and benchmarks
 
@@ -117,6 +117,7 @@ pub fn ensure_downloaded(datafile: &str) -> PathBuf {
             key: ("playground/apendleton/gridstore_bench/".to_owned() + datafile),
             ..Default::default()
         };
+        println!("{:?}", &request);
 
         let result = client.get_object(request).sync().unwrap();
 
@@ -155,38 +156,68 @@ struct SubqueryPlaceholder {
     mask: u32,
 }
 
+fn load_stack(
+    placeholders: &[SubqueryPlaceholder],
+    stores: &mut HashMap<String, Arc<GridStore>>
+) -> Vec<PhrasematchSubquery<Arc<GridStore>>> {
+    placeholders.iter().map(|placeholder| {
+        let store = stores.entry(placeholder.store.clone()).or_insert_with(|| {
+            let store_name = placeholder.store
+                .rsplit("/").next().unwrap()
+                .replace(".rocksdb", ".dat.lz4");
+            let store_path = ensure_store(&store_name);
+            let gs = GridStore::new(store_path).unwrap();
+            Arc::new(gs)
+        });
+        PhrasematchSubquery {
+            store: store.clone(),
+            weight: placeholder.weight,
+            match_key: placeholder.match_key.clone(),
+            idx: placeholder.idx,
+            zoom: placeholder.zoom,
+            mask: placeholder.mask,
+        }
+    }).collect()
+}
+
 pub fn prepare_coalesce_stacks(datafile: &str) ->
-    Vec<(Vec<PhrasematchSubquery<Rc<GridStore>>>, MatchOpts)>
+    Vec<(Vec<PhrasematchSubquery<Arc<GridStore>>>, MatchOpts)>
 {
     let path = ensure_downloaded(datafile);
     let decoder = Decoder::new(File::open(path).unwrap()).unwrap();
     let file = io::BufReader::new(decoder);
-    let mut stores: HashMap<String, Rc<GridStore>> = HashMap::new();
-    let out: Vec<(Vec<PhrasematchSubquery<Rc<GridStore>>>, MatchOpts)> = file.lines().filter_map(|l| {
+    let mut stores: HashMap<String, Arc<GridStore>> = HashMap::new();
+    let out: Vec<(Vec<PhrasematchSubquery<Arc<GridStore>>>, MatchOpts)> = file.lines().filter_map(|l| {
         let record = l.unwrap();
         if !record.is_empty() {
             let deserialized: (Vec<SubqueryPlaceholder>, MatchOpts) =
                 serde_json::from_str(&record).expect("Error deserializing json from string");
-            let stack: Vec<_> = deserialized.0.iter().map(|placeholder| {
-                let store = stores.entry(placeholder.store.clone()).or_insert_with(|| {
-                    let store_name = placeholder.store
-                        .rsplit("/").next().unwrap()
-                        .replace(".rocksdb", ".dat.lz4");
-                    let store_path = ensure_store(&store_name);
-                    let gs = GridStore::new(store_path).unwrap();
-                    Rc::new(gs)
-                });
-                PhrasematchSubquery {
-                    store: store.clone(),
-                    weight: placeholder.weight,
-                    match_key: placeholder.match_key.clone(),
-                    idx: placeholder.idx,
-                    zoom: placeholder.zoom,
-                    mask: placeholder.mask,
-                }
-            }).collect();
-
+            let stack = load_stack(&deserialized.0, &mut stores);
             Some((stack, deserialized.1))
+        } else {
+            None
+        }
+    }).collect();
+    out
+}
+
+pub fn prepare_grouped_stacks(datafile: &str) ->
+    Vec<Vec<(Vec<PhrasematchSubquery<Arc<GridStore>>>, MatchOpts)>>
+{
+    let path = ensure_downloaded(datafile);
+    let decoder = Decoder::new(File::open(path).unwrap()).unwrap();
+    let file = io::BufReader::new(decoder);
+    let mut stores: HashMap<String, Arc<GridStore>> = HashMap::new();
+    let out: Vec<Vec<(Vec<PhrasematchSubquery<Arc<GridStore>>>, MatchOpts)>> = file.lines().filter_map(|l| {
+        let record = l.unwrap();
+        if !record.is_empty() {
+            let deserialized: Vec<(Vec<SubqueryPlaceholder>, MatchOpts)> =
+                serde_json::from_str(&record).expect("Error deserializing json from string");
+            Some(
+                deserialized.into_iter().map(|(stack, opts)|
+                    (load_stack(&stack, &mut stores), opts)
+                ).collect()
+            )
         } else {
             None
         }

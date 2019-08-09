@@ -1,7 +1,9 @@
 use std::borrow::Borrow;
+use std::hash::{Hash, Hasher};
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use failure::Error;
+use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize, Serializer};
 
 use crate::gridstore::store::GridStore;
@@ -33,13 +35,13 @@ impl GridKey {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialOrd, Ord, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Hash)]
 pub enum MatchPhrase {
     Exact(u32),
     Range { start: u32, end: u32 },
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialOrd, Ord, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Hash)]
 pub struct MatchKey {
     pub match_phrase: MatchPhrase,
     pub lang_set: u128,
@@ -84,13 +86,31 @@ impl MatchKey {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Proximity {
     pub point: [u16; 2],
     pub radius: f64,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+impl Proximity {
+    fn hash_key(&self) -> ([u16; 2], ordered_float::OrderedFloat<f64>) {
+        (self.point, OrderedFloat(self.radius))
+    }
+}
+
+impl PartialEq for Proximity {
+    fn eq(&self, other: &Self) -> bool {
+        self.hash_key() == other.hash_key()
+    }
+}
+impl Eq for Proximity {}
+impl Hash for Proximity {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.hash_key().hash(state);
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Eq, Hash)]
 pub struct MatchOpts {
     pub bbox: Option<[u16; 4]>,
     pub proximity: Option<Proximity>,
@@ -361,6 +381,24 @@ pub struct PhrasematchSubquery<T: Borrow<GridStore> + Clone> {
     pub idx: u16,
     pub zoom: u16,
     pub mask: u32,
+}
+
+impl<T: Borrow<GridStore> + Clone> PhrasematchSubquery<T> {
+    fn hash_key(&self) -> (&std::path::PathBuf, ordered_float::OrderedFloat<f64>, &MatchKey, u16, u16, u32) {
+        (&self.store.borrow().path, OrderedFloat(self.weight), &self.match_key, self.idx, self.zoom, self.mask)
+    }
+}
+
+impl<T: Borrow<GridStore> + Clone> PartialEq for PhrasematchSubquery<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.hash_key() == other.hash_key()
+    }
+}
+impl<T: Borrow<GridStore> + Clone> Eq for PhrasematchSubquery<T> {}
+impl<T: Borrow<GridStore> + Clone> Hash for PhrasematchSubquery<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.hash_key().hash(state);
+    }
 }
 
 #[inline]
