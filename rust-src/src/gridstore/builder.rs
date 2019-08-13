@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use failure::{Error, Fail};
 use itertools::Itertools;
 use morton::interleave_morton;
-use rocksdb::{DB, DBCompressionType, Options};
+use rocksdb::{DBCompressionType, Options, DB};
 
 use crate::gridstore::common::*;
 use crate::gridstore::gridstore_generated::*;
