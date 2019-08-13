@@ -21,9 +21,8 @@ pub fn coalesce<T: Borrow<GridStore> + Clone + Debug>(
     let contexts = if stack.len() <= 1 {
         let subquery = &stack[0];
         let matching = subquery.store.borrow().get_matching(&subquery.match_key, match_opts)?;
-        let grids: Vec<MatchEntry> = matching.take(120).collect();
 
-        coalesce_single(subquery, &grids, match_opts)?
+        coalesce_single(subquery, matching, match_opts)?
     } else {
         let stack_with_data: Result<Vec<(PhrasematchSubquery<T>, Vec<MatchEntry>, MatchOpts)>, Error> = stack.into_iter().map(|subquery| {
             let adjusted_match_opts = match_opts.adjust_to_zoom(subquery.zoom);
@@ -67,28 +66,28 @@ pub fn parallel_coalesce<T: Borrow<GridStore> + Clone + Debug + Send + Sync>(
     // let v: Vec<PhrasematchSubquery<T>> = Vec::new();
     // let () = (&v).into_par_iter();
 
-    let mut subqueries_need_multi: HashMap<(&PhrasematchSubquery<T>, &MatchOpts), bool> = HashMap::new();
+    let mut tagged_subqueries: HashMap<(&PhrasematchSubquery<T>, &MatchOpts), (bool, bool)> = HashMap::new();
     for (stack, match_opts) in stacks.iter() {
         if stack.len() == 1 {
-            // only insert (and set to false) if not already present
-            subqueries_need_multi.entry((&stack[0], match_opts)).or_insert(false);
+            tagged_subqueries.entry((&stack[0], match_opts))
+                .and_modify(|e| e.0 = true)
+                .or_insert((true, false));
         } else {
             for subquery in stack.iter() {
                 // always insert, setting true regardless
-                subqueries_need_multi.insert((subquery, match_opts), true);
+                tagged_subqueries.entry((subquery, match_opts))
+                    .and_modify(|e| e.1 = true)
+                    .or_insert((false, true));
             }
         }
     }
 
-    let subqueries: Vec<Result<((&PhrasematchSubquery<T>, &MatchOpts), (Vec<MatchEntry>, MatchOpts)), Error>> =
-        subqueries_need_multi.into_par_iter().map(|((subquery, match_opts), needs_multi)| {
-            let output = if !needs_multi {
-                let adjusted_match_opts = match_opts.adjust_to_zoom(subquery.zoom);
-                let matching = subquery.store.borrow().get_matching(&subquery.match_key, &adjusted_match_opts)?;
-                let grids: Vec<MatchEntry> = matching.take(120).collect();
-
-                (grids, adjusted_match_opts)
-            } else {
+    let subqueries: Vec<Result<(
+            (&PhrasematchSubquery<T>, &MatchOpts),
+            (Option<Vec<CoalesceContext>>, Option<Vec<MatchEntry>>, MatchOpts)
+        ), Error>> =
+        tagged_subqueries.into_par_iter().map(|((subquery, match_opts), (needs_single, needs_multi))| {
+            let output = if needs_multi {
                 let adjusted_match_opts = match_opts.adjust_to_zoom(subquery.zoom);
                 let matching =
                     subquery.store.borrow().get_matching(&subquery.match_key, &adjusted_match_opts)?;
@@ -96,27 +95,42 @@ pub fn parallel_coalesce<T: Borrow<GridStore> + Clone + Debug + Send + Sync>(
                 // limit to 100,000 records -- we may want to experiment with this number; it was 500k in
                 // carmen-cache, but hopefully we're sorting more intelligently on the way in here so
                 // shouldn't need as many records. Still, we should limit it somehow.
-                let grids: Vec<MatchEntry> = matching.take(100_000).collect();
-                (grids, adjusted_match_opts)
+                let multi_grids: Vec<MatchEntry> = matching.take(100_000).collect();
+
+                let single_results = if needs_single {
+                    Some(coalesce_single(&subquery, multi_grids.iter().cloned(), &adjusted_match_opts)?)
+                } else {
+                    None
+                };
+                (single_results, Some(multi_grids), adjusted_match_opts)
+            } else {
+                let adjusted_match_opts = match_opts.adjust_to_zoom(subquery.zoom);
+                let matching = subquery.store.borrow().get_matching(&subquery.match_key, &adjusted_match_opts)?;
+                let single_results = Some(coalesce_single(subquery, matching, &adjusted_match_opts)?);
+
+                (single_results, None, adjusted_match_opts)
             };
 
             Ok(((subquery, match_opts), output))
         }).collect();
-    let subqueries: Result<HashMap<(&PhrasematchSubquery<T>, &MatchOpts), (Vec<MatchEntry>, MatchOpts)>, Error> = subqueries.into_iter().collect();
+    let subqueries: Result<HashMap<
+        (&PhrasematchSubquery<T>, &MatchOpts),
+        (Option<Vec<CoalesceContext>>, Option<Vec<MatchEntry>>, MatchOpts)
+    >, Error> = subqueries.into_iter().collect();
     let subqueries = subqueries?;
 
     let all_contexts: Result<Vec<Vec<CoalesceContext>>, Error> = (&stacks).into_par_iter().map(|(stack, match_opts)| {
-        let contexts = if stack.len() <= 1 {
+        let contexts = if stack.len() == 1 {
             let subquery = &stack[0];
-            let (grids, adjusted_opts) = subqueries.get(&(subquery, &match_opts)).unwrap();
+            let (single_results, _, _) = subqueries.get(&(subquery, &match_opts)).unwrap();
 
-            coalesce_single(subquery, grids, adjusted_opts)?
+            single_results.as_ref().unwrap().clone()
         } else {
             let stack_with_data: Vec<(&PhrasematchSubquery<T>, &Vec<MatchEntry>, MatchOpts)> = stack.iter().map(|subquery| {
-                let (grids, opts) = subqueries.get(&(subquery, &match_opts)).unwrap();
+                let (_, multi_grids, opts) = subqueries.get(&(subquery, &match_opts)).unwrap();
 
                 let adjusted_opts = opts.clone();
-                (subquery, grids, adjusted_opts)
+                (subquery, multi_grids.as_ref().unwrap(), adjusted_opts)
             }).collect();
 
             coalesce_multi(stack_with_data)?
@@ -168,9 +182,9 @@ fn grid_to_coalesce_entry<T: Borrow<GridStore> + Clone>(
     }
 }
 
-fn coalesce_single<T: Borrow<GridStore> + Clone>(
+fn coalesce_single<T: Borrow<GridStore> + Clone, U: Iterator<Item = MatchEntry>>(
     subquery: &PhrasematchSubquery<T>,
-    grids: &[MatchEntry],
+    grids: U,
     match_opts: &MatchOpts,
 ) -> Result<Vec<CoalesceContext>, Error> {
     let mut max_relev: f64 = 0.;

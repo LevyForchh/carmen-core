@@ -342,7 +342,7 @@ pub struct GridEntry {
     pub source_phrase_hash: u8,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialOrd, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialOrd, PartialEq, Clone)]
 pub struct MatchEntry {
     pub grid_entry: GridEntry,
     pub matches_language: bool,
@@ -361,7 +361,7 @@ pub struct CoalesceEntry {
     pub scoredist: f64,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialOrd, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialOrd, PartialEq, Clone)]
 pub struct CoalesceContext {
     pub mask: u32,
     pub relev: f64,
