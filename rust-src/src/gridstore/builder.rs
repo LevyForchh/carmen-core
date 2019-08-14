@@ -1,5 +1,6 @@
 use std::collections::{btree_map::Entry, BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
+use rayon::prelude::*;
 
 use failure::{Error, Fail};
 use itertools::Itertools;
@@ -127,7 +128,6 @@ impl GridStoreBuilder {
         opts.create_if_missing(true);
 
         let db = DB::open(&opts, &self.path)?;
-        let mut db_key: Vec<u8> = Vec::with_capacity(MAX_KEY_LENGTH);
 
         let grouped = self.data.iter_mut().group_by(|(key, _value)| (key.phrase_id >> 10) << 10);
 
@@ -136,7 +136,7 @@ impl GridStoreBuilder {
 
             for (grid_key, value) in group_value {
                 // figure out the key
-                db_key.clear();
+                let mut db_key: Vec<u8> = Vec::with_capacity(MAX_KEY_LENGTH);
                 // type marker is 0 -- regular entry
                 grid_key.write_to(0, &mut db_key)?;
 
@@ -147,13 +147,16 @@ impl GridStoreBuilder {
                 let db_data = get_fb_value(value)?;
                 db.put(&db_key, &db_data)?;
             }
-            for (lang_set, mut builder_entry) in lang_set_map.into_iter() {
-                db_key.clear();
+
+            let write_to_db: Vec<Result<(), Error>> = lang_set_map.into_par_iter().map(|(lang_set, mut builder_entry)| {
+                let mut db_key: Vec<u8> = Vec::with_capacity(MAX_KEY_LENGTH);
                 let group_key = GridKey { phrase_id: group_id, lang_set };
                 group_key.write_to(1, &mut db_key)?;
-                let grouped_db_data = get_fb_value(&mut builder_entry)?;
-                db.put(&db_key, &grouped_db_data)?;
-            }
+                let grouped_db_data = get_fb_value(&mut builder_entry);
+                Ok(db.put(&db_key, &grouped_db_data.unwrap())?)
+            }).collect();
+            let out: Result<Vec<()>, Error> = write_to_db.into_iter().collect();
+            out?;
         }
 
         db.compact_range(None::<&[u8]>, None::<&[u8]>);
