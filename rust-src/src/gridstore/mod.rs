@@ -1,7 +1,6 @@
 mod builder;
 mod coalesce;
 mod common;
-mod gridstore_generated;
 mod gridstore_format;
 mod spatial;
 mod store;
