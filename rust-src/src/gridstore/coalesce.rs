@@ -105,8 +105,8 @@ pub fn parallel_coalesce<T: Borrow<GridStore> + Clone + Debug + Send + Sync>(
                 (single_results, Some(multi_grids), adjusted_match_opts)
             } else {
                 let adjusted_match_opts = match_opts.adjust_to_zoom(subquery.zoom);
-                let matching = subquery.store.borrow().get_matching(&subquery.match_key, &adjusted_match_opts)?;
-                let single_results = Some(coalesce_single(subquery, matching, &adjusted_match_opts)?);
+                let matching = subquery.store.borrow().eager_get_matching(&subquery.match_key, &adjusted_match_opts, 80)?;
+                let single_results = Some(coalesce_single(subquery, matching.into_iter(), &adjusted_match_opts)?);
 
                 (single_results, None, adjusted_match_opts)
             };
