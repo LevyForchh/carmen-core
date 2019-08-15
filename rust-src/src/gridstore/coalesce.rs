@@ -20,9 +20,9 @@ pub fn coalesce<T: Borrow<GridStore> + Clone + Debug>(
 ) -> Result<Vec<CoalesceContext>, Error> {
     let contexts = if stack.len() <= 1 {
         let subquery = &stack[0];
-        let matching = subquery.store.borrow().get_matching(&subquery.match_key, match_opts)?;
+        let matching = subquery.store.borrow().eager_get_matching(&subquery.match_key, match_opts, 80)?;
 
-        coalesce_single(subquery, matching, match_opts)?
+        coalesce_single(subquery, matching.into_iter(), match_opts)?
     } else {
         let stack_with_data: Result<Vec<(PhrasematchSubquery<T>, Vec<MatchEntry>, MatchOpts)>, Error> = stack.into_iter().map(|subquery| {
             let adjusted_match_opts = match_opts.adjust_to_zoom(subquery.zoom);

@@ -11,6 +11,7 @@ path = "rust-src/src/lib.rs"
 serde = { version = "1.0", features = ["derive"] }
 # use https://github.com/apendleton/morton/tree/modernize because upstream
 # doesn't work on rust stable
+min-max-heap = "1.2"
 morton = { git = "https://github.com/apendleton/morton.git", rev = "d892e8f2759aa2de29629232946db47924f1802e" }
 itertools = "0.8"
 # using this fork until https://github.com/google/flatbuffers/pull/5166 lands
