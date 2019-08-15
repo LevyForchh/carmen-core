@@ -9,7 +9,7 @@ use rocksdb::{DBCompressionType, Options, DB};
 use smallvec::{smallvec, SmallVec};
 
 use crate::gridstore::common::*;
-use crate::gridstore::gridstore_generated::*;
+use crate::gridstore::gridstore_format;
 
 type BuilderEntry = HashMap<u8, HashMap<u32, SmallVec<[u32; 4]>>>;
 
@@ -52,16 +52,15 @@ fn copy_entries(source_entry: &BuilderEntry, destination_entry: &mut BuilderEntr
     }
 }
 
-fn get_fb_value(value: BuilderEntry) -> Result<Vec<u8>, Error> {
-    let mut fb_builder = flatbuffers::FlatBufferBuilder::new();
+fn get_encoded_value(value: BuilderEntry) -> Result<Vec<u8>, Error> {
+    let mut builder = gridstore_format::Writer::new();
 
     let mut items: Vec<(_, _)> = value.into_iter().collect();
     items.sort_by(|a, b| b.0.cmp(&a.0));
 
     let mut rses: Vec<_> = Vec::with_capacity(items.len());
 
-    let mut id_lists: HashMap<_, u32> = HashMap::new();
-    let mut id_idx = 0;
+    let mut id_lists: HashMap<_, gridstore_format::VecOffset<u32>> = HashMap::new();
 
     for (rs, coord_group) in items.into_iter() {
         let mut inner_items: Vec<(_, _)> = coord_group.into_iter().collect();
@@ -74,43 +73,24 @@ fn get_fb_value(value: BuilderEntry) -> Result<Vec<u8>, Error> {
             ids.sort_by(|a, b| b.cmp(a));
             ids.dedup();
 
-            let idx = id_lists.entry(ids).or_insert_with(|| {
-                let new_id = id_idx;
-                id_idx += 1;
-                new_id
+            let encoded_ids = id_lists.entry(ids.clone()).or_insert_with(|| {
+                builder.write_vec(&ids)
             });
 
-            //let fb_ids = fb_builder.create_vector(&ids);
-            let fb_coord = Coord::new(coord, *idx);
-            coords.push(fb_coord);
+            let encoded_coord = gridstore_format::Coord { coord, ids: encoded_ids.clone() };
+            coords.push(encoded_coord);
         }
-        let fb_coords = fb_builder.create_vector(&coords);
-        let fb_rs = RelevScore::create(
-            &mut fb_builder,
-            &RelevScoreArgs { relev_score: rs, coords: Some(fb_coords) },
-        );
-        rses.push(fb_rs);
+        let encoded_coords = builder.write_vec(&coords);
+        let encoded_rs = gridstore_format::RelevScore { relev_score: rs, coords: encoded_coords };
+        rses.push(encoded_rs);
     }
 
-    let fb_rses = fb_builder.create_vector(&rses);
+    let encoded_rses = builder.write_vec(&rses);
 
-    let mut id_lists: Vec<_> = id_lists.into_iter().collect();
-    id_lists.sort_by_key(|e| e.1);
-    let fb_id_lists: Vec<_> = id_lists
-        .into_iter()
-        .map(|(list, _)| {
-            let list = fb_builder.create_vector(&list);
-            IdList::create(&mut fb_builder, &IdListArgs { ids: Some(list) })
-        })
-        .collect();
-    let fb_id_lists = fb_builder.create_vector(&fb_id_lists);
+    let record = gridstore_format::PhraseRecord { relev_scores: encoded_rses };
+    builder.write_scalar(record);
 
-    let record = PhraseRecord::create(
-        &mut fb_builder,
-        &PhraseRecordArgs { relev_scores: Some(fb_rses), id_lists: Some(fb_id_lists) },
-    );
-    fb_builder.finish(record, None);
-    Ok(fb_builder.finished_data().to_vec())
+    Ok(builder.finish())
 }
 
 impl GridStoreBuilder {
@@ -205,14 +185,14 @@ impl GridStoreBuilder {
                     lang_set_map.entry(grid_key.lang_set).or_insert_with(|| BuilderEntry::new());
                 copy_entries(&value, &mut grouped_entry);
                 // figure out the value
-                let db_data = get_fb_value(value)?;
+                let db_data = get_encoded_value(value)?;
                 db.put(&db_key, &db_data)?;
             }
             for (lang_set, builder_entry) in lang_set_map.into_iter() {
                 db_key.clear();
                 let group_key = GridKey { phrase_id: group_id, lang_set };
                 group_key.write_to(1, &mut db_key)?;
-                let grouped_db_data = get_fb_value(builder_entry)?;
+                let grouped_db_data = get_encoded_value(builder_entry)?;
                 db.put(&db_key, &grouped_db_data)?;
             }
         }
