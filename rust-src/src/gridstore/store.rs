@@ -2,40 +2,21 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
+use byteorder::{BigEndian, ReadBytesExt};
 use failure::Error;
-use flatbuffers;
 use itertools::Itertools;
 use morton::deinterleave_morton;
 use ordered_float::OrderedFloat;
 use rocksdb::{DBCompressionType, Direction, IteratorMode, Options, DB};
 
 use crate::gridstore::common::*;
-use crate::gridstore::gridstore_generated::*;
+use crate::gridstore::gridstore_format;
 use crate::gridstore::spatial;
 
 #[derive(Debug)]
 pub struct GridStore {
     db: DB,
     pub path: PathBuf,
-}
-
-// this is a bit of a hack -- it constructs a flatbuffers vector bounded by the lifetime
-// of the underlying buffer, rather than by the lifetime of its parent vector, in the event
-// that vectors are nested
-fn get_vector<'a, T: 'a>(
-    buf: &'a [u8],
-    table: &flatbuffers::Table,
-    field: flatbuffers::VOffsetT,
-) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<T>>> {
-    let o = table.vtable().get(field) as usize;
-    if o == 0 {
-        return None;
-    }
-
-    let addr = table.loc + o;
-    let offset = (&buf[addr..(addr + 4)]).read_u32::<LittleEndian>().unwrap() as usize;
-    Some(flatbuffers::Vector::new(buf, addr + offset))
 }
 
 #[inline]
@@ -51,31 +32,25 @@ fn decode_value<T: AsRef<[u8]>>(value: T) -> impl Iterator<Item = GridEntry> {
         let static_ref: &'static [u8] = unsafe { std::mem::transmute(value_ref) };
         (value, static_ref)
     };
-    let record = get_root_as_phrase_record(record_ref.1);
-    let rs_vec =
-        get_vector::<RelevScore>(record_ref.1, &record._tab, PhraseRecord::VT_RELEV_SCORES)
-            .unwrap();
-    let id_vec =
-        get_vector::<IdList>(record_ref.1, &record._tab, PhraseRecord::VT_ID_LISTS).unwrap();
+    let reader = gridstore_format::Reader::new(record_ref.1);
+    let record = {
+        gridstore_format::read_phrase_record_from(&reader)
+    };
 
-    let iter = rs_vec.iter().flat_map(move |rs_obj| {
+    let iter = gridstore_format::read_vec_raw(record_ref.1, record.relev_scores).into_iter().flat_map(move |rs_obj| {
         // grab a reference to the outer object to make sure it doesn't get freed
         let _ref = &record_ref;
 
-        let relev_score = rs_obj.relev_score();
+        let relev_score = rs_obj.relev_score;
         let relev = relev_int_to_float(relev_score >> 4);
         // mask for the least significant four bits
         let score = relev_score & 15;
 
-        let coords = rs_obj.coords().unwrap();
+        let nested_ref = record_ref.1;
+        gridstore_format::read_vec_raw(record_ref.1, rs_obj.coords).into_iter().flat_map(move |coords_obj| {
+            let (x, y) = deinterleave_morton(coords_obj.coord);
 
-        coords.into_iter().flat_map(move |coords_obj| {
-            let (x, y) = deinterleave_morton(coords_obj.coord());
-            let id_list_idx = coords_obj.id_list() as usize;
-
-            let ids = id_vec.get(id_list_idx).ids();
-
-            ids.unwrap().iter().map(move |id_comp| {
+            gridstore_format::read_vec_raw(nested_ref, coords_obj.ids).into_iter().map(move |id_comp| {
                 let id = id_comp >> 8;
                 let source_phrase_hash = (id_comp & 255) as u8;
                 GridEntry { relev, score, x, y, id, source_phrase_hash }
@@ -165,46 +140,44 @@ impl GridStore {
         // DB entries into a single set
         let mut coords_for_relev = BTreeMap::new();
         for record_ref in &record_refs {
-            let record = get_root_as_phrase_record(record_ref.1);
-            let rs_vec =
-                get_vector::<RelevScore>(record_ref.1, &record._tab, PhraseRecord::VT_RELEV_SCORES)
-                    .unwrap();
-            let id_list_vec =
-                get_vector::<IdList>(record_ref.1, &record._tab, PhraseRecord::VT_ID_LISTS)
-                    .unwrap();
+            let record: gridstore_format::PhraseRecord = {
+                let reader = gridstore_format::Reader::new(&record_ref.1);
+                reader.read_root()
+            };
 
+            let rs_vec = gridstore_format::read_vec_raw(record_ref.1, record.relev_scores);
             let matches_language = record_ref.2;
 
-            for rs_obj in rs_vec {
-                let relev_score = rs_obj.relev_score();
+            for rs_obj in rs_vec.into_iter() {
+                let relev_score = rs_obj.relev_score;
                 let relev = relev_int_to_float(relev_score >> 4);
                 // mask for the least significant four bits
                 let score = relev_score & 15;
 
-                let coords_vec = rs_obj.coords().unwrap();
+                let coords_vec = gridstore_format::read_vec_raw(record_ref.1, rs_obj.coords);
                 // TODO could this be a reference? The compiler was saying:
                 // "cannot move out of captured variable in an `FnMut` closure"
                 // "help: consider borrowing here: `&match_opts`rustc(E0507)""
                 let coords = match &match_opts {
                     MatchOpts { bbox: None, proximity: None, .. } => {
-                        Some(Box::new(coords_vec.into_iter()) as Box<Iterator<Item = &Coord>>)
+                        Some(Box::new(coords_vec.into_iter()) as Box<Iterator<Item = gridstore_format::Coord>>)
                     }
                     MatchOpts { bbox: Some(bbox), proximity: None, .. } => {
                         // TODO should the bbox argument be changed to a reference in bbox? The compiler was complaining
                         match spatial::bbox_filter(coords_vec, *bbox) {
-                            Some(v) => Some(Box::new(v) as Box<Iterator<Item = &Coord>>),
+                            Some(v) => Some(Box::new(v) as Box<Iterator<Item = gridstore_format::Coord>>),
                             None => None,
                         }
                     }
                     MatchOpts { bbox: None, proximity: Some(prox_pt), .. } => {
                         match spatial::proximity(coords_vec, prox_pt.point) {
-                            Some(v) => Some(Box::new(v) as Box<Iterator<Item = &Coord>>),
+                            Some(v) => Some(Box::new(v) as Box<Iterator<Item = gridstore_format::Coord>>),
                             None => None,
                         }
                     }
                     MatchOpts { bbox: Some(bbox), proximity: Some(prox_pt), .. } => {
                         match spatial::bbox_proximity_filter(coords_vec, *bbox, prox_pt.point) {
-                            Some(v) => Some(Box::new(v) as Box<Iterator<Item = &Coord>>),
+                            Some(v) => Some(Box::new(v) as Box<Iterator<Item = gridstore_format::Coord>>),
                             None => None,
                         }
                     }
@@ -213,14 +186,14 @@ impl GridStore {
                 if coords.is_some() {
                     let slot =
                         coords_for_relev.entry(OrderedFloat(relev)).or_insert_with(|| vec![]);
-                    slot.push((score, matches_language, coords.unwrap(), id_list_vec.clone()));
+                    slot.push((score, matches_language, coords.unwrap(), record_ref.1));
                 }
             }
         }
 
-        struct SortGroup<'a> {
-            coords: Coord,
-            id_lists: flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<IdList<'a>>>,
+        struct SortGroup {
+            coord: gridstore_format::Coord,
+            buffer: &'static [u8],
             scoredist: f64,
             x: u16,
             y: u16,
@@ -240,11 +213,10 @@ impl GridStore {
             // for each relev/score, lazily k-way-merge the child entities by z-order curve value
             let merged = coord_sets
                 .into_iter()
-                .map(move |(score, matches_language, coord_vec, id_lists)| {
+                .map(move |(score, matches_language, coord_vec, buffer)| {
                     let match_opts = match_opts.clone();
-                    coord_vec.map(move |coords| {
-                        let coord = coords.coord();
-                        let (x, y) = deinterleave_morton(coord);
+                    coord_vec.map(move |coord| {
+                        let (x, y) = deinterleave_morton(coord.coord);
                         let (distance, within_radius, scoredist) = match &match_opts {
                             MatchOpts { proximity: Some(prox_pt), zoom, .. } => {
                                 let distance =
@@ -260,8 +232,8 @@ impl GridStore {
                             _ => (0f64, false, score as f64),
                         };
                         SortGroup {
-                            coords: *coords,
-                            id_lists,
+                            coord,
+                            buffer,
                             scoredist,
                             x,
                             y,
@@ -296,19 +268,17 @@ impl GridStore {
                             score = coords_obj_group[0].score;
                             distance = coords_obj_group[0].distance;
 
-                            let id_list_idx = coords_obj_group[0].coords.id_list() as usize;
-                            let ids = coords_obj_group[0].id_lists.get(id_list_idx).ids();
+                            let ids = gridstore_format::read_vec_raw(coords_obj_group[0].buffer, coords_obj_group[0].coord.ids);
 
-                            ids.unwrap().iter().collect()
+                            ids.into_iter().collect()
                         }
                         _ => {
                             let mut ids = Vec::new();
                             score = coords_obj_group[0].score;
                             distance = coords_obj_group[0].distance;
                             for group in coords_obj_group {
-                                let id_list_idx = group.coords.id_list() as usize;
-                                let fb_ids = group.id_lists.get(id_list_idx).ids();
-                                ids.extend(fb_ids.unwrap().iter());
+                                let ids_vec = gridstore_format::read_vec_raw(group.buffer, group.coord.ids);
+                                ids.extend(ids_vec.into_iter());
                             }
                             ids.sort_by(|a, b| b.cmp(a));
                             ids.dedup();

@@ -7,7 +7,6 @@ use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize, Serializer};
 
 use crate::gridstore::store::GridStore;
-use crate::gridstore::gridstore_format;
 
 #[derive(Serialize, Deserialize, Debug, PartialOrd, Ord, PartialEq, Eq, Clone)]
 pub struct GridKey {
