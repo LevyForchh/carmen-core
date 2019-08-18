@@ -24,7 +24,7 @@ matrix:
       - cargo test
 
       after_success: |
-        cargo kcov
+        cargo kcov -v
         bash <(curl -s https://codecov.io/bash)
 
     - language: node_js
