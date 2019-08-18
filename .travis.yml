@@ -21,10 +21,8 @@ matrix:
       cache: cargo
       rust: nightly
 
-      before_cache:
-      - cargo +nightly install cargo-tarpaulin -f
-
       script: |
+        cargo +nightly install cargo-tarpaulin -f
         cargo +nightly tarpaulin --out Xml
         bash <(curl -s https://codecov.io/bash)
 
