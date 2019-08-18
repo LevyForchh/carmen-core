@@ -9,17 +9,23 @@ matrix:
       before_script:
       - rustup component add rustfmt
 
-      before_cache:
-      - cargo install cargo-tarpaulin -f
-
       script:
       - cargo clean
       - cargo fmt --all -- --check
       - cargo build
       - cargo test
 
-      after_success: |
-        cargo tarpaulin --out Xml
+    - language: rust
+      sudo: required
+      dist: xenial
+      cache: cargo
+      rust: nightly
+
+      before_cache:
+      - cargo +nightly install cargo-tarpaulin -f
+
+      script: |
+        cargo +nightly tarpaulin --out Xml
         bash <(curl -s https://codecov.io/bash)
 
     - language: node_js
