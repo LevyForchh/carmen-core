@@ -24,11 +24,11 @@ matrix:
       before_install:
       - sudo add-apt-repository ppa:sivakov512/kcov -y
       - sudo apt-get update -q
-      - sudo apt-get install kcov
+      - sudo apt-get install kcov nodejs
 
       script: |
         cargo install cargo-kcov -f
-        cargo kcov -v
+        node keepalive.js cargo kcov -v
         bash <(curl -s https://codecov.io/bash)
 
     - language: node_js
