@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use failure::{Error, Fail};
 use itertools::Itertools;
 use morton::interleave_morton;
-use rocksdb::DB;
+use rocksdb::{DBCompressionType, Options, DB};
 
 use crate::gridstore::common::*;
 use crate::gridstore::gridstore_generated::*;
@@ -121,7 +121,12 @@ impl GridStoreBuilder {
 
     /// Writes data to disk.
     pub fn finish(mut self) -> Result<(), Error> {
-        let db = DB::open_default(&self.path)?;
+        let mut opts = Options::default();
+        opts.set_disable_auto_compactions(true);
+        opts.set_compression_type(DBCompressionType::Lz4hc);
+        opts.create_if_missing(true);
+
+        let db = DB::open(&opts, &self.path)?;
         let mut db_key: Vec<u8> = Vec::with_capacity(MAX_KEY_LENGTH);
 
         let grouped = self.data.iter_mut().group_by(|(key, _value)| (key.phrase_id >> 10) << 10);
@@ -151,6 +156,7 @@ impl GridStoreBuilder {
             }
         }
 
+        db.compact_range(None::<&[u8]>, None::<&[u8]>);
         drop(db);
         Ok(())
     }

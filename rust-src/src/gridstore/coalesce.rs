@@ -2,6 +2,7 @@ use std::borrow::Borrow;
 use std::cmp::Reverse;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
+use std::fmt::Debug;
 
 use failure::Error;
 use itertools::Itertools;
@@ -12,7 +13,7 @@ use crate::gridstore::store::GridStore;
 
 /// Takes a vector of phrasematch subqueries (stack) and match options, gets matching grids, sorts the grids,
 /// and returns a result of a sorted vector of contexts (lists of grids with added metadata)
-pub fn coalesce<T: Borrow<GridStore> + Clone>(
+pub fn coalesce<T: Borrow<GridStore> + Clone + Debug>(
     stack: Vec<PhrasematchSubquery<T>>,
     match_opts: &MatchOpts,
 ) -> Result<Vec<CoalesceContext>, Error> {

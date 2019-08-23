@@ -13,7 +13,7 @@ pub fn benchmark(c: &mut Criterion) {
 
     // Load data for coalesce single from json into a store
     let filepath = Path::new("benches/data/coalesce-bench-single-3848571113.json");
-    let grid_entries = load_grids_from_json(&filepath).unwrap();
+    let grid_entries = load_simple_grids_from_json(&filepath).unwrap();
     let store_single_rc = Rc::new(create_store(vec![StoreEntryBuildingBlock {
         grid_key: GridKey { phrase_id: 1, lang_set: 1 },
         entries: grid_entries,
@@ -83,14 +83,14 @@ pub fn benchmark(c: &mut Criterion) {
 
     // Load data for coalesce multi from json into stores
     let filepath = Path::new("benches/data/coalesce-bench-multi-1965155344.json");
-    let grid_entries = load_grids_from_json(&filepath).unwrap();
+    let grid_entries = load_simple_grids_from_json(&filepath).unwrap();
     let store_multi1_rc = Rc::new(create_store(vec![StoreEntryBuildingBlock {
         grid_key: GridKey { phrase_id: 1, lang_set: 1 },
         entries: grid_entries,
     }]));
 
     let filepath = Path::new("benches/data/coalesce-bench-multi-3848571113.json");
-    let grid_entries = load_grids_from_json(&filepath).unwrap();
+    let grid_entries = load_simple_grids_from_json(&filepath).unwrap();
     let store_multi2_rc = Rc::new(create_store(vec![StoreEntryBuildingBlock {
         grid_key: GridKey { phrase_id: 2, lang_set: 1 },
         entries: grid_entries,
