@@ -13,6 +13,7 @@ pub use store::*;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeMap;
 
     #[test]
     fn combined_test() {
@@ -434,7 +435,17 @@ mod tests {
         let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
         let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
 
-        for i in 0..=2400 {
+        let alphabet = "abcdefghijklmnopqrstuvwxyz";
+        let phrases: Vec<String> = alphabet.bytes().flat_map(move |l1| {
+            alphabet.bytes().flat_map(move |l2| {
+                alphabet.bytes().map(move |l3| {
+                    String::from_utf8(vec![l1, l2, l3]).unwrap()
+                })
+            })
+        }).take(5000).collect();
+
+        // insert phrases
+        for i in 0..=(phrases.len() as u32) {
             let key = GridKey { phrase_id: i, lang_set: 1 };
             let entries = vec![GridEntry {
                 id: i,
@@ -447,16 +458,47 @@ mod tests {
             builder.insert(&key, entries).expect("Unable to insert record");
         }
 
+        // calculate bins
+        let mut bins: BTreeMap<u8, u32> = BTreeMap::new();
+        for (i, phrase) in phrases.iter().enumerate() {
+            // insert the first occurrence of every prefix
+            bins.entry(phrase.bytes().next().unwrap()).or_insert(i as u32);
+        }
+        let mut boundaries: Vec<_> = bins.values().cloned().collect();
+        boundaries.push(phrases.len() as u32);
+
+        builder.load_bin_boundaries(boundaries);
+
         builder.finish().unwrap();
 
         let reader = GridStore::new(directory.path()).unwrap();
+
+        let find_range = |prefix: &str| {
+            let start = phrases
+                .iter()
+                .enumerate()
+                .find(|(_, phrase)| phrase.starts_with(prefix))
+                .unwrap().0;
+            let end = phrases
+                .iter()
+                .enumerate()
+                .rev()
+                .find(|(_, phrase)| phrase.starts_with(prefix))
+                .unwrap().0 + 1;
+            (start as u32, end as u32)
+        };
+
+        let starts_with_b = find_range("b");
+        let starts_with_bc = find_range("bc");
+
+        // query that we expect to use the pre-cached ranges
         let search_key =
-            MatchKey { match_phrase: MatchPhrase::Range { start: 800, end: 2049 }, lang_set: 1 };
+            MatchKey { match_phrase: MatchPhrase::Range { start: starts_with_b.0, end: starts_with_b.1 }, lang_set: 1 };
         let mut records: Vec<_> =
             reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
         records.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let mut expected = Vec::new();
-        for i in 800..=2048 {
+        for i in starts_with_b.0..starts_with_b.1 {
             expected.push(MatchEntry {
                 grid_entry: GridEntry {
                     relev: 1.0,
@@ -473,61 +515,14 @@ mod tests {
         }
         assert_eq!(records, expected);
 
+        // query that we expect not to use the precached ranges
         let search_key =
-            MatchKey { match_phrase: MatchPhrase::Range { start: 1024, end: 2049 }, lang_set: 1 };
-        let mut records: Vec<_> =
-            reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
-        records.sort_by(|a, b| a.partial_cmp(b).unwrap());
-
-        let mut expected = Vec::new();
-        for i in 1024..=2048 {
-            expected.push(MatchEntry {
-                grid_entry: GridEntry {
-                    relev: 1.0,
-                    score: 1,
-                    x: i as u16,
-                    y: 1,
-                    id: i,
-                    source_phrase_hash: 0,
-                },
-                matches_language: true,
-                distance: 0.0,
-                scoredist: 1.0,
-            })
-        }
-        assert_eq!(records, expected);
-
-        let search_key =
-            MatchKey { match_phrase: MatchPhrase::Range { start: 1000, end: 2024 }, lang_set: 1 };
-        let mut records: Vec<_> =
-            reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
-
-        records.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        let mut expected = Vec::new();
-        for i in 1000..=2023 {
-            expected.push(MatchEntry {
-                grid_entry: GridEntry {
-                    relev: 1.0,
-                    score: 1,
-                    x: i as u16,
-                    y: 1,
-                    id: i,
-                    source_phrase_hash: 0,
-                },
-                matches_language: true,
-                distance: 0.0,
-                scoredist: 1.0,
-            })
-        }
-        assert_eq!(records, expected);
-
-        let search_key =
-            MatchKey { match_phrase: MatchPhrase::Range { start: 1024, end: 2048 }, lang_set: 1 };
+            MatchKey { match_phrase: MatchPhrase::Range { start: starts_with_bc.0, end: starts_with_bc.1 }, lang_set: 1 };
         let mut records: Vec<_> =
             reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
         records.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let mut expected = Vec::new();
-        for i in 1024..=2047 {
+        for i in starts_with_bc.0..starts_with_bc.1 {
             expected.push(MatchEntry {
                 grid_entry: GridEntry {
                     relev: 1.0,

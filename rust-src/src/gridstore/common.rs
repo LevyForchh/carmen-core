@@ -394,11 +394,11 @@ pub fn relev_int_to_float(relev: u8) -> f64 {
 // the itertools version
 pub fn somewhat_eager_groupby<T: Iterator, F, K>(
     mut it: T,
-    key: F,
+    mut key: F,
 ) -> impl Iterator<Item = (K, Vec<T::Item>)>
 where
     K: Sized + Copy + PartialEq,
-    F: Fn(&T::Item) -> K,
+    F: FnMut(&T::Item) -> K,
 {
     let mut curr_key: Option<K> = None;
     let mut running_group: Vec<T::Item> = Vec::new();

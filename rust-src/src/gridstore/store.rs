@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
+use std::convert::TryInto;
 use std::path::{Path, PathBuf};
 
 use byteorder::{BigEndian, ReadBytesExt};
@@ -16,6 +17,7 @@ use crate::gridstore::spatial;
 #[derive(Debug)]
 pub struct GridStore {
     db: DB,
+    bin_boundaries: HashSet<u32>,
     pub path: PathBuf,
 }
 
@@ -68,7 +70,22 @@ impl GridStore {
         opts.set_compression_type(DBCompressionType::Lz4hc);
         opts.set_allow_mmap_reads(true);
         let db = DB::open(&opts, &path)?;
-        Ok(GridStore { db, path })
+
+        let bin_boundaries: HashSet<u32> = match db.get("~BOUNDS")? {
+            Some(entry) => {
+                let encoded_boundaries: &[u8] = entry.as_ref();
+                encoded_boundaries.chunks(4).filter_map(|chunk| {
+                    if chunk.len() == 4 {
+                        Some(u32::from_le_bytes(chunk.try_into().unwrap()))
+                    } else {
+                        None
+                    }
+                }).collect()
+            },
+            None => HashSet::new()
+        };
+
+        Ok(GridStore { db, path, bin_boundaries })
     }
 
     #[inline(never)]
@@ -89,51 +106,39 @@ impl GridStore {
         match_key: &MatchKey,
         match_opts: &MatchOpts,
     ) -> Result<impl Iterator<Item = MatchEntry>, Error> {
-        let mut range_list: Vec<(u32, u32, u8)> = Vec::new();
-        match match_key.match_phrase {
-            MatchPhrase::Exact(id) => range_list.push((id, id + 1, 0)),
+        let (fetch_start, fetch_end, fetch_type_marker) = match match_key.match_phrase {
+            MatchPhrase::Exact(id) => (id, id + 1, 0),
             MatchPhrase::Range { start, end } => {
-                let remainder = start % 1024;
-                let prefix_start = if remainder == 0 { start } else { start + (1024 - remainder) };
-                let remainder = end % 1024;
-                let prefix_end = if remainder == 0 { end } else { end - remainder };
-                if prefix_start >= prefix_end {
-                    range_list.push((start, end, 0));
+                if self.bin_boundaries.contains(&start) && self.bin_boundaries.contains(&end) {
+                    (start, end, 1)
                 } else {
-                    if start != prefix_start {
-                        range_list.push((start, prefix_start, 0));
-                    }
-                    range_list.push((prefix_start, prefix_end, 1));
-                    if end != prefix_end {
-                        range_list.push((prefix_end, end, 0));
-                    }
+                    (start, end, 0)
                 }
             }
-        }
+        };
 
         let match_opts = match_opts.clone();
         let mut record_refs: Vec<(Box<[u8]>, &'static [u8], bool)> = Vec::new();
-        for (start, end, type_marker) in range_list {
-            let mut range_key = match_key.clone();
-            range_key.match_phrase = MatchPhrase::Range { start, end };
-            let mut db_key: Vec<u8> = Vec::new();
-            range_key.write_start_to(type_marker, &mut db_key)?;
 
-            let db_iter = self
-                .db
-                .iterator(IteratorMode::From(&db_key, Direction::Forward))
-                .take_while(|(k, _)| range_key.matches_key(type_marker, k).unwrap());
+        let mut range_key = match_key.clone();
+        range_key.match_phrase = MatchPhrase::Range { start: fetch_start, end: fetch_end };
+        let mut db_key: Vec<u8> = Vec::new();
+        range_key.write_start_to(fetch_type_marker, &mut db_key)?;
 
-            for (key, value) in db_iter {
-                let matches_language = match_key.matches_language(&key).unwrap();
-                let record_ref = {
-                    let value_ref: &[u8] = value.as_ref();
-                    // same approach as in get above -- maybe sketchy
-                    let static_ref: &'static [u8] = unsafe { std::mem::transmute(value_ref) };
-                    (value, static_ref, matches_language)
-                };
-                record_refs.push(record_ref);
-            }
+        let db_iter = self
+            .db
+            .iterator(IteratorMode::From(&db_key, Direction::Forward))
+            .take_while(|(k, _)| range_key.matches_key(fetch_type_marker, k).unwrap());
+
+        for (key, value) in db_iter {
+            let matches_language = match_key.matches_language(&key).unwrap();
+            let record_ref = {
+                let value_ref: &[u8] = value.as_ref();
+                // same approach as in get above -- maybe sketchy
+                let static_ref: &'static [u8] = unsafe { std::mem::transmute(value_ref) };
+                (value, static_ref, matches_language)
+            };
+            record_refs.push(record_ref);
         }
 
         // eagerly bucket all the relev/score chunks from all the groups

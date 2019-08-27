@@ -16,6 +16,7 @@ type BuilderEntry = HashMap<u8, HashMap<u32, SmallVec<[u32; 4]>>>;
 pub struct GridStoreBuilder {
     path: PathBuf,
     data: BTreeMap<GridKey, BuilderEntry>,
+    bin_boundaries: Vec<u32>
 }
 
 /// Extends a BuildEntry with the given values.
@@ -96,7 +97,7 @@ fn get_encoded_value(value: BuilderEntry) -> Result<Vec<u8>, Error> {
 impl GridStoreBuilder {
     /// Makes a new GridStoreBuilder with a particular filename.
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
-        Ok(GridStoreBuilder { path: path.as_ref().to_owned(), data: BTreeMap::new() })
+        Ok(GridStoreBuilder { path: path.as_ref().to_owned(), data: BTreeMap::new(), bin_boundaries: Vec::new() })
     }
 
     /// Inserts a new GridStore entry with the given values.
@@ -158,6 +159,11 @@ impl GridStoreBuilder {
         Ok(())
     }
 
+    pub fn load_bin_boundaries(&mut self, bin_boundaries: Vec<u32>) -> Result<(), Error> {
+        self.bin_boundaries = bin_boundaries;
+        Ok(())
+    }
+
     /// Writes data to disk.
     pub fn finish(self) -> Result<(), Error> {
         let mut opts = Options::default();
@@ -168,8 +174,16 @@ impl GridStoreBuilder {
         let db = DB::open(&opts, &self.path)?;
         let mut db_key: Vec<u8> = Vec::with_capacity(MAX_KEY_LENGTH);
 
+        let mut bin_seq = self.bin_boundaries.iter().cloned().peekable();
+        let mut current_bin = None;
+        let mut next_boundary = 0u32;
         let grouped = somewhat_eager_groupby(self.data.into_iter(), |(key, _value)| {
-            (key.phrase_id >> 10) << 10
+            while key.phrase_id >= next_boundary {
+                current_bin = bin_seq.next();
+                next_boundary = *(bin_seq.peek().unwrap_or(&std::u32::MAX));
+            }
+
+            current_bin
         });
 
         for (group_id, group_value) in grouped {
@@ -188,14 +202,23 @@ impl GridStoreBuilder {
                 let db_data = get_encoded_value(value)?;
                 db.put(&db_key, &db_data)?;
             }
-            for (lang_set, builder_entry) in lang_set_map.into_iter() {
-                db_key.clear();
-                let group_key = GridKey { phrase_id: group_id, lang_set };
-                group_key.write_to(1, &mut db_key)?;
-                let grouped_db_data = get_encoded_value(builder_entry)?;
-                db.put(&db_key, &grouped_db_data)?;
+            if let Some(group_id) = group_id {
+                for (lang_set, builder_entry) in lang_set_map.into_iter() {
+                    db_key.clear();
+                    let group_key = GridKey { phrase_id: group_id, lang_set };
+                    group_key.write_to(1, &mut db_key)?;
+                    let grouped_db_data = get_encoded_value(builder_entry)?;
+                    db.put(&db_key, &grouped_db_data)?;
+                }
             }
         }
+
+        // bake the prefix boundaries
+        let mut encoded_boundaries: Vec<u8> = Vec::with_capacity(self.bin_boundaries.len() * 4);
+        for boundary in self.bin_boundaries {
+            encoded_boundaries.extend_from_slice(&boundary.to_le_bytes());
+        }
+        db.put("~BOUNDS", &encoded_boundaries)?;
 
         db.compact_range(None::<&[u8]>, None::<&[u8]>);
         drop(db);
