@@ -108,7 +108,7 @@ declare_types! {
             }
         }
 
-        method compact_append(mut cx) {
+        method compactAppend(mut cx) {
             let grid_key = cx.argument::<JsObject>(0)?;
             let phrase_id: u32 = grid_key
                 .get(&mut cx, "phrase_id")?
@@ -167,6 +167,39 @@ declare_types! {
                             }
                             None => {
                                 Err("can't call renumber after finish()".to_owned())
+                            }
+                        }
+                    },
+                    Err(e) => Err(e.to_string())
+                };
+
+                borrow_result
+            };
+
+            match result {
+                Ok(_) => Ok(JsUndefined::new().upcast()),
+                Err(e) => cx.throw_type_error(e)
+            }
+        }
+
+        method loadBinBoundaries(mut cx) {
+            let bin_boundaries = cx.argument::<JsArrayBuffer>(0)?;
+            let mut this = cx.this();
+
+            let result: Result<(), String> = {
+                let lock = cx.lock();
+
+                let borrow_result = match bin_boundaries.try_borrow(&lock) {
+                    Ok(data) => {
+                        let slice = data.as_slice::<u32>();
+
+                        let mut gridstore = this.borrow_mut(&lock);
+                        match gridstore.as_mut() {
+                            Some(builder) => {
+                                builder.load_bin_boundaries(slice.to_vec()).map_err(|e| e.to_string())
+                            }
+                            None => {
+                                Err("can't call loadBinBoundaries after finish()".to_owned())
                             }
                         }
                     },
