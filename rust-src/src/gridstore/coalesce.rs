@@ -69,7 +69,9 @@ fn coalesce_single<T: Borrow<GridStore> + Clone>(
     subquery: &PhrasematchSubquery<T>,
     match_opts: &MatchOpts,
 ) -> Result<Vec<CoalesceContext>, Error> {
-    let grids = subquery.store.borrow().get_matching(&subquery.match_key, match_opts)?;
+    let bigger_max = 2 * MAX_CONTEXTS;
+
+    let grids = subquery.store.borrow().streaming_get_matching(&subquery.match_key, match_opts, bigger_max)?;
     let mut max_relev: f64 = 0.;
     // TODO: rename all of the last things to previous things
     let mut last_id: u32 = 0;
@@ -77,7 +79,6 @@ fn coalesce_single<T: Borrow<GridStore> + Clone>(
     let mut last_scoredist: f64 = 0.;
     let mut min_scoredist = std::f64::MAX;
     let mut feature_count: usize = 0;
-    let bigger_max = 2 * MAX_CONTEXTS;
 
     let mut coalesced: HashMap<(u32), CoalesceEntry> = HashMap::new();
 
@@ -189,7 +190,7 @@ fn coalesce_multi<T: Borrow<GridStore> + Clone>(
         // That way we could avoid a function call and creating a cloned object in the common case where the zooms are the same
         let adjusted_match_opts = match_opts.adjust_to_zoom(subquery.zoom);
         let grids =
-            subquery.store.borrow().get_matching(&subquery.match_key, &adjusted_match_opts)?;
+            subquery.store.borrow().streaming_get_matching(&subquery.match_key, &adjusted_match_opts, 100_000)?;
 
         // limit to 100,000 records -- we may want to experiment with this number; it was 500k in
         // carmen-cache, but hopefully we're sorting more intelligently on the way in here so
