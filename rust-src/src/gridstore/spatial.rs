@@ -88,9 +88,9 @@ pub fn proximity<'a>(
     };
 
     let getter = move |i| coords.get(i as usize);
-    let head = Box::new((0..prox_mid).rev().map(getter)) as Box<Iterator<Item = Coord>>;
-    let tail = Box::new((prox_mid..len).map(getter)) as Box<Iterator<Item = Coord>>;
-    let coord_sets = vec![head, tail].into_iter().kmerge_by(move |a, b| {
+    let head = (0..prox_mid).rev().map(getter);
+    let tail = (prox_mid..len).map(getter);
+    let coord_sets = head.into_iter().merge_by(tail.into_iter(), move |a, b| {
         let d1 = (a.coord as i64 - prox_pt) as i64;
         let d2 = (b.coord as i64 - prox_pt) as i64;
         d1.abs().cmp(&d2.abs()) == Less
@@ -129,11 +129,9 @@ pub fn bbox_proximity_filter<'a>(
         };
     };
 
-    let head = Box::new((range.0..prox_mid).rev().filter_map(filtered_get))
-        as Box<Iterator<Item = Coord>>;
-    let tail =
-        Box::new((prox_mid..=range.1).filter_map(filtered_get)) as Box<Iterator<Item = Coord>>;
-    let coord_sets = vec![head, tail].into_iter().kmerge_by(move |a, b| {
+    let head = (range.0..prox_mid).rev().filter_map(filtered_get);
+    let tail = (prox_mid..=range.1).filter_map(filtered_get);
+    let coord_sets = head.into_iter().merge_by(tail.into_iter(), move |a, b| {
         let d1 = (a.coord as i64 - prox_pt) as i64;
         let d2 = (b.coord as i64 - prox_pt) as i64;
         d1.abs().cmp(&d2.abs()) == Less
