@@ -9,6 +9,7 @@ path = "rust-src/src/lib.rs"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
+min-max-heap = "1.2"
 # use https://github.com/apendleton/morton/tree/modernize because upstream
 # doesn't work on rust stable
 morton = { git = "https://github.com/apendleton/morton.git", rev = "d892e8f2759aa2de29629232946db47924f1802e" }
@@ -37,6 +38,6 @@ harness = false
 # https://github.com/rust-rocksdb/rust-rocksdb/pull/268 lands
 [dependencies.rocksdb]
 git = "https://github.com/apendleton/rust-rocksdb.git"
-rev = "f6a9d278262f090790578dbf435e591748c4622e"
+rev = "a456e3c5c5ecb512f8be3c2a429cd4358029a395"
 default-features = false
 features = ["lz4"]
