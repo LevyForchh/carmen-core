@@ -280,7 +280,6 @@ impl GridStore {
         };
 
         let match_opts = match_opts.clone();
-        let mut record_refs: Vec<(Box<[u8]>, &'static [u8], bool)> = Vec::new();
 
         let mut range_key = match_key.clone();
         range_key.match_phrase = MatchPhrase::Range { start: fetch_start, end: fetch_end };
@@ -313,14 +312,12 @@ impl GridStore {
         }
 
         let iter = std::iter::from_fn(move || {
-            let _ref = &record_refs;
-            if pri_queue.len() > 0 {
-                let mut best_entry = pri_queue.pop_max().unwrap();
+            if let Some(mut best_entry) = pri_queue.peek_max_mut() {
                 if let Some(mut next_entry) = best_entry.entry_iter.next() {
                     std::mem::swap(&mut next_entry, &mut (best_entry.next_entry));
-                    pri_queue.push(best_entry);
                     Some(next_entry)
                 } else {
+                    let best_entry = best_entry.pop();
                     Some(best_entry.next_entry)
                 }
             } else {
