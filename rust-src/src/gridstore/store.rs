@@ -290,18 +290,26 @@ impl GridStore {
 
         let mut pri_queue = MinMaxHeap::<QueueElement<_>>::new();
         scope(|sc| {
-            let db = &self.db;
             let (sender, receiver) = unbounded();
-            sc.spawn(move |_| {
-                let db_iter = db
+            let iter: Box<dyn Iterator<Item = (std::boxed::Box<[u8]>, std::boxed::Box<[u8]>)>> = if fetch_type_marker == 1 {
+                let db = &self.db;
+                sc.spawn(move |_| {
+                    let db_iter = db
+                        .iterator(IteratorMode::From(&db_key, Direction::Forward))
+                        .take_while(|(k, _)| range_key.matches_key(fetch_type_marker, k).unwrap());
+                    for key_value in db_iter {
+                        sender.send(key_value).unwrap();
+                    }
+                });
+                Box::new(receiver.iter())
+            } else {
+                let db_iter = self.db
                     .iterator(IteratorMode::From(&db_key, Direction::Forward))
                     .take_while(|(k, _)| range_key.matches_key(fetch_type_marker, k).unwrap());
-                for key_value in db_iter {
-                    sender.send(key_value).unwrap();
-                }
-            });
+                Box::new(db_iter)
+            };
 
-            for (key, value) in receiver.iter() {
+            for (key, value) in iter {
                 let matches_language = match_key.matches_language(&key).unwrap();
                 let mut entry_iter = decode_matching_value(value, &match_opts, matches_language);
                 if let Some(next_entry) = entry_iter.next() {
