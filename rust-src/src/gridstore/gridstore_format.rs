@@ -269,7 +269,7 @@ impl VarEncodable for RelevScore {
 #[derive(Copy, Clone)]
 pub struct Coord {
     pub coord: u32,
-    pub ids: VarVecOffset<VarU32>
+    pub ids: FixedVecOffset<u32>
 }
 
 impl FixedEncodable for Coord {
@@ -280,7 +280,7 @@ impl FixedEncodable for Coord {
     }
     fn read_fixed_from(buffer: &[u8], offset: ScalarOffset<Self>) -> Self {
         let coord = u32::from_le_bytes(buffer[offset.addr..(offset.addr + 4)].try_into().unwrap());
-        let ids = VarVecOffset::<VarU32>::from_fixed_pointer(buffer, offset.addr + 4);
+        let ids = FixedVecOffset::<u32>::from_fixed_pointer(buffer, offset.addr + 4);
         Coord { coord, ids }
     }
 }
@@ -293,72 +293,6 @@ impl FixedEncodable for u32 {
 
     fn read_fixed_from(buffer: &[u8], offset: ScalarOffset<Self>) -> Self {
         u32::from_le_bytes(buffer[(offset.addr as usize)..offset.addr + 4].try_into().unwrap())
-    }
-}
-
-#[derive(Copy, Clone)]
-pub struct VarU32(u32);
-
-impl VarEncodable for VarU32 {
-    fn write_to(&self, buffer: &mut Vec<u8>) -> usize {
-        let mut buf = [0u8; 8];
-        let len = self.0.encode_var(&mut buf);
-        buffer.extend_from_slice(&buf[..len]);
-        len
-    }
-
-    fn read_from(buffer: &[u8], offset: ScalarOffset<Self>) -> (Self, usize) {
-        let (val, len) = u32::decode_var(&buffer[offset.addr..]);
-        (VarU32(val), len)
-    }
-}
-
-impl<'a> VarVec<'a, VarU32> {
-    pub fn delta_write_slice_to(s: &[u32], wtr: &mut Writer) -> VarVecOffset<VarU32> {
-        let loc = wtr.data.len();
-        let mut len_buf = [0u8; 8];
-        let len_len = (s.len() as u32).encode_var(&mut len_buf);
-        wtr.data.extend_from_slice(&len_buf[..len_len]);
-        let mut prev: u32 = 0;
-        for (i, item) in s.iter().enumerate() {
-            if i == 0 {
-                VarU32(*item).write_to(&mut wtr.data);
-            } else {
-                VarU32(prev - *item).write_to(&mut wtr.data);
-            }
-            prev = *item;
-        }
-        VarVecOffset::new(loc)
-    }
-
-    pub fn delta_iter(&self) -> impl Iterator<Item = u32> + '_ {
-        let mut first: bool = true;
-        let mut prev: u32 = 0;
-        self.iter().map(move |item| {
-            let out = if first {
-                first = false;
-                item.0
-            } else {
-                prev - item.0
-            };
-            prev = item.0;
-            out
-        })
-    }
-
-    pub fn into_delta_iter(self) -> impl Iterator<Item = u32> + 'a {
-        let mut first: bool = true;
-        let mut prev: u32 = 0;
-        self.into_iter().map(move |item| {
-            let out = if first {
-                first = false;
-                item.0
-            } else {
-                prev - item.0
-            };
-            prev = item.0;
-            out
-        })
     }
 }
 
@@ -417,7 +351,7 @@ fn test_write() {
         let mut coords = Vec::new();
         for (coord, coord_group) in &rs_group.into_iter().group_by(|g| g.coord) {
             let ids: Vec<_> = coord_group.into_iter().map(|g| g.id).dedup().collect();
-            let w_ids = VarVec::<VarU32>::delta_write_slice_to(&ids, &mut writer);
+            let w_ids = writer.write_fixed_vec(&ids);
             coords.push(Coord { coord, ids: w_ids });
         }
         let w_coords = writer.write_fixed_vec(&coords);
@@ -434,7 +368,7 @@ fn test_write() {
     let mut out_grids = Vec::new();
     for rs in reader.read_var_vec(r_reader.relev_scores).iter() {
         for coord in reader.read_fixed_vec(rs.coords).iter() {
-            for id in reader.read_var_vec(coord.ids).delta_iter() {
+            for id in reader.read_fixed_vec(coord.ids).iter() {
                 out_grids.push(Grid { relev_score: rs.relev_score, coord: coord.coord, id })
             }
         }

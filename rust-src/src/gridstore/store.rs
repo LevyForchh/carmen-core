@@ -53,7 +53,7 @@ fn decode_value<T: AsRef<[u8]>>(value: T) -> impl Iterator<Item = GridEntry> {
         gridstore_format::read_fixed_vec_raw(record_ref.1, rs_obj.coords).into_iter().flat_map(move |coords_obj| {
             let (x, y) = deinterleave_morton(coords_obj.coord);
 
-            gridstore_format::read_var_vec_raw(nested_ref, coords_obj.ids).into_delta_iter().map(move |id_comp| {
+            gridstore_format::read_fixed_vec_raw(nested_ref, coords_obj.ids).into_iter().map(move |id_comp| {
                 let id = id_comp >> 8;
                 let source_phrase_hash = (id_comp & 255) as u8;
                 GridEntry { relev, score, x, y, id, source_phrase_hash }
@@ -159,9 +159,9 @@ fn decode_matching_value<T: AsRef<[u8]>>(value: T, match_opts: &MatchOpts, match
 
         let nested_ref = record_ref.1;
         all_coords.flat_map(move |(distance, within_radius, score, scoredist, x, y, coords_obj)| {
-            let ids = gridstore_format::read_var_vec_raw(nested_ref, coords_obj.ids);
+            let ids = gridstore_format::read_fixed_vec_raw(nested_ref, coords_obj.ids);
 
-            ids.into_delta_iter().map(move |id_comp| {
+            ids.into_iter().map(move |id_comp| {
                 let id = id_comp >> 8;
                 let source_phrase_hash = (id_comp & 255) as u8;
                 MatchEntry {
@@ -501,17 +501,17 @@ impl GridStore {
                             score = coords_obj_group[0].score;
                             distance = coords_obj_group[0].distance;
 
-                            let ids = gridstore_format::read_var_vec_raw(coords_obj_group[0].buffer, coords_obj_group[0].coord.ids);
+                            let ids = gridstore_format::read_fixed_vec_raw(coords_obj_group[0].buffer, coords_obj_group[0].coord.ids);
 
-                            ids.into_delta_iter().collect()
+                            ids.into_iter().collect()
                         }
                         _ => {
                             let mut ids = Vec::new();
                             score = coords_obj_group[0].score;
                             distance = coords_obj_group[0].distance;
                             for group in coords_obj_group {
-                                let ids_vec = gridstore_format::read_var_vec_raw(group.buffer, group.coord.ids);
-                                ids.extend(ids_vec.into_delta_iter());
+                                let ids_vec = gridstore_format::read_fixed_vec_raw(group.buffer, group.coord.ids);
+                                ids.extend(ids_vec.into_iter());
                             }
                             ids.sort_by(|a, b| b.cmp(a));
                             ids.dedup();
