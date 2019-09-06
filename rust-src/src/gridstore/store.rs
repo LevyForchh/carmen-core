@@ -40,7 +40,7 @@ fn decode_value<T: AsRef<[u8]>>(value: T) -> impl Iterator<Item = GridEntry> {
         gridstore_format::read_phrase_record_from(&reader)
     };
 
-    let iter = gridstore_format::read_vec_raw(record_ref.1, record.relev_scores).into_iter().flat_map(move |rs_obj| {
+    let iter = gridstore_format::read_var_vec_raw(record_ref.1, record.relev_scores).into_iter().flat_map(move |rs_obj| {
         // grab a reference to the outer object to make sure it doesn't get freed
         let _ref = &record_ref;
 
@@ -50,10 +50,10 @@ fn decode_value<T: AsRef<[u8]>>(value: T) -> impl Iterator<Item = GridEntry> {
         let score = relev_score & 15;
 
         let nested_ref = record_ref.1;
-        gridstore_format::read_vec_raw(record_ref.1, rs_obj.coords).into_iter().flat_map(move |coords_obj| {
+        gridstore_format::read_fixed_vec_raw(record_ref.1, rs_obj.coords).into_iter().flat_map(move |coords_obj| {
             let (x, y) = deinterleave_morton(coords_obj.coord);
 
-            gridstore_format::read_vec_raw(nested_ref, coords_obj.ids).into_iter().map(move |id_comp| {
+            gridstore_format::read_var_vec_raw(nested_ref, coords_obj.ids).into_delta_iter().map(move |id_comp| {
                 let id = id_comp >> 8;
                 let source_phrase_hash = (id_comp & 255) as u8;
                 GridEntry { relev, score, x, y, id, source_phrase_hash }
@@ -83,7 +83,7 @@ fn decode_matching_value<T: AsRef<[u8]>>(value: T, match_opts: &MatchOpts, match
         gridstore_format::read_phrase_record_from(&reader)
     };
 
-    let relevs = gridstore_format::read_vec_raw(record_ref.1, record.relev_scores).into_iter().map(|rs_obj| {
+    let relevs = gridstore_format::read_var_vec_raw(record_ref.1, record.relev_scores).into_iter().map(|rs_obj| {
         let relev_score = rs_obj.relev_score;
         let relev = relev_int_to_float(relev_score >> 4);
         // mask for the least significant four bits
@@ -98,7 +98,7 @@ fn decode_matching_value<T: AsRef<[u8]>>(value: T, match_opts: &MatchOpts, match
         let match_opts = match_opts.clone();
         let nested_ref = _ref.1;
         let coords_per_score = score_groups.into_iter().map(move |(_, score, rs_obj)| {
-            let coords_vec = gridstore_format::read_vec_raw(nested_ref, rs_obj.coords);
+            let coords_vec = gridstore_format::read_fixed_vec_raw(nested_ref, rs_obj.coords);
             let coords = match &match_opts {
                 MatchOpts { bbox: None, proximity: None, .. } => {
                     Some(Box::new(coords_vec.into_iter()) as Box<Iterator<Item = gridstore_format::Coord>>)
@@ -159,9 +159,9 @@ fn decode_matching_value<T: AsRef<[u8]>>(value: T, match_opts: &MatchOpts, match
 
         let nested_ref = record_ref.1;
         all_coords.flat_map(move |(distance, within_radius, score, scoredist, x, y, coords_obj)| {
-            let ids = gridstore_format::read_vec_raw(nested_ref, coords_obj.ids);
+            let ids = gridstore_format::read_var_vec_raw(nested_ref, coords_obj.ids);
 
-            ids.into_iter().map(move |id_comp| {
+            ids.into_delta_iter().map(move |id_comp| {
                 let id = id_comp >> 8;
                 let source_phrase_hash = (id_comp & 255) as u8;
                 MatchEntry {
@@ -378,7 +378,7 @@ impl GridStore {
                 reader.read_root()
             };
 
-            let rs_vec = gridstore_format::read_vec_raw(record_ref.1, record.relev_scores);
+            let rs_vec = gridstore_format::read_var_vec_raw(record_ref.1, record.relev_scores);
             let matches_language = record_ref.2;
 
             for rs_obj in rs_vec.into_iter() {
@@ -387,7 +387,7 @@ impl GridStore {
                 // mask for the least significant four bits
                 let score = relev_score & 15;
 
-                let coords_vec = gridstore_format::read_vec_raw(record_ref.1, rs_obj.coords);
+                let coords_vec = gridstore_format::read_fixed_vec_raw(record_ref.1, rs_obj.coords);
                 // TODO could this be a reference? The compiler was saying:
                 // "cannot move out of captured variable in an `FnMut` closure"
                 // "help: consider borrowing here: `&match_opts`rustc(E0507)""
@@ -501,17 +501,17 @@ impl GridStore {
                             score = coords_obj_group[0].score;
                             distance = coords_obj_group[0].distance;
 
-                            let ids = gridstore_format::read_vec_raw(coords_obj_group[0].buffer, coords_obj_group[0].coord.ids);
+                            let ids = gridstore_format::read_var_vec_raw(coords_obj_group[0].buffer, coords_obj_group[0].coord.ids);
 
-                            ids.into_iter().collect()
+                            ids.into_delta_iter().collect()
                         }
                         _ => {
                             let mut ids = Vec::new();
                             score = coords_obj_group[0].score;
                             distance = coords_obj_group[0].distance;
                             for group in coords_obj_group {
-                                let ids_vec = gridstore_format::read_vec_raw(group.buffer, group.coord.ids);
-                                ids.extend(ids_vec.into_iter());
+                                let ids_vec = gridstore_format::read_var_vec_raw(group.buffer, group.coord.ids);
+                                ids.extend(ids_vec.into_delta_iter());
                             }
                             ids.sort_by(|a, b| b.cmp(a));
                             ids.dedup();

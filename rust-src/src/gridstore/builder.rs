@@ -61,7 +61,7 @@ fn get_encoded_value(value: BuilderEntry) -> Result<Vec<u8>, Error> {
 
     let mut rses: Vec<_> = Vec::with_capacity(items.len());
 
-    let mut id_lists: HashMap<_, gridstore_format::VecOffset<u32>> = HashMap::new();
+    let mut id_lists: HashMap<_, gridstore_format::VarVecOffset<gridstore_format::VarU32>> = HashMap::new();
 
     for (rs, coord_group) in items.into_iter() {
         let mut inner_items: Vec<(_, _)> = coord_group.into_iter().collect();
@@ -75,18 +75,18 @@ fn get_encoded_value(value: BuilderEntry) -> Result<Vec<u8>, Error> {
             ids.dedup();
 
             let encoded_ids = id_lists.entry(ids.clone()).or_insert_with(|| {
-                builder.write_vec(&ids)
+                gridstore_format::VarVec::<gridstore_format::VarU32>::delta_write_slice_to(&ids, &mut builder)
             });
 
             let encoded_coord = gridstore_format::Coord { coord, ids: encoded_ids.clone() };
             coords.push(encoded_coord);
         }
-        let encoded_coords = builder.write_vec(&coords);
+        let encoded_coords = builder.write_fixed_vec(&coords);
         let encoded_rs = gridstore_format::RelevScore { relev_score: rs, coords: encoded_coords };
         rses.push(encoded_rs);
     }
 
-    let encoded_rses = builder.write_vec(&rses);
+    let encoded_rses = builder.write_var_vec(&rses);
 
     let record = gridstore_format::PhraseRecord { relev_scores: encoded_rses };
     builder.write_scalar(record);
