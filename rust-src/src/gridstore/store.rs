@@ -230,7 +230,7 @@ impl GridStore {
         let path = path.as_ref().to_owned();
         let mut opts = Options::default();
         opts.set_read_only(true);
-        opts.set_compression_type(DBCompressionType::Lz4hc);
+        opts.set_compression_type(DBCompressionType::Lz4);
         opts.set_allow_mmap_reads(true);
         let db = DB::open(&opts, &path)?;
 
