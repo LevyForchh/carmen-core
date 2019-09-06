@@ -8,6 +8,8 @@ edition = "2018"
 path = "rust-src/src/lib.rs"
 
 [dependencies]
+crossbeam = "0.7"
+crossbeam-channel = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 min-max-heap = { git = "https://github.com/apendleton/min-max-heap-rs.git", rev = "1077ab489bbc0ecc994a14990746b76d635626b3" }
 # use https://github.com/apendleton/morton/tree/modernize because upstream

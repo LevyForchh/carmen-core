@@ -4,6 +4,8 @@ use std::convert::TryInto;
 use std::path::{Path, PathBuf};
 
 use byteorder::{BigEndian, ReadBytesExt};
+use crossbeam::scope;
+use crossbeam_channel::unbounded;
 use failure::Error;
 use itertools::Itertools;
 use min_max_heap::MinMaxHeap;
@@ -286,30 +288,37 @@ impl GridStore {
         let mut db_key: Vec<u8> = Vec::new();
         range_key.write_start_to(fetch_type_marker, &mut db_key)?;
 
-        let db_iter = self
-            .db
-            .iterator(IteratorMode::From(&db_key, Direction::Forward))
-            .take_while(|(k, _)| range_key.matches_key(fetch_type_marker, k).unwrap());
-
         let mut pri_queue = MinMaxHeap::<QueueElement<_>>::new();
+        scope(|sc| {
+            let db = &self.db;
+            let (sender, receiver) = unbounded();
+            sc.spawn(move |_| {
+                let db_iter = db
+                    .iterator(IteratorMode::From(&db_key, Direction::Forward))
+                    .take_while(|(k, _)| range_key.matches_key(fetch_type_marker, k).unwrap());
+                for key_value in db_iter {
+                    sender.send(key_value).unwrap();
+                }
+            });
 
-        for (key, value) in db_iter {
-            let matches_language = match_key.matches_language(&key).unwrap();
-            let mut entry_iter = decode_matching_value(value, &match_opts, matches_language);
-            if let Some(next_entry) = entry_iter.next() {
-                let queue_element = QueueElement { next_entry, entry_iter };
-                if pri_queue.len() >= max_values {
-                    let worst_entry = pri_queue.peek_min().unwrap();
-                    if worst_entry >= &queue_element {
-                        continue;
+            for (key, value) in receiver.iter() {
+                let matches_language = match_key.matches_language(&key).unwrap();
+                let mut entry_iter = decode_matching_value(value, &match_opts, matches_language);
+                if let Some(next_entry) = entry_iter.next() {
+                    let queue_element = QueueElement { next_entry, entry_iter };
+                    if pri_queue.len() >= max_values {
+                        let worst_entry = pri_queue.peek_min().unwrap();
+                        if worst_entry >= &queue_element {
+                            continue;
+                        } else {
+                            pri_queue.replace_min(queue_element);
+                        }
                     } else {
-                        pri_queue.replace_min(queue_element);
+                        pri_queue.push(queue_element);
                     }
-                } else {
-                    pri_queue.push(queue_element);
                 }
             }
-        }
+        });
 
         let iter = std::iter::from_fn(move || {
             if let Some(mut best_entry) = pri_queue.peek_max_mut() {
