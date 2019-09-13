@@ -168,7 +168,6 @@ impl GridStoreBuilder {
     pub fn finish(self) -> Result<(), Error> {
         let mut opts = Options::default();
         opts.set_disable_auto_compactions(true);
-        opts.set_compression_type(DBCompressionType::Lz4);
         opts.create_if_missing(true);
 
         let db = DB::open(&opts, &self.path)?;
