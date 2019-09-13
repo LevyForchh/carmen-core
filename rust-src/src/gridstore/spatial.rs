@@ -1,4 +1,4 @@
-use crate::gridstore::gridstore_format::{Coord, FixedVec};
+use crate::gridstore::gridstore_format::{Coord, UniformVec};
 use itertools::Itertools;
 use morton::{deinterleave_morton, interleave_morton};
 use std::cmp::Ordering::{Equal, Greater, Less};
@@ -7,7 +7,7 @@ use std::cmp::Ordering::{Equal, Greater, Less};
 ///
 /// Returns (Some(min,max)) if the Coord Vector morton order range overlaps with the bounding box,
 /// [`None`] if the Coord Vector morton order range does not overlaps with the bounding box
-pub fn bbox_range<'a>(coords: FixedVec<'a, Coord>, bbox: [u16; 4]) -> Option<(u32, u32)> {
+pub fn bbox_range<'a>(coords: UniformVec<'a, Coord>, bbox: [u16; 4]) -> Option<(u32, u32)> {
     let min = interleave_morton(bbox[0], bbox[1]);
     let max = interleave_morton(bbox[2], bbox[3]);
     debug_assert!(min <= max, "Invalid bounding box");
@@ -49,7 +49,7 @@ pub fn bbox_range<'a>(coords: FixedVec<'a, Coord>, bbox: [u16; 4]) -> Option<(u3
 /// [`None`] otherwise. May return an Iterator that yields no results if the morton order overlaps
 /// but the actual elements are not in the bounding box.
 pub fn bbox_filter<'a>(
-    coords: FixedVec<'a, Coord>,
+    coords: UniformVec<'a, Coord>,
     bbox: [u16; 4],
 ) -> Option<impl Iterator<Item = Coord> + 'a> {
     let len = coords.len();
@@ -73,7 +73,7 @@ pub fn bbox_filter<'a>(
 /// Returns [`Some(Iterator<>`] which is a Coord Vector morton order range ordered by the z-order distance from the proximity point
 /// [`None`] if the Coord Vector is empty
 pub fn proximity<'a>(
-    coords: FixedVec<'a, Coord>,
+    coords: UniformVec<'a, Coord>,
     proximity: [u16; 2],
 ) -> Option<impl Iterator<Item = Coord> + 'a> {
     let prox_pt = interleave_morton(proximity[0], proximity[1]) as i64;
@@ -104,7 +104,7 @@ pub fn proximity<'a>(
 /// Returns [`Some(Iterator<>`] which is a Coord Vector morton order range that overlaps with a bounding box and is ordered by the z-order distance from the proximity point
 /// [`None`] if the bounding box does not overlap with the morton order range
 pub fn bbox_proximity_filter<'a>(
-    coords: FixedVec<'a, Coord>,
+    coords: UniformVec<'a, Coord>,
     bbox: [u16; 4],
     proximity: [u16; 2],
 ) -> Option<impl Iterator<Item = Coord> + 'a> {
@@ -147,7 +147,7 @@ pub fn bbox_proximity_filter<'a>(
 /// index of the matching element. If the value is less than the first element and greater than the last,
 /// [`Result::Ok'] is returned containing either 0 or the length of the Vector. A ['Results:Err'] is
 /// returned if the offset is greater to the vector length.
-fn coord_binary_search<'a>(coords: &FixedVec<'a, Coord>, val: u32, offset: u32) -> Result<u32, &'a str> {
+fn coord_binary_search<'a>(coords: &UniformVec<'a, Coord>, val: u32, offset: u32) -> Result<u32, &'a str> {
     let len = coords.len() as u32;
 
     if offset >= len {

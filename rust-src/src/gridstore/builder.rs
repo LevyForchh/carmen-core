@@ -81,7 +81,7 @@ fn get_encoded_value(value: BuilderEntry) -> Result<Vec<u8>, Error> {
             let encoded_coord = gridstore_format::Coord { coord, ids: encoded_ids.clone() };
             coords.push(encoded_coord);
         }
-        let encoded_coords = builder.write_fixed_vec(&coords);
+        let encoded_coords = builder.write_uniform_vec(&coords);
         let encoded_rs = gridstore_format::RelevScore { relev_score: rs, coords: encoded_coords };
         rses.push(encoded_rs);
     }
@@ -89,7 +89,7 @@ fn get_encoded_value(value: BuilderEntry) -> Result<Vec<u8>, Error> {
     let encoded_rses = builder.write_var_vec(&rses);
 
     let record = gridstore_format::PhraseRecord { relev_scores: encoded_rses };
-    builder.write_scalar(record);
+    builder.write_fixed_scalar(record);
 
     Ok(builder.finish())
 }

@@ -50,7 +50,7 @@ fn decode_value<T: AsRef<[u8]>>(value: T) -> impl Iterator<Item = GridEntry> {
         let score = relev_score & 15;
 
         let nested_ref = record_ref.1;
-        gridstore_format::read_fixed_vec_raw(record_ref.1, rs_obj.coords).into_iter().flat_map(move |coords_obj| {
+        gridstore_format::read_uniform_vec_raw(record_ref.1, rs_obj.coords).into_iter().flat_map(move |coords_obj| {
             let (x, y) = deinterleave_morton(coords_obj.coord);
 
             gridstore_format::read_fixed_vec_raw(nested_ref, coords_obj.ids).into_iter().map(move |id_comp| {
@@ -98,7 +98,7 @@ fn decode_matching_value<T: AsRef<[u8]>>(value: T, match_opts: &MatchOpts, match
         let match_opts = match_opts.clone();
         let nested_ref = _ref.1;
         let coords_per_score = score_groups.into_iter().map(move |(_, score, rs_obj)| {
-            let coords_vec = gridstore_format::read_fixed_vec_raw(nested_ref, rs_obj.coords);
+            let coords_vec = gridstore_format::read_uniform_vec_raw(nested_ref, rs_obj.coords);
             let coords = match &match_opts {
                 MatchOpts { bbox: None, proximity: None, .. } => {
                     Some(Box::new(coords_vec.into_iter()) as Box<Iterator<Item = gridstore_format::Coord>>)
@@ -387,7 +387,7 @@ impl GridStore {
                 // mask for the least significant four bits
                 let score = relev_score & 15;
 
-                let coords_vec = gridstore_format::read_fixed_vec_raw(record_ref.1, rs_obj.coords);
+                let coords_vec = gridstore_format::read_uniform_vec_raw(record_ref.1, rs_obj.coords);
                 // TODO could this be a reference? The compiler was saying:
                 // "cannot move out of captured variable in an `FnMut` closure"
                 // "help: consider borrowing here: `&match_opts`rustc(E0507)""
