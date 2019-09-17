@@ -251,6 +251,7 @@ impl GridStore {
         let mut opts = Options::default();
         opts.set_read_only(true);
         opts.set_allow_mmap_reads(true);
+        opts.set_compression_type(DBCompressionType::None);
         let mut read_opts = ReadOptions::default();
         read_opts.set_verify_checksum(false);
         let db = DB::open(&opts, &path)?;
@@ -294,6 +295,8 @@ impl GridStore {
         match_opts: &MatchOpts,
         max_values: usize,
     ) -> Result<impl Iterator<Item = MatchEntry>, Error> {
+        let mut read_opts = ReadOptions::default();
+        read_opts.set_verify_checksum(false);
         let (fetch_start, fetch_end, fetch_type_marker) = match match_key.match_phrase {
             MatchPhrase::Exact(id) => (id, id + 1, 0),
             MatchPhrase::Range { start, end } => {
@@ -314,7 +317,7 @@ impl GridStore {
 
         let db_iter = self
             .db
-            .iterator(IteratorMode::From(&db_key, Direction::Forward))
+            .iterator_opt(IteratorMode::From(&db_key, Direction::Forward), &read_opts)
             .take_while(|(k, _)| range_key.matches_key(fetch_type_marker, k).unwrap());
 
         let mut pri_queue = MinMaxHeap::<QueueElement<_>>::new();

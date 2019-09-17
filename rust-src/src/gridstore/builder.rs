@@ -182,6 +182,7 @@ impl GridStoreBuilder {
         let mut opts = Options::default();
         opts.set_disable_auto_compactions(true);
         opts.create_if_missing(true);
+        opts.set_compression_type(DBCompressionType::None);
 
         let db = DB::open(&opts, &self.path)?;
         let mut db_key: Vec<u8> = Vec::with_capacity(MAX_KEY_LENGTH);
