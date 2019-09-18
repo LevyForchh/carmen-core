@@ -363,6 +363,8 @@ impl GridStore {
         match_key: &MatchKey,
         match_opts: &MatchOpts,
     ) -> Result<impl Iterator<Item = MatchEntry>, Error> {
+        let mut read_opts = ReadOptions::default();
+        read_opts.set_verify_checksum(false);
         let (fetch_start, fetch_end, fetch_type_marker) = match match_key.match_phrase {
             MatchPhrase::Exact(id) => (id, id + 1, 0),
             MatchPhrase::Range { start, end } => {
@@ -384,7 +386,7 @@ impl GridStore {
 
         let db_iter = self
             .db
-            .iterator(IteratorMode::From(&db_key, Direction::Forward))
+            .iterator_opt(IteratorMode::From(&db_key, Direction::Forward), &read_opts)
             .take_while(|(k, _)| range_key.matches_key(fetch_type_marker, k).unwrap());
 
         for (key, value) in db_iter {
@@ -592,7 +594,9 @@ impl GridStore {
     }
 
     pub fn keys<'i>(&'i self) -> impl Iterator<Item = Result<GridKey, Error>> + 'i {
-        let db_iter = self.db.iterator(IteratorMode::Start);
+        let mut read_opts = ReadOptions::default();
+        read_opts.set_verify_checksum(false);
+        let db_iter = self.db.iterator_opt(IteratorMode::Start, &read_opts);
         db_iter.take_while(|(key, _)| key[0] == 0).map(|(key, _)| {
             let phrase_id = (&key[1..]).read_u32::<BigEndian>()?;
 
@@ -614,7 +618,9 @@ impl GridStore {
     pub fn iter<'i>(
         &'i self,
     ) -> impl Iterator<Item = Result<(GridKey, Vec<GridEntry>), Error>> + 'i {
-        let db_iter = self.db.iterator(IteratorMode::Start);
+        let mut read_opts = ReadOptions::default();
+        read_opts.set_verify_checksum(false);
+        let db_iter = self.db.iterator_opt(IteratorMode::Start, &read_opts);
         db_iter.take_while(|(key, _)| key[0] == 0).map(|(key, value)| {
             let phrase_id = (&key[1..]).read_u32::<BigEndian>()?;
 
