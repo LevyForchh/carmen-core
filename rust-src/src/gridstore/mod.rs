@@ -469,7 +469,7 @@ mod tests {
         let mut boundaries: Vec<_> = bins.values().cloned().collect();
         boundaries.push(phrases.len() as u32);
 
-        builder.load_bin_boundaries(boundaries);
+        builder.load_bin_boundaries(boundaries).expect("Unable to load bin boundaries");
 
         builder.finish().unwrap();
 

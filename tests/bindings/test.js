@@ -47,6 +47,19 @@ tape('GridStoreBuilder append()', (t) => {
     t.end();
 });
 
+tape('GridStoreBuilder compactAppend()', (t) => {
+    const tmpDir = tmp.dirSync();
+    const builder = new addon.GridStoreBuilder(tmpDir.name);
+    builder.insert({ phrase_id: 0, lang_set: [0] }, [{ id: 0, x: 0, y: 0, relev: 1, score: 1, source_phrase_hash: 0 }]);
+    builder.compactAppend({ phrase_id: 0, lang_set: [0] }, 1, 1, 0, 0, [[1, 1]]);
+    builder.finish();
+
+    const reader = new addon.GridStore(tmpDir.name);
+    const list = Array.from(reader.keys());
+    t.deepEquals(list, [{ phrase_id: 0, lang_set: [0] }], 'appended coordinates to the same feature');
+    t.end();
+});
+
 tape('GridStoreBuilder finish()', (t) => {
     const tmpDir = tmp.dirSync();
     const builder = new addon.GridStoreBuilder(tmpDir.name);
