@@ -1,5 +1,5 @@
-use std::env;
 use ::test_utils::load_db_from_json;
+use std::env;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
