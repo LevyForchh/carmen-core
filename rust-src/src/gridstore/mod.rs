@@ -195,7 +195,7 @@ mod tests {
         let search_key =
             MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 2 }, lang_set: 1 };
         let records: Vec<_> =
-            reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
+            reader.streaming_get_matching(&search_key, &MatchOpts::default(), MAX_CONTEXTS).unwrap().collect();
         #[cfg_attr(rustfmt, rustfmt::skip)]
         assert_eq!(
             records,
@@ -214,7 +214,7 @@ mod tests {
         let search_key =
             MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 };
         let records: Vec<_> =
-            reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
+            reader.streaming_get_matching(&search_key, &MatchOpts::default(), MAX_CONTEXTS).unwrap().collect();
         #[cfg_attr(rustfmt, rustfmt::skip)]
         assert_eq!(
             records,
@@ -237,7 +237,7 @@ mod tests {
         let search_key =
             MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 0 };
         let records: Vec<_> =
-            reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
+            reader.streaming_get_matching(&search_key, &MatchOpts::default(), MAX_CONTEXTS).unwrap().collect();
         #[cfg_attr(rustfmt, rustfmt::skip)]
         assert_eq!(
             records,
@@ -251,16 +251,16 @@ mod tests {
                 MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 26, y: 1, id: 14, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 7.0 },
                 MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 25, y: 1, id: 15, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 7.0 },
                 MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 25, y: 1, id: 13, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 7.0 },
-                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 1, x: 24, y: 1, id: 12, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 1.0 },
                 MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 1, x: 56, y: 1, id: 28, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 1.0 },
-                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 1, x: 40, y: 1, id: 20, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 1.0 }
+                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 1, x: 40, y: 1, id: 20, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 1.0 },
+                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 1, x: 24, y: 1, id: 12, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 1.0 }
             ]
         );
 
         let search_key =
             MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 2 };
         let records: Vec<_> =
-            reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
+            reader.streaming_get_matching(&search_key, &MatchOpts::default(), MAX_CONTEXTS).unwrap().collect();
         #[cfg_attr(rustfmt, rustfmt::skip)]
         assert_eq!(
             records,
@@ -269,12 +269,12 @@ mod tests {
                 MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 25, y: 1, id: 15, source_phrase_hash: 0 }, matches_language: true, distance: 0.0, scoredist: 7.0 },
                 MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 25, y: 1, id: 13, source_phrase_hash: 0 }, matches_language: true, distance: 0.0, scoredist: 7.0 },
                 MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 1, x: 24, y: 1, id: 12, source_phrase_hash: 0 }, matches_language: true, distance: 0.0, scoredist: 1.0 },
-                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 42, y: 1, id: 22, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 7.0 },
-                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 41, y: 1, id: 23, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 7.0 },
-                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 41, y: 1, id: 21, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 7.0 },
                 MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 58, y: 1, id: 30, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 7.0 },
                 MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 57, y: 1, id: 31, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 7.0 },
                 MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 57, y: 1, id: 29, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 7.0 },
+                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 42, y: 1, id: 22, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 7.0 },
+                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 41, y: 1, id: 23, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 7.0 },
+                MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 7, x: 41, y: 1, id: 21, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 7.0 },
                 MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 1, x: 56, y: 1, id: 28, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 1.0 },
                 MatchEntry { grid_entry: GridEntry { relev: 0.96, score: 1, x: 40, y: 1, id: 20, source_phrase_hash: 0 }, matches_language: false, distance: 0.0, scoredist: 1.0 }
             ]
@@ -283,7 +283,7 @@ mod tests {
         let search_key =
             MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 3 };
         let records: Vec<_> =
-            reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
+            reader.streaming_get_matching(&search_key, &MatchOpts::default(), MAX_CONTEXTS).unwrap().collect();
         #[cfg_attr(rustfmt, rustfmt::skip)]
         assert_eq!(
             records,
@@ -297,30 +297,31 @@ mod tests {
                 MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 26, y: 1, id: 14, source_phrase_hash: 0 }, matches_language: true, distance: 0.0, scoredist: 7.0 },
                 MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 25, y: 1, id: 15, source_phrase_hash: 0 }, matches_language: true, distance: 0.0, scoredist: 7.0 },
                 MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 7, x: 25, y: 1, id: 13, source_phrase_hash: 0 }, matches_language: true, distance: 0.0, scoredist: 7.0 },
-                MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 1, x: 24, y: 1, id: 12, source_phrase_hash: 0 }, matches_language: true, distance: 0.0, scoredist: 1.0 },
                 MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 1, x: 56, y: 1, id: 28, source_phrase_hash: 0 }, matches_language: true, distance: 0.0, scoredist: 1.0 },
-                MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 1, x: 40, y: 1, id: 20, source_phrase_hash: 0 }, matches_language: true, distance: 0.0, scoredist: 1.0 }
+                MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 1, x: 40, y: 1, id: 20, source_phrase_hash: 0 }, matches_language: true, distance: 0.0, scoredist: 1.0 },
+                MatchEntry { grid_entry: GridEntry { relev: 1.0, score: 1, x: 24, y: 1, id: 12, source_phrase_hash: 0 }, matches_language: true, distance: 0.0, scoredist: 1.0 }
             ]
         );
 
         let search_key =
             MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 1 }, lang_set: 1 };
         let records: Vec<_> =
-            reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
+            reader.streaming_get_matching(&search_key, &MatchOpts::default(), MAX_CONTEXTS).unwrap().collect();
         assert_eq!(records, []);
 
         let search_key =
             MatchKey { match_phrase: MatchPhrase::Range { start: 3, end: 4 }, lang_set: 1 };
         let records: Vec<_> =
-            reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
+            reader.streaming_get_matching(&search_key, &MatchOpts::default(), MAX_CONTEXTS).unwrap().collect();
         assert_eq!(records, []);
 
         let search_key =
             MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 };
         let records: Vec<_> = reader
-            .get_matching(
+            .streaming_get_matching(
                 &search_key,
                 &MatchOpts { bbox: Some([26, 0, 41, 2]), ..MatchOpts::default() },
+                MAX_CONTEXTS
             )
             .unwrap()
             .collect();
@@ -340,25 +341,27 @@ mod tests {
         let search_key =
             MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 };
         let records: Vec<_> = reader
-            .get_matching(
+            .streaming_get_matching(
                 &search_key,
                 &MatchOpts { bbox: Some([0, 2, 100, 2]), proximity: None, ..MatchOpts::default() },
+                MAX_CONTEXTS
             )
             .unwrap()
             .collect();
         assert_eq!(records.len(), 0, "no matching recods in bbox");
 
-        // Search where neigther z-order curve or actual x,y overlap with bbox.
+        // Search where neither z-order curve or actual x,y overlap with bbox.
         let search_key =
             MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 };
         let records: Vec<_> = reader
-            .get_matching(
+            .streaming_get_matching(
                 &search_key,
                 &MatchOpts {
                     bbox: Some([100, 100, 100, 100]),
                     proximity: None,
                     ..MatchOpts::default()
                 },
+                MAX_CONTEXTS
             )
             .unwrap()
             .collect();
@@ -367,13 +370,14 @@ mod tests {
         let search_key =
             MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 2 };
         let records: Vec<_> = reader
-            .get_matching(
+            .streaming_get_matching(
                 &search_key,
                 &MatchOpts {
                     bbox: None,
                     proximity: Some(Proximity { point: [26, 1], radius: 1000. }),
                     ..MatchOpts::default()
                 },
+                MAX_CONTEXTS
             )
             .unwrap()
             .collect();
@@ -399,13 +403,14 @@ mod tests {
         let search_key =
             MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 2 };
         let records: Vec<_> = reader
-            .get_matching(
+            .streaming_get_matching(
                 &search_key,
                 &MatchOpts {
                     bbox: Some([10, 0, 41, 2]),
                     proximity: Some(Proximity { point: [26, 1], radius: 1000. }),
                     ..MatchOpts::default()
                 },
+                MAX_CONTEXTS
             )
             .unwrap()
             .collect();
@@ -502,7 +507,7 @@ mod tests {
             lang_set: 1,
         };
         let mut records: Vec<_> =
-            reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
+            reader.streaming_get_matching(&search_key, &MatchOpts::default(), MAX_CONTEXTS).unwrap().collect();
         records.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let mut expected = Vec::new();
         for i in starts_with_b.0..starts_with_b.1 {
@@ -528,7 +533,7 @@ mod tests {
             lang_set: 1,
         };
         let mut records: Vec<_> =
-            reader.get_matching(&search_key, &MatchOpts::default()).unwrap().collect();
+            reader.streaming_get_matching(&search_key, &MatchOpts::default(), MAX_CONTEXTS).unwrap().collect();
         records.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let mut expected = Vec::new();
         for i in starts_with_bc.0..starts_with_bc.1 {
