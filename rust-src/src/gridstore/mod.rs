@@ -451,9 +451,13 @@ mod tests {
 
     #[test]
     fn prefix_test() {
-        let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
-        let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
+        let directory_with_boundaries: tempfile::TempDir = tempfile::tempdir().unwrap();
+        let directory_without_boundaries: tempfile::TempDir = tempfile::tempdir().unwrap();
 
+        let mut builder_with_boundaries = GridStoreBuilder::new(directory_with_boundaries.path()).unwrap();
+        let mut builder_without_boundaries = GridStoreBuilder::new(directory_without_boundaries.path()).unwrap();
+
+        // this will produce 5000 phrases aaa, aab, aac, ...
         let alphabet = "abcdefghijklmnopqrstuvwxyz";
         let phrases: Vec<String> = alphabet
             .bytes()
@@ -476,7 +480,8 @@ mod tests {
                 score: 1,
                 source_phrase_hash: 0,
             }];
-            builder.insert(&key, entries).expect("Unable to insert record");
+            builder_with_boundaries.insert(&key, entries.clone()).expect("Unable to insert record");
+            builder_without_boundaries.insert(&key, entries.clone()).expect("Unable to insert record");
         }
 
         // calculate bins
@@ -488,11 +493,13 @@ mod tests {
         let mut boundaries: Vec<_> = bins.values().cloned().collect();
         boundaries.push(phrases.len() as u32);
 
-        builder.load_bin_boundaries(boundaries);
+        builder_with_boundaries.load_bin_boundaries(boundaries).expect("Failed to load boundaries");
 
-        builder.finish().unwrap();
+        builder_with_boundaries.finish().unwrap();
+        builder_without_boundaries.finish().unwrap();
 
-        let reader = GridStore::new(directory.path()).unwrap();
+        let reader_with_boundaries = GridStore::new(directory_with_boundaries.path()).unwrap();
+        let reader_without_boundaries = GridStore::new(directory_without_boundaries.path()).unwrap();
 
         let find_range = |prefix: &str| {
             let start = phrases
@@ -520,11 +527,18 @@ mod tests {
             match_phrase: MatchPhrase::Range { start: starts_with_b.0, end: starts_with_b.1 },
             lang_set: 1,
         };
-        let mut records: Vec<_> = reader
-            .streaming_get_matching(&search_key, &MatchOpts::default(), MAX_CONTEXTS)
+        let mut records_with_boundaries: Vec<_> = reader_with_boundaries
+            .streaming_get_matching(&search_key, &MatchOpts::default(), std::usize::MAX)
             .unwrap()
             .collect();
-        records.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let mut records_without_boundaries: Vec<_> = reader_without_boundaries
+            .streaming_get_matching(&search_key, &MatchOpts::default(), std::usize::MAX)
+            .unwrap()
+            .collect();
+
+        records_with_boundaries.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        records_without_boundaries.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
         let mut expected = Vec::new();
         for i in starts_with_b.0..starts_with_b.1 {
             expected.push(MatchEntry {
@@ -541,18 +555,27 @@ mod tests {
                 scoredist: 1.0,
             })
         }
-        assert_eq!(records, expected);
+
+        assert_eq!(records_with_boundaries, expected);
+        assert_eq!(records_without_boundaries, expected);
 
         // query that we expect not to use the precached ranges
         let search_key = MatchKey {
             match_phrase: MatchPhrase::Range { start: starts_with_bc.0, end: starts_with_bc.1 },
             lang_set: 1,
         };
-        let mut records: Vec<_> = reader
-            .streaming_get_matching(&search_key, &MatchOpts::default(), MAX_CONTEXTS)
+        let mut records_with_boundaries: Vec<_> = reader_with_boundaries
+            .streaming_get_matching(&search_key, &MatchOpts::default(), std::usize::MAX)
             .unwrap()
             .collect();
-        records.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let mut records_without_boundaries: Vec<_> = reader_without_boundaries
+            .streaming_get_matching(&search_key, &MatchOpts::default(), std::usize::MAX)
+            .unwrap()
+            .collect();
+
+        records_with_boundaries.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        records_without_boundaries.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
         let mut expected = Vec::new();
         for i in starts_with_bc.0..starts_with_bc.1 {
             expected.push(MatchEntry {
@@ -569,6 +592,37 @@ mod tests {
                 scoredist: 1.0,
             })
         }
-        assert_eq!(records, expected);
+        assert_eq!(records_with_boundaries, expected);
+        assert_eq!(records_without_boundaries, expected);
+
+        println!("{:?} {:?}", starts_with_b, starts_with_bc);
+        // try via coalesce, comparing the two backends
+        let results = vec![
+            (&reader_with_boundaries, &starts_with_b),
+            (&reader_without_boundaries, &starts_with_b),
+            (&reader_with_boundaries, &starts_with_bc),
+            (&reader_without_boundaries, &starts_with_bc)
+        ].into_iter().map(|(reader, range)| {
+            let subquery = PhrasematchSubquery {
+                store: reader,
+                weight: 1.,
+                match_key: MatchKey { match_phrase: MatchPhrase::Range { start: range.0, end: range.1 }, lang_set: 1 },
+                idx: 1,
+                zoom: 14,
+                mask: 1 << 0,
+            };
+            let stack = vec![subquery];
+            let match_opts = MatchOpts {
+                zoom: 14,
+                proximity: None, // NE proximity point
+                ..MatchOpts::default()
+            };
+            coalesce(stack, &match_opts).unwrap()
+        }).collect::<Vec<_>>();
+
+        // the starts_with_b ones should be the same
+        assert_eq!(results[0], results[1]);
+        // and so should the starts_with_bc ones
+        assert_eq!(results[2], results[3]);
     }
 }
