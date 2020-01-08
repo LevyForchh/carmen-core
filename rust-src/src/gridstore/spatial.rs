@@ -4,9 +4,9 @@ use morton::{deinterleave_morton, interleave_morton};
 use std::cmp::Ordering::{Equal, Greater, Less};
 
 #[cfg(test)]
-use crate::gridstore::gridstore_format;
-#[cfg(test)]
 use crate::gridstore::common::relev_float_to_int;
+#[cfg(test)]
+use crate::gridstore::gridstore_format;
 
 /// Generate a tuple of the (min, max) range of the Coord Vector that overlaps with the bounding box
 ///
@@ -216,13 +216,12 @@ fn encoded_val_generator<T: Iterator<Item = u32>>(val: T) -> Vec<u8> {
 }
 
 #[cfg(test)]
-fn get_coords_from_reader<'a>(reader: &'a gridstore_format::Reader<&'a [u8]>) -> gridstore_format::UniformVec<'a, gridstore_format::Coord> {
+fn get_coords_from_reader<'a>(
+    reader: &'a gridstore_format::Reader<&'a [u8]>,
+) -> gridstore_format::UniformVec<'a, gridstore_format::Coord> {
     let record = gridstore_format::read_phrase_record_from(reader);
 
-    let rs_obj = reader.read_var_vec(record.relev_scores)
-        .into_iter()
-        .next()
-        .unwrap();
+    let rs_obj = reader.read_var_vec(record.relev_scores).into_iter().next().unwrap();
 
     reader.read_uniform_vec(rs_obj.coords)
 }
