@@ -4,6 +4,7 @@ const addon = require('../../');
 const tape = require('tape');
 const tmp = require('tmp');
 const rimraf = require('rimraf').sync;
+const queue = require('d3-queue').queue;
 
 tape('JsGridStoreBuilder init', (t) => {
     const tmpDir = tmp.dirSync();
@@ -340,3 +341,104 @@ tape('lang_set >= 128', (t) => {
     });
     t.end();
 });
+
+tape('Bin boundaries', (t) => {
+    const directoryWithBoundaries = tmp.dirSync();
+    const directoryWithoutBoundaries = tmp.dirSync();
+
+    const builderWithBoundaries = new addon.GridStoreBuilder(directoryWithBoundaries.name);
+    const builderWithoutBoundaries = new addon.GridStoreBuilder(directoryWithoutBoundaries.name);
+
+    // this will produce 5000 phrases aaa, aab, aac, ...
+    const alphabet = 'abcdefghijklmnopqrstuvwxyz';
+    const phrases = [];
+
+    outermost:
+    for (const l1 of alphabet) {
+        for (const l2 of alphabet) {
+            for (const l3 of alphabet) {
+                phrases.push(l1 + l2 + l3);
+                if (phrases.length >= 5000) break outermost;
+            }
+        }
+    }
+
+    // insert phrases
+    for (let i = 0; i < phrases.length; i++) {
+        let key = { phrase_id: i, lang_set: [1] };
+        let entries = [{
+            id: i,
+            x: i,
+            y: 1,
+            relev: 1.,
+            score: 1,
+            source_phrase_hash: 0,
+        }];
+        builderWithBoundaries.insert(key, entries);
+        builderWithoutBoundaries.insert(key, entries);
+    }
+
+    // calculate bins
+    let bins = new Map();
+    for (let i = 0; i < phrases.length; i++) {
+        // insert the first occurrence of every prefix
+        if (!bins.has(phrases[i].charAt(0))) {
+            bins.set(phrases[i].charAt(0), i);
+        }
+    }
+    const boundaries = Array.from(bins.values());
+    boundaries.push(phrases.length);
+    boundaries.sort((a, b) => a - b);
+
+    builderWithBoundaries.loadBinBoundaries(Uint32Array.from(boundaries).buffer);
+
+    builderWithBoundaries.finish();
+    builderWithoutBoundaries.finish();
+
+    const readerWithBoundaries = new addon.GridStore(directoryWithBoundaries.name);
+    const readerWithoutBoundaries = new addon.GridStore(directoryWithoutBoundaries.name);
+
+    const findRange = (prefix) => {
+        let start = null,
+            end = null;
+        for (let i = 0; i < phrases.length; i++) {
+            if (phrases[i].startsWith(prefix)) {
+                if (start === null) start = i;
+                end = i;
+            }
+        }
+        return { start, end };
+    };
+
+    let startsWithB = findRange('b');
+    let startsWithBc = findRange('bc');
+
+    // try via coalesce, comparing the two backends
+    const q = queue();
+    [
+        { reader: readerWithBoundaries, range: startsWithB },
+        { reader: readerWithoutBoundaries, range: startsWithB },
+        { reader: readerWithBoundaries, range: startsWithBc },
+        { reader: readerWithoutBoundaries, range: startsWithBc }
+    ].forEach(({ reader, range }) => {
+        const subquery = {
+            store: reader,
+            weight: 1.,
+            match_key: { match_phrase: { "Range": range }, lang_set: [1] },
+            idx: 1,
+            zoom: 14,
+            mask: 1,
+        };
+        let stack = [subquery];
+        let match_opts = {
+            zoom: 14
+        };
+        q.defer((cb) => addon.coalesce(stack, match_opts, cb));
+    });
+
+    q.awaitAll((err, results) => {
+        t.deepEquals(results[0], results[1], 'things that start with b are the same with and without bins');
+        t.deepEquals(results[2], results[3], 'things that start with bc are the same with and without bins');
+        t.end();
+    });
+})

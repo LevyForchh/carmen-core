@@ -595,7 +595,6 @@ mod tests {
         assert_eq!(records_with_boundaries, expected);
         assert_eq!(records_without_boundaries, expected);
 
-        println!("{:?} {:?}", starts_with_b, starts_with_bc);
         // try via coalesce, comparing the two backends
         let results = vec![
             (&reader_with_boundaries, &starts_with_b),
