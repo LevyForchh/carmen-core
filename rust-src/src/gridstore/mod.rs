@@ -454,8 +454,10 @@ mod tests {
         let directory_with_boundaries: tempfile::TempDir = tempfile::tempdir().unwrap();
         let directory_without_boundaries: tempfile::TempDir = tempfile::tempdir().unwrap();
 
-        let mut builder_with_boundaries = GridStoreBuilder::new(directory_with_boundaries.path()).unwrap();
-        let mut builder_without_boundaries = GridStoreBuilder::new(directory_without_boundaries.path()).unwrap();
+        let mut builder_with_boundaries =
+            GridStoreBuilder::new(directory_with_boundaries.path()).unwrap();
+        let mut builder_without_boundaries =
+            GridStoreBuilder::new(directory_without_boundaries.path()).unwrap();
 
         // this will produce 5000 phrases aaa, aab, aac, ...
         let alphabet = "abcdefghijklmnopqrstuvwxyz";
@@ -481,7 +483,9 @@ mod tests {
                 source_phrase_hash: 0,
             }];
             builder_with_boundaries.insert(&key, entries.clone()).expect("Unable to insert record");
-            builder_without_boundaries.insert(&key, entries.clone()).expect("Unable to insert record");
+            builder_without_boundaries
+                .insert(&key, entries.clone())
+                .expect("Unable to insert record");
         }
 
         // calculate bins
@@ -499,7 +503,8 @@ mod tests {
         builder_without_boundaries.finish().unwrap();
 
         let reader_with_boundaries = GridStore::new(directory_with_boundaries.path()).unwrap();
-        let reader_without_boundaries = GridStore::new(directory_without_boundaries.path()).unwrap();
+        let reader_without_boundaries =
+            GridStore::new(directory_without_boundaries.path()).unwrap();
 
         let find_range = |prefix: &str| {
             let start = phrases
@@ -600,12 +605,17 @@ mod tests {
             (&reader_with_boundaries, &starts_with_b),
             (&reader_without_boundaries, &starts_with_b),
             (&reader_with_boundaries, &starts_with_bc),
-            (&reader_without_boundaries, &starts_with_bc)
-        ].into_iter().map(|(reader, range)| {
+            (&reader_without_boundaries, &starts_with_bc),
+        ]
+        .into_iter()
+        .map(|(reader, range)| {
             let subquery = PhrasematchSubquery {
                 store: reader,
                 weight: 1.,
-                match_key: MatchKey { match_phrase: MatchPhrase::Range { start: range.0, end: range.1 }, lang_set: 1 },
+                match_key: MatchKey {
+                    match_phrase: MatchPhrase::Range { start: range.0, end: range.1 },
+                    lang_set: 1,
+                },
                 idx: 1,
                 zoom: 14,
                 mask: 1 << 0,
@@ -617,7 +627,8 @@ mod tests {
                 ..MatchOpts::default()
             };
             coalesce(stack, &match_opts).unwrap()
-        }).collect::<Vec<_>>();
+        })
+        .collect::<Vec<_>>();
 
         // the starts_with_b ones should be the same
         assert_eq!(results[0], results[1]);
