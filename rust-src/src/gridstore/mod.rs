@@ -194,8 +194,10 @@ mod tests {
 
         let search_key =
             MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 2 }, lang_set: 1 };
-        let records: Vec<_> =
-            reader.streaming_get_matching(&search_key, &MatchOpts::default(), MAX_CONTEXTS).unwrap().collect();
+        let records: Vec<_> = reader
+            .streaming_get_matching(&search_key, &MatchOpts::default(), MAX_CONTEXTS)
+            .unwrap()
+            .collect();
         #[cfg_attr(rustfmt, rustfmt::skip)]
         assert_eq!(
             records,
@@ -213,8 +215,10 @@ mod tests {
 
         let search_key =
             MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 };
-        let records: Vec<_> =
-            reader.streaming_get_matching(&search_key, &MatchOpts::default(), MAX_CONTEXTS).unwrap().collect();
+        let records: Vec<_> = reader
+            .streaming_get_matching(&search_key, &MatchOpts::default(), MAX_CONTEXTS)
+            .unwrap()
+            .collect();
         #[cfg_attr(rustfmt, rustfmt::skip)]
         assert_eq!(
             records,
@@ -236,8 +240,10 @@ mod tests {
 
         let search_key =
             MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 0 };
-        let records: Vec<_> =
-            reader.streaming_get_matching(&search_key, &MatchOpts::default(), MAX_CONTEXTS).unwrap().collect();
+        let records: Vec<_> = reader
+            .streaming_get_matching(&search_key, &MatchOpts::default(), MAX_CONTEXTS)
+            .unwrap()
+            .collect();
         #[cfg_attr(rustfmt, rustfmt::skip)]
         assert_eq!(
             records,
@@ -259,8 +265,10 @@ mod tests {
 
         let search_key =
             MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 2 };
-        let records: Vec<_> =
-            reader.streaming_get_matching(&search_key, &MatchOpts::default(), MAX_CONTEXTS).unwrap().collect();
+        let records: Vec<_> = reader
+            .streaming_get_matching(&search_key, &MatchOpts::default(), MAX_CONTEXTS)
+            .unwrap()
+            .collect();
         #[cfg_attr(rustfmt, rustfmt::skip)]
         assert_eq!(
             records,
@@ -282,8 +290,10 @@ mod tests {
 
         let search_key =
             MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 3 };
-        let records: Vec<_> =
-            reader.streaming_get_matching(&search_key, &MatchOpts::default(), MAX_CONTEXTS).unwrap().collect();
+        let records: Vec<_> = reader
+            .streaming_get_matching(&search_key, &MatchOpts::default(), MAX_CONTEXTS)
+            .unwrap()
+            .collect();
         #[cfg_attr(rustfmt, rustfmt::skip)]
         assert_eq!(
             records,
@@ -305,14 +315,18 @@ mod tests {
 
         let search_key =
             MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 1 }, lang_set: 1 };
-        let records: Vec<_> =
-            reader.streaming_get_matching(&search_key, &MatchOpts::default(), MAX_CONTEXTS).unwrap().collect();
+        let records: Vec<_> = reader
+            .streaming_get_matching(&search_key, &MatchOpts::default(), MAX_CONTEXTS)
+            .unwrap()
+            .collect();
         assert_eq!(records, []);
 
         let search_key =
             MatchKey { match_phrase: MatchPhrase::Range { start: 3, end: 4 }, lang_set: 1 };
-        let records: Vec<_> =
-            reader.streaming_get_matching(&search_key, &MatchOpts::default(), MAX_CONTEXTS).unwrap().collect();
+        let records: Vec<_> = reader
+            .streaming_get_matching(&search_key, &MatchOpts::default(), MAX_CONTEXTS)
+            .unwrap()
+            .collect();
         assert_eq!(records, []);
 
         let search_key =
@@ -321,7 +335,7 @@ mod tests {
             .streaming_get_matching(
                 &search_key,
                 &MatchOpts { bbox: Some([26, 0, 41, 2]), ..MatchOpts::default() },
-                MAX_CONTEXTS
+                MAX_CONTEXTS,
             )
             .unwrap()
             .collect();
@@ -344,7 +358,7 @@ mod tests {
             .streaming_get_matching(
                 &search_key,
                 &MatchOpts { bbox: Some([0, 2, 100, 2]), proximity: None, ..MatchOpts::default() },
-                MAX_CONTEXTS
+                MAX_CONTEXTS,
             )
             .unwrap()
             .collect();
@@ -361,7 +375,7 @@ mod tests {
                     proximity: None,
                     ..MatchOpts::default()
                 },
-                MAX_CONTEXTS
+                MAX_CONTEXTS,
             )
             .unwrap()
             .collect();
@@ -377,7 +391,7 @@ mod tests {
                     proximity: Some(Proximity { point: [26, 1], radius: 1000. }),
                     ..MatchOpts::default()
                 },
-                MAX_CONTEXTS
+                MAX_CONTEXTS,
             )
             .unwrap()
             .collect();
@@ -410,7 +424,7 @@ mod tests {
                     proximity: Some(Proximity { point: [26, 1], radius: 1000. }),
                     ..MatchOpts::default()
                 },
-                MAX_CONTEXTS
+                MAX_CONTEXTS,
             )
             .unwrap()
             .collect();
@@ -506,8 +520,10 @@ mod tests {
             match_phrase: MatchPhrase::Range { start: starts_with_b.0, end: starts_with_b.1 },
             lang_set: 1,
         };
-        let mut records: Vec<_> =
-            reader.streaming_get_matching(&search_key, &MatchOpts::default(), MAX_CONTEXTS).unwrap().collect();
+        let mut records: Vec<_> = reader
+            .streaming_get_matching(&search_key, &MatchOpts::default(), MAX_CONTEXTS)
+            .unwrap()
+            .collect();
         records.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let mut expected = Vec::new();
         for i in starts_with_b.0..starts_with_b.1 {
@@ -532,8 +548,10 @@ mod tests {
             match_phrase: MatchPhrase::Range { start: starts_with_bc.0, end: starts_with_bc.1 },
             lang_set: 1,
         };
-        let mut records: Vec<_> =
-            reader.streaming_get_matching(&search_key, &MatchOpts::default(), MAX_CONTEXTS).unwrap().collect();
+        let mut records: Vec<_> = reader
+            .streaming_get_matching(&search_key, &MatchOpts::default(), MAX_CONTEXTS)
+            .unwrap()
+            .collect();
         records.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let mut expected = Vec::new();
         for i in starts_with_bc.0..starts_with_bc.1 {
