@@ -3,6 +3,11 @@ use itertools::Itertools;
 use morton::{deinterleave_morton, interleave_morton};
 use std::cmp::Ordering::{Equal, Greater, Less};
 
+#[cfg(test)]
+use crate::gridstore::gridstore_format;
+#[cfg(test)]
+use crate::gridstore::common::relev_float_to_int;
+
 /// Generate a tuple of the (min, max) range of the Coord Vector that overlaps with the bounding box
 ///
 /// Returns (Some(min,max)) if the Coord Vector morton order range overlaps with the bounding box,
@@ -185,23 +190,41 @@ fn coord_binary_search<'a>(
 }
 
 #[cfg(test)]
-fn flatbuffer_generator<T: Iterator<Item = u32>>(val: T) -> Vec<u8> {
-    let mut fb_builder = flatbuffers::FlatBufferBuilder::new_with_capacity(256);
+fn encoded_val_generator<T: Iterator<Item = u32>>(val: T) -> Vec<u8> {
+    let mut builder = gridstore_format::Writer::new();
+
+    let relev_score = (relev_float_to_int(1.0) << 4) | 1;
+
+    let ids: Vec<u32> = vec![];
+    let encoded_ids = builder.write_fixed_vec(&ids);
+
     let mut coords: Vec<_> = Vec::new();
 
     for i in val {
-        let fb_coord = Coord::new(i as u32, 0);
-        coords.push(fb_coord);
+        let coord = gridstore_format::Coord { coord: i, ids: encoded_ids.clone() };
+        coords.push(coord);
     }
-    let fb_coords = fb_builder.create_vector(&coords);
+    let encoded_coords = builder.write_uniform_vec(&coords);
+    let encoded_rs = gridstore_format::RelevScore { relev_score, coords: encoded_coords };
 
-    let fb_rs = RelevScore::create(
-        &mut fb_builder,
-        &RelevScoreArgs { relev_score: 1, coords: Some(fb_coords) },
-    );
-    fb_builder.finish(fb_rs, None);
-    let data = fb_builder.finished_data();
-    Vec::from(data)
+    let encoded_rses = builder.write_var_vec(&vec![encoded_rs]);
+
+    let record = gridstore_format::PhraseRecord { relev_scores: encoded_rses };
+    builder.write_fixed_scalar(record);
+
+    builder.finish()
+}
+
+#[cfg(test)]
+fn get_coords_from_reader<'a>(reader: &'a gridstore_format::Reader<&'a [u8]>) -> gridstore_format::UniformVec<'a, gridstore_format::Coord> {
+    let record = gridstore_format::read_phrase_record_from(reader);
+
+    let rs_obj = reader.read_var_vec(record.relev_scores)
+        .into_iter()
+        .next()
+        .unwrap();
+
+    reader.read_uniform_vec(rs_obj.coords)
 }
 
 #[cfg(test)]
@@ -211,38 +234,38 @@ mod test {
     #[test]
     fn filter_bbox() {
         let empty: Vec<u32> = vec![];
-        let buffer = flatbuffer_generator(empty.into_iter());
-        let rs = flatbuffers::get_root::<RelevScore>(&buffer);
-        let coords = rs.coords().unwrap();
+        let buffer = encoded_val_generator(empty.into_iter());
+        let reader = gridstore_format::Reader::new(buffer.as_slice());
+        let coords = get_coords_from_reader(&reader);
         assert_eq!(bbox_filter(coords, [0, 0, 0, 0]).is_none(), true);
 
-        let buffer = flatbuffer_generator((0..4).rev());
-        let rs = flatbuffers::get_root::<RelevScore>(&buffer);
-        let coords = rs.coords().unwrap();
-        let result = bbox_filter(coords, [0, 0, 1, 1]).unwrap().cloned().collect::<Vec<Coord>>();
+        let buffer = encoded_val_generator((0..4).rev());
+        let reader = gridstore_format::Reader::new(buffer.as_slice());
+        let coords = get_coords_from_reader(&reader);
+        let result = bbox_filter(coords, [0, 0, 1, 1]).unwrap().collect::<Vec<Coord>>();
         assert_eq!(result.len(), 4);
 
-        let buffer = flatbuffer_generator((2..4).rev());
-        let rs = flatbuffers::get_root::<RelevScore>(&buffer);
-        let coords = rs.coords().unwrap();
-        let result = bbox_filter(coords, [0, 0, 1, 1]).unwrap().cloned().collect::<Vec<Coord>>();
+        let buffer = encoded_val_generator((2..4).rev());
+        let reader = gridstore_format::Reader::new(buffer.as_slice());
+        let coords = get_coords_from_reader(&reader);
+        let result = bbox_filter(coords, [0, 0, 1, 1]).unwrap().collect::<Vec<Coord>>();
         assert_eq!(result.len(), 2, "starts before bbox and ends between the result set");
 
-        let buffer = flatbuffer_generator((2..4).rev());
-        let rs = flatbuffers::get_root::<RelevScore>(&buffer);
-        let coords = rs.coords().unwrap();
-        let result = bbox_filter(coords, [1, 1, 3, 1]).unwrap().cloned().collect::<Vec<Coord>>();
+        let buffer = encoded_val_generator((2..4).rev());
+        let reader = gridstore_format::Reader::new(buffer.as_slice());
+        let coords = get_coords_from_reader(&reader);
+        let result = bbox_filter(coords, [1, 1, 3, 1]).unwrap().collect::<Vec<Coord>>();
         assert_eq!(result.len(), 1, "starts in the bbox and ends after the result set");
 
-        let buffer = flatbuffer_generator((1..4).rev());
-        let rs = flatbuffers::get_root::<RelevScore>(&buffer);
-        let coords = rs.coords().unwrap();
-        let result = bbox_filter(coords, [0, 1, 1, 1]).unwrap().cloned().collect::<Vec<Coord>>();
+        let buffer = encoded_val_generator((1..4).rev());
+        let reader = gridstore_format::Reader::new(buffer.as_slice());
+        let coords = get_coords_from_reader(&reader);
+        let result = bbox_filter(coords, [0, 1, 1, 1]).unwrap().collect::<Vec<Coord>>();
         assert_eq!(result.len(), 2, "starts in the bbox and ends in the bbox");
 
-        let buffer = flatbuffer_generator((5..7).rev());
-        let rs = flatbuffers::get_root::<RelevScore>(&buffer);
-        let coords = rs.coords().unwrap();
+        let buffer = encoded_val_generator((5..7).rev());
+        let reader = gridstore_format::Reader::new(buffer.as_slice());
+        let coords = get_coords_from_reader(&reader);
         assert_eq!(
             bbox_filter(coords, [0, 0, 0, 1]).is_none(),
             true,
@@ -255,35 +278,35 @@ mod test {
         );
 
         let sparse: Vec<u32> = vec![24, 7];
-        let buffer = flatbuffer_generator(sparse.into_iter());
-        let rs = flatbuffers::get_root::<RelevScore>(&buffer);
-        let coords = rs.coords().unwrap();
-        let result = bbox_filter(coords, [3, 1, 4, 2]).unwrap().cloned().collect::<Vec<Coord>>();
+        let buffer = encoded_val_generator(sparse.into_iter());
+        let reader = gridstore_format::Reader::new(buffer.as_slice());
+        let coords = get_coords_from_reader(&reader);
+        let result = bbox_filter(coords, [3, 1, 4, 2]).unwrap().collect::<Vec<Coord>>();
         assert_eq!(result.len(), 2, "sparse result set that spans z-order jumps");
 
-        let buffer = flatbuffer_generator((7..24).rev());
-        let rs = flatbuffers::get_root::<RelevScore>(&buffer);
-        let coords = rs.coords().unwrap();
-        let result = bbox_filter(coords, [3, 1, 4, 2]).unwrap().cloned().collect::<Vec<Coord>>();
+        let buffer = encoded_val_generator((7..24).rev());
+        let reader = gridstore_format::Reader::new(buffer.as_slice());
+        let coords = get_coords_from_reader(&reader);
+        let result = bbox_filter(coords, [3, 1, 4, 2]).unwrap().collect::<Vec<Coord>>();
         assert_eq!(result.len(), 3, "continuous result set that spans z-order jumps");
 
         let sparse: Vec<u32> = vec![8];
-        let buffer = flatbuffer_generator(sparse.into_iter());
-        let rs = flatbuffers::get_root::<RelevScore>(&buffer);
-        let coords = rs.coords().unwrap();
-        let result = bbox_filter(coords, [3, 1, 4, 2]).unwrap().cloned().collect::<Vec<Coord>>();
+        let buffer = encoded_val_generator(sparse.into_iter());
+        let reader = gridstore_format::Reader::new(buffer.as_slice());
+        let coords = get_coords_from_reader(&reader);
+        let result = bbox_filter(coords, [3, 1, 4, 2]).unwrap().collect::<Vec<Coord>>();
         assert_eq!(result.len(), 0, "result is on the z-order curve but not in the bbox");
     }
 
     #[test]
     fn proximity_search() {
-        let buffer = flatbuffer_generator((1..10).rev()); // [9,8,7,6,5,4,3,2,1]
-        let rs = flatbuffers::get_root::<RelevScore>(&buffer);
-        let coords = rs.coords().unwrap();
+        let buffer = encoded_val_generator((1..10).rev()); // [9,8,7,6,5,4,3,2,1]
+        let reader = gridstore_format::Reader::new(buffer.as_slice());
+        let coords = get_coords_from_reader(&reader);
 
         let result = proximity(coords, [3, 0]).unwrap().map(|x| x.coord).collect::<Vec<u32>>();
         assert_eq!(
-            vec![5, 4, 6, 7, 3, 2, 8, 9, 1],
+            vec![5, 4, 6, 3, 7, 2, 8, 1, 9],
             result,
             "proximity point is in the middle of the result set - 5"
         );
@@ -303,18 +326,18 @@ mod test {
         );
 
         let empty: Vec<u32> = vec![];
-        let buffer = flatbuffer_generator(empty.into_iter());
-        let rs = flatbuffers::get_root::<RelevScore>(&buffer);
-        let coords = rs.coords().unwrap();
+        let buffer = encoded_val_generator(empty.into_iter());
+        let reader = gridstore_format::Reader::new(buffer.as_slice());
+        let coords = get_coords_from_reader(&reader);
         assert_eq!(proximity(coords, [3, 0]).is_none(), true);
 
         let sparse: Vec<u32> = vec![24, 21, 13, 8, 7, 6, 1]; // 1 and 13 are at the same distance from 7
-        let buffer = flatbuffer_generator(sparse.into_iter());
-        let rs = flatbuffers::get_root::<RelevScore>(&buffer);
-        let coords = rs.coords().unwrap();
+        let buffer = encoded_val_generator(sparse.into_iter());
+        let reader = gridstore_format::Reader::new(buffer.as_slice());
+        let coords = get_coords_from_reader(&reader);
         let result = proximity(coords, [3, 1]).unwrap().map(|x| x.coord).collect::<Vec<u32>>();
         assert_eq!(
-            vec![7, 6, 8, 13, 1, 21, 24],
+            vec![7, 6, 8, 1, 13, 21, 24],
             result,
             "sparse result set sorted by z-order in the middle of the result set"
         );
@@ -322,16 +345,16 @@ mod test {
 
     #[test]
     fn bbox_proximity_search() {
-        let buffer = flatbuffer_generator((1..10).rev()); // [9,8,7,6,5,4,3,2,1]
-        let rs = flatbuffers::get_root::<RelevScore>(&buffer);
-        let coords = rs.coords().unwrap();
+        let buffer = encoded_val_generator((1..10).rev()); // [9,8,7,6,5,4,3,2,1]
+        let reader = gridstore_format::Reader::new(buffer.as_slice());
+        let coords = get_coords_from_reader(&reader);
         // bbox is from 1-7; proximity is 4
         let result = bbox_proximity_filter(coords, [1, 0, 3, 1], [2, 0])
             .unwrap()
             .map(|x| x.coord)
             .collect::<Vec<u32>>();
         assert_eq!(
-            vec![4, 3, 5, 6, 7, 1],
+            vec![4, 3, 5, 6, 1, 7],
             result,
             "bbox within the range of coordinates; proximity point within the result set"
         );
@@ -352,9 +375,9 @@ mod test {
             "bbox within the range of coordinates; proximity point outside the result set"
         );
 
-        let buffer = flatbuffer_generator((2..5).rev()); // [4,3,2]
-        let rs = flatbuffers::get_root::<RelevScore>(&buffer);
-        let coords = rs.coords().unwrap();
+        let buffer = encoded_val_generator((2..5).rev()); // [4,3,2]
+        let reader = gridstore_format::Reader::new(buffer.as_slice());
+        let coords = get_coords_from_reader(&reader);
         let result = bbox_proximity_filter(coords, [1, 1, 3, 1], [0, 0]) // bbox is 3-7; proximity is 0
             .unwrap()
             .map(|x| x.coord)
@@ -366,9 +389,9 @@ mod test {
         );
 
         let sparse: Vec<u32> = vec![24, 23, 13, 8, 7, 6, 1];
-        let buffer = flatbuffer_generator(sparse.into_iter());
-        let rs = flatbuffers::get_root::<RelevScore>(&buffer);
-        let coords = rs.coords().unwrap();
+        let buffer = encoded_val_generator(sparse.into_iter());
+        let reader = gridstore_format::Reader::new(buffer.as_slice());
+        let coords = get_coords_from_reader(&reader);
         // bbox is 7-23; proximity is 7
         let result = bbox_proximity_filter(coords, [3, 1, 7, 1], [3, 1])
             .unwrap()
@@ -385,25 +408,25 @@ mod test {
     fn binary_search() {
         // Empty Coord list
         let empty: Vec<u32> = vec![];
-        let buffer = flatbuffer_generator(empty.into_iter());
-        let rs = flatbuffers::get_root::<RelevScore>(&buffer);
-        let coords = rs.coords().unwrap();
+        let buffer = encoded_val_generator(empty.into_iter());
+        let reader = gridstore_format::Reader::new(buffer.as_slice());
+        let coords = get_coords_from_reader(&reader);
         assert_eq!(coord_binary_search(&coords, 0, 0), Err("Offset greater than Vector"));
         assert_eq!(coord_binary_search(&coords, 1, 0), Err("Offset greater than Vector"));
 
         // Single Coord list
         let single: Vec<u32> = vec![0];
-        let buffer = flatbuffer_generator(single.into_iter());
-        let rs = flatbuffers::get_root::<RelevScore>(&buffer);
-        let coords = rs.coords().unwrap();
+        let buffer = encoded_val_generator(single.into_iter());
+        let reader = gridstore_format::Reader::new(buffer.as_slice());
+        let coords = get_coords_from_reader(&reader);
 
         assert_eq!(coord_binary_search(&coords, 0, 0), Ok(0));
         assert_eq!(coord_binary_search(&coords, 1, 0), Ok(0));
 
         // Continuous Coord list
-        let buffer = flatbuffer_generator((4..8).rev()); // [7,6,5,4]
-        let rs = flatbuffers::get_root::<RelevScore>(&buffer);
-        let coords = rs.coords().unwrap();
+        let buffer = encoded_val_generator((4..8).rev()); // [7,6,5,4]
+        let reader = gridstore_format::Reader::new(buffer.as_slice());
+        let coords = get_coords_from_reader(&reader);
 
         assert_eq!(coord_binary_search(&coords, 0, 0), Ok(3));
         assert_eq!(coord_binary_search(&coords, 4, 0), Ok(3));
@@ -417,9 +440,9 @@ mod test {
 
         // Sparse Coord list
         let sparse: Vec<u32> = vec![7, 4, 2, 1];
-        let buffer = flatbuffer_generator(sparse.into_iter());
-        let rs = flatbuffers::get_root::<RelevScore>(&buffer);
-        let coords = rs.coords().unwrap();
+        let buffer = encoded_val_generator(sparse.into_iter());
+        let reader = gridstore_format::Reader::new(buffer.as_slice());
+        let coords = get_coords_from_reader(&reader);
 
         assert_eq!(coord_binary_search(&coords, 0, 0), Ok(3));
         assert_eq!(coord_binary_search(&coords, 1, 0), Ok(3));
