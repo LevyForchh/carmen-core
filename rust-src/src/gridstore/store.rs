@@ -109,41 +109,38 @@ fn decode_matching_value<T: AsRef<[u8]>>(
             let nested_ref = _ref.1;
             let coords_per_score = score_groups.into_iter().map(move |(_, score, rs_obj)| {
                 let coords_vec = gridstore_format::read_uniform_vec_raw(nested_ref, rs_obj.coords);
-                let coords = match &match_opts {
-                    MatchOpts { bbox: None, proximity: None, .. } => {
-                        Some(Box::new(coords_vec.into_iter())
-                            as Box<Iterator<Item = gridstore_format::Coord>>)
-                    }
-                    MatchOpts { bbox: Some(bbox), proximity: None, .. } => {
-                        // TODO should the bbox argument be changed to a reference in bbox? The compiler was complaining
-                        match spatial::bbox_filter(coords_vec, *bbox) {
-                            Some(v) => {
-                                Some(Box::new(v) as Box<Iterator<Item = gridstore_format::Coord>>)
-                            }
-                            None => None,
+                let coords =
+                    match &match_opts {
+                        MatchOpts { bbox: None, proximity: None, .. } => {
+                            Some(Box::new(coords_vec.into_iter())
+                                as Box<dyn Iterator<Item = gridstore_format::Coord>>)
                         }
-                    }
-                    MatchOpts { bbox: None, proximity: Some(prox_pt), .. } => {
-                        match spatial::proximity(coords_vec, prox_pt.point) {
-                            Some(v) => {
-                                Some(Box::new(v) as Box<Iterator<Item = gridstore_format::Coord>>)
+                        MatchOpts { bbox: Some(bbox), proximity: None, .. } => {
+                            match spatial::bbox_filter(coords_vec, *bbox) {
+                                Some(v) => Some(Box::new(v)
+                                    as Box<dyn Iterator<Item = gridstore_format::Coord>>),
+                                None => None,
                             }
-                            None => None,
                         }
-                    }
-                    MatchOpts { bbox: Some(bbox), proximity: Some(prox_pt), .. } => {
-                        match spatial::bbox_proximity_filter(coords_vec, *bbox, prox_pt.point) {
-                            Some(v) => {
-                                Some(Box::new(v) as Box<Iterator<Item = gridstore_format::Coord>>)
+                        MatchOpts { bbox: None, proximity: Some(prox_pt), .. } => {
+                            match spatial::proximity(coords_vec, prox_pt.point) {
+                                Some(v) => Some(Box::new(v)
+                                    as Box<dyn Iterator<Item = gridstore_format::Coord>>),
+                                None => None,
                             }
-                            None => None,
                         }
-                    }
-                };
+                        MatchOpts { bbox: Some(bbox), proximity: Some(prox_pt), .. } => {
+                            match spatial::bbox_proximity_filter(coords_vec, *bbox, prox_pt.point) {
+                                Some(v) => Some(Box::new(v)
+                                    as Box<dyn Iterator<Item = gridstore_format::Coord>>),
+                                None => None,
+                            }
+                        }
+                    };
 
                 let coords = coords.unwrap_or_else(|| {
                     Box::new((Option::<gridstore_format::Coord>::None).into_iter())
-                        as Box<Iterator<Item = gridstore_format::Coord>>
+                        as Box<dyn Iterator<Item = gridstore_format::Coord>>
                 });
                 let match_opts = match_opts.clone();
                 coords.map(move |coords_obj| {
