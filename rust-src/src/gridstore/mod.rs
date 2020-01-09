@@ -13,6 +13,7 @@ pub use store::*;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use once_cell::sync::Lazy;
     use std::collections::BTreeMap;
 
     #[test]
@@ -449,8 +450,13 @@ mod tests {
         assert_eq!(listed_keys.unwrap(), orig_keys);
     }
 
-    #[test]
-    fn prefix_test() {
+    static PREFIX_DATA: Lazy<(
+        GridStore,
+        GridStore,
+        Vec<String>,
+        tempfile::TempDir,
+        tempfile::TempDir,
+    )> = Lazy::new(|| {
         let directory_with_boundaries: tempfile::TempDir = tempfile::tempdir().unwrap();
         let directory_without_boundaries: tempfile::TempDir = tempfile::tempdir().unwrap();
 
@@ -506,26 +512,40 @@ mod tests {
         let reader_without_boundaries =
             GridStore::new(directory_without_boundaries.path()).unwrap();
 
-        let find_range = |prefix: &str| {
-            let start = phrases
-                .iter()
-                .enumerate()
-                .find(|(_, phrase)| phrase.starts_with(prefix))
-                .unwrap()
-                .0;
-            let end = phrases
-                .iter()
-                .enumerate()
-                .rev()
-                .find(|(_, phrase)| phrase.starts_with(prefix))
-                .unwrap()
-                .0
-                + 1;
-            (start as u32, end as u32)
-        };
+        (
+            reader_with_boundaries,
+            reader_without_boundaries,
+            phrases,
+            directory_with_boundaries,
+            directory_without_boundaries,
+        )
+    });
 
-        let starts_with_b = find_range("b");
-        let starts_with_bc = find_range("bc");
+    fn find_prefix_range(prefix: &str) -> (u32, u32) {
+        let phrases = &PREFIX_DATA.2;
+
+        let start =
+            phrases.iter().enumerate().find(|(_, phrase)| phrase.starts_with(prefix)).unwrap().0;
+        let end = phrases
+            .iter()
+            .enumerate()
+            .rev()
+            .find(|(_, phrase)| phrase.starts_with(prefix))
+            .unwrap()
+            .0
+            + 1;
+        (start as u32, end as u32)
+    }
+
+    #[test]
+    fn prefix_make_bins() {
+        Lazy::force(&PREFIX_DATA);
+    }
+
+    #[test]
+    fn prefix_test_with_bins() {
+        let (reader_with_boundaries, reader_without_boundaries) = (&PREFIX_DATA.0, &PREFIX_DATA.1);
+        let starts_with_b = find_prefix_range("b");
 
         // query that we expect to use the pre-cached ranges
         let search_key = MatchKey {
@@ -563,6 +583,12 @@ mod tests {
 
         assert_eq!(records_with_boundaries, expected);
         assert_eq!(records_without_boundaries, expected);
+    }
+
+    #[test]
+    fn prefix_test_no_bins() {
+        let (reader_with_boundaries, reader_without_boundaries) = (&PREFIX_DATA.0, &PREFIX_DATA.1);
+        let starts_with_bc = find_prefix_range("bc");
 
         // query that we expect not to use the precached ranges
         let search_key = MatchKey {
@@ -599,13 +625,20 @@ mod tests {
         }
         assert_eq!(records_with_boundaries, expected);
         assert_eq!(records_without_boundaries, expected);
+    }
+
+    #[test]
+    fn prefix_test_coalesce() {
+        let (reader_with_boundaries, reader_without_boundaries) = (&PREFIX_DATA.0, &PREFIX_DATA.1);
+        let starts_with_b = find_prefix_range("b");
+        let starts_with_bc = find_prefix_range("bc");
 
         // try via coalesce, comparing the two backends
         let results = vec![
-            (&reader_with_boundaries, &starts_with_b),
-            (&reader_without_boundaries, &starts_with_b),
-            (&reader_with_boundaries, &starts_with_bc),
-            (&reader_without_boundaries, &starts_with_bc),
+            (reader_with_boundaries, &starts_with_b),
+            (reader_without_boundaries, &starts_with_b),
+            (reader_with_boundaries, &starts_with_bc),
+            (reader_without_boundaries, &starts_with_bc),
         ]
         .into_iter()
         .map(|(reader, range)| {
