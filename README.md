@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/mapbox/carmen-core.svg?branch=master)](https://travis-ci.org/mapbox/carmen-core)
+
 ## carmen-core
 Carmen-core is a backend storage library for [Carmen](https://github.com/mapbox/carmen) written in Rust. This repository contains both a Rust library (in `rust-src`) and a Javascript wrapper around that library (in `index.js` and `native`).
 
@@ -74,4 +76,3 @@ cargo bench
 Html reports will be generated in `target/criterion/report/index.html`
 
 Criterion will measure the statistical significance of the difference between two different bench runs, so to measure the impact of a change, you can checkout master, run a bench, and then check out a feature branch and run a bench. Note: the results are sensitive to other resource usage on your machine. For more accurate results, run in an isolated environment.
-
