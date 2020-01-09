@@ -161,7 +161,8 @@ impl MatchOpts {
                         // Scale the top left (min x and y) tile coordinates by 2^(zoom diff).
                         // Scale the bottom right (max x and y) tile coordinates by 2^(zoom diff),
                         // and add the new number of tiles (-1) to get the outer edge of possible tiles.
-                        // TODO comment explaining why parens for -1
+                        // We subtract 1 from the scale_multiplier before adding to prevent an integer overflow
+                        // given that we're using a 16bit integer
                         Some([
                             orig_bbox[0] * scale_multiplier,
                             orig_bbox[1] * scale_multiplier,
@@ -178,8 +179,6 @@ impl MatchOpts {
     }
 }
 
-// TODO: test what happens with invalid bbox
-// TODO: test bottom right most tile at highest zoom
 #[test]
 fn adjust_to_zoom_test_proximity() {
     let match_opts1 = MatchOpts {
@@ -205,8 +204,7 @@ fn adjust_to_zoom_test_proximity() {
         zoom: 4,
         ..MatchOpts::default()
     };
-    // TODO: a function taht takes an original, new zoom, and expected zxy and generates these?
-    // TODO: remove some of the tests for the radius and that the new zoom is as expected?
+
     let same_zoom = match_opts3.adjust_to_zoom(4);
     assert_eq!(same_zoom, match_opts3, "If the zoom is the same as the original, adjusted MatchOpts should be a clone of the original");
     let zoomed_out_1z = match_opts3.adjust_to_zoom(3);
@@ -217,27 +215,25 @@ fn adjust_to_zoom_test_proximity() {
     let zoomed_out_2z = match_opts3.adjust_to_zoom(2);
     let proximity_out_2z = zoomed_out_2z.proximity.unwrap();
     assert_eq!(proximity_out_2z.point, [1, 1], "4/6/6 zoomed out to zoom 2 should be 2/1/1");
-    assert_eq!(proximity_out_2z.radius, 400., "The adjusted radius should be the original radius");
-    assert_eq!(zoomed_out_2z.zoom, 2, "The adjusted zoom should be the target zoom");
     let zoomed_in_1z = match_opts3.adjust_to_zoom(5);
     let proximity_in_1z = zoomed_in_1z.proximity.unwrap();
     assert_eq!(proximity_in_1z.point, [12, 12], "4/6/6 zoomed in to zoom 5 should be 5/12/12");
-    assert_eq!(proximity_in_1z.radius, 400., "The adjusted radius should be the original radius");
     assert_eq!(zoomed_in_1z.zoom, 5, "The adjusted zoom should be the target zoom");
     let zoomed_in_2z = match_opts3.adjust_to_zoom(6);
     let proximity_in_2z = zoomed_in_2z.proximity.unwrap();
     assert_eq!(proximity_in_2z.point, [25, 25], "4/6/6 zoomed in to zoom 6 should be 6/25/25");
-    assert_eq!(proximity_in_2z.radius, 400., "The adjusted radius should be the original radius");
-    assert_eq!(zoomed_in_2z.zoom, 6, "The adjusted zoom should be the target zoom");
     let zoomed_in_3z = match_opts3.adjust_to_zoom(7);
     let proximity_in_3z = zoomed_in_3z.proximity.unwrap();
     assert_eq!(proximity_in_3z.point, [51, 51], "4/6/6 zoomed in to zoom 7 should be 7/51/51");
-    assert_eq!(proximity_in_3z.radius, 400., "The adjusted radius should be the original radius");
-    assert_eq!(zoomed_in_3z.zoom, 7, "The adjusted zoom should be the target zoom");
 }
 
 #[test]
 fn adjust_to_zoom_text_bbox() {
+    // Test bottom right most tile at highest zoom
+    let match_opts = MatchOpts { bbox: Some([32760, 32758, 32767, 32714]), zoom: 15, ..MatchOpts::default() };
+    let zoomed_in_16 = match_opts.adjust_to_zoom(16);
+    assert_eq!(zoomed_in_16.bbox.unwrap(), [65520, 65516, 65535, 65429], "does not error while zooming into the right most tile on the highest zoom level");
+
     // Test case where single parent tile contains entire bbox
     let match_opts = MatchOpts { bbox: Some([6, 4, 7, 5]), zoom: 4, ..MatchOpts::default() };
     let zoomed_out_1z = match_opts.adjust_to_zoom(3);
