@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/mapbox/carmen-core.svg?branch=master)](https://travis-ci.org/mapbox/carmen-core)
+[![codecov](https://codecov.io/gh/mapbox/carmen-core/branch/master/graph/badge.svg)](https://codecov.io/gh/mapbox/carmen-core)
 
 ## carmen-core
 Carmen-core is a backend storage library for [Carmen](https://github.com/mapbox/carmen) written in Rust. This repository contains both a Rust library (in `rust-src`) and a Javascript wrapper around that library (in `index.js` and `native`).
