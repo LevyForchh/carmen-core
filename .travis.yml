@@ -12,7 +12,7 @@ matrix:
       - rustup component add rustfmt
 
       before_cache:
-      - cargo install cargo-tarpaulin -f
+      - cargo install cargo-tarpaulin
 
       script:
       - cargo clean
