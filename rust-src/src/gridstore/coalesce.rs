@@ -154,13 +154,13 @@ fn coalesce_single<T: Borrow<GridStore> + Clone>(
         .collect();
 
     contexts.sort_by_key(|context| {
-        (
-            Reverse(OrderedFloat(context.relev)),
-            Reverse(OrderedFloat(context.entries[0].scoredist)),
-            context.entries[0].grid_entry.id,
+        Reverse((
+            OrderedFloat(context.relev),
+            OrderedFloat(context.entries[0].scoredist),
             context.entries[0].grid_entry.x,
             context.entries[0].grid_entry.y,
-        )
+            context.entries[0].grid_entry.id,
+        ))
     });
 
     contexts.truncate(MAX_CONTEXTS);
@@ -320,9 +320,9 @@ fn coalesce_multi<T: Borrow<GridStore> + Clone>(
             Reverse(OrderedFloat(context.relev)),
             Reverse(OrderedFloat(context.entries[0].scoredist)),
             context.entries[0].idx,
-            context.entries[0].grid_entry.id,
-            context.entries[0].grid_entry.x,
-            context.entries[0].grid_entry.y,
+            Reverse(context.entries[0].grid_entry.x),
+            Reverse(context.entries[0].grid_entry.y),
+            Reverse(context.entries[0].grid_entry.id),
         )
     });
 
