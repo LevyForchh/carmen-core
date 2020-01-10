@@ -230,9 +230,14 @@ fn adjust_to_zoom_test_proximity() {
 #[test]
 fn adjust_to_zoom_text_bbox() {
     // Test bottom right most tile at highest zoom
-    let match_opts = MatchOpts { bbox: Some([32760, 32758, 32767, 32714]), zoom: 15, ..MatchOpts::default() };
+    let match_opts =
+        MatchOpts { bbox: Some([32760, 32758, 32767, 32714]), zoom: 15, ..MatchOpts::default() };
     let zoomed_in_16 = match_opts.adjust_to_zoom(16);
-    assert_eq!(zoomed_in_16.bbox.unwrap(), [65520, 65516, 65535, 65429], "does not error while zooming into the right most tile on the highest zoom level");
+    assert_eq!(
+        zoomed_in_16.bbox.unwrap(),
+        [65520, 65516, 65535, 65429],
+        "does not error while zooming into the right most tile on the highest zoom level"
+    );
 
     // Test case where single parent tile contains entire bbox
     let match_opts = MatchOpts { bbox: Some([6, 4, 7, 5]), zoom: 4, ..MatchOpts::default() };
