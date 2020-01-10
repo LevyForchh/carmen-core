@@ -1,4 +1,5 @@
 use carmen_core::gridstore::*;
+use once_cell::sync::Lazy;
 use test_utils::*;
 
 const ALL_LANGUAGES: u128 = u128::max_value();
@@ -266,7 +267,7 @@ fn coalesce_multi_test_language_penalty() {
 }
 
 #[test]
-fn coalesce_single_test() {
+fn coalesce_single_no_proximity_no_bbox_test() {
     let store = create_store(vec![StoreEntryBuildingBlock {
         grid_key: GridKey { phrase_id: 1, lang_set: 1 },
         entries: vec![
@@ -285,8 +286,6 @@ fn coalesce_single_test() {
     };
     let stack = vec![subquery];
 
-    // Test default opts - no proximity or bbox
-    println!("Coalsece single - no proximity, no bbox");
     let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
     let result = coalesce(stack.clone(), &match_opts).unwrap();
 
@@ -330,16 +329,36 @@ fn coalesce_single_test() {
         assert_eq!(result[2].entries[0].mask, 1 << 0, "3rd result has original mask");
         assert_eq!(result[2].entries[0].scoredist, 3., "3rd result scoredist is the grid score");
         assert_eq!(result[2].entries[0].grid_entry, GridEntry {
-                id: 2,
-                x: 2,
-                y: 2,
-                relev: 0.8,
-                score: 3,
-                source_phrase_hash: 0,
-            }, "3rd result grid entry is the lowest relevance, even though score is higher than 2nd");
+            id: 2,
+            x: 2,
+            y: 2,
+            relev: 0.8,
+            score: 3,
+            source_phrase_hash: 0,
+        }, "3rd result grid entry is the lowest relevance, even though score is higher than 2nd");
     }
-    // Test opts with proximity
-    println!("Coalsece single - with proximity");
+}
+
+#[test]
+fn coalesce_single_proximity_no_bbox_test() {
+    let store = create_store(vec![StoreEntryBuildingBlock {
+        grid_key: GridKey { phrase_id: 1, lang_set: 1 },
+        entries: vec![
+            GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 3, source_phrase_hash: 0 },
+            GridEntry { id: 2, x: 2, y: 2, relev: 0.8, score: 3, source_phrase_hash: 0 },
+            GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 1, source_phrase_hash: 0 },
+        ],
+    }]);
+    let subquery = PhrasematchSubquery {
+        store: &store,
+        weight: 1.,
+        match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 },
+        idx: 1,
+        zoom: 6,
+        mask: 1 << 0,
+    };
+    let stack = vec![subquery];
+
     let match_opts = MatchOpts {
         zoom: 6,
         proximity: Some(Proximity { point: [3, 3], radius: 40. }),
@@ -347,8 +366,8 @@ fn coalesce_single_test() {
     };
     let result = coalesce(stack.clone(), &match_opts).unwrap();
     #[cfg_attr(rustfmt, rustfmt::skip)]
-    {
-        assert_eq!(result[0].entries[0].grid_entry.id, 3, "1st result is the closest, even if its a slightly lower score");
+        {
+            assert_eq!(result[0].entries[0].grid_entry.id, 3, "1st result is the closest, even if its a slightly lower score");
         assert_eq!(result[1].entries[0].grid_entry.id, 1, "2nd result is farther away than 3rd but has a higher relevance");
         assert_eq!(result[2].entries[0].grid_entry.id, 2, "3rd is closer but has a lower relevance");
     }
@@ -425,12 +444,32 @@ fn coalesce_single_test() {
         },
         "2nd result has expected properties"
     );
+}
 
-    // Test with bbox
-    println!("Coalsece single - with bbox");
+#[test]
+fn coalesce_single_no_proximity_bbox_test() {
+    let store = create_store(vec![StoreEntryBuildingBlock {
+        grid_key: GridKey { phrase_id: 1, lang_set: 1 },
+        entries: vec![
+            GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 3, source_phrase_hash: 0 },
+            GridEntry { id: 2, x: 2, y: 2, relev: 0.8, score: 3, source_phrase_hash: 0 },
+            GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 1, source_phrase_hash: 0 },
+        ],
+    }]);
+    let subquery = PhrasematchSubquery {
+        store: &store,
+        weight: 1.,
+        match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 },
+        idx: 1,
+        zoom: 6,
+        mask: 1 << 0,
+    };
+    let stack = vec![subquery];
+
     let match_opts = MatchOpts { zoom: 6, bbox: Some([1, 1, 1, 1]), ..MatchOpts::default() };
     let result = coalesce(stack.clone(), &match_opts).unwrap();
-    assert_eq!(result[0].entries.len(), 1, "Only one result is within the bbox");
+    assert_eq!(result.len(), 1, "Only one result is within the bbox");
+    assert_eq!(result[0].entries.len(), 1, "Only one context in the result");
     assert_eq!(result[0].entries[0].grid_entry.id, 1, "Result is the one that's within the bbox");
     assert_eq!(
         result[0],
@@ -456,16 +495,36 @@ fn coalesce_single_test() {
         },
         "Result has expected properties"
     );
+}
 
-    // Test with bbox and proximity
-    println!("Coalesce single - with bbox and proximity");
+#[test]
+fn coalesce_single_proximity_bbox_test() {
+    let store = create_store(vec![StoreEntryBuildingBlock {
+        grid_key: GridKey { phrase_id: 1, lang_set: 1 },
+        entries: vec![
+            GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 3, source_phrase_hash: 0 },
+            GridEntry { id: 2, x: 2, y: 2, relev: 0.8, score: 3, source_phrase_hash: 0 },
+            GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 1, source_phrase_hash: 0 },
+        ],
+    }]);
+    let subquery = PhrasematchSubquery {
+        store: &store,
+        weight: 1.,
+        match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 },
+        idx: 1,
+        zoom: 6,
+        mask: 1 << 0,
+    };
+    let stack = vec![subquery];
+
     let match_opts = MatchOpts {
         zoom: 6,
         bbox: Some([1, 1, 1, 1]),
         proximity: Some(Proximity { point: [1, 1], radius: 40. }),
     };
     let result = coalesce(stack.clone(), &match_opts).unwrap();
-    assert_eq!(result[0].entries.len(), 1, "Only one result is within the bbox");
+    assert_eq!(result.len(), 1, "Only one result is within the bbox");
+    assert_eq!(result[0].entries.len(), 1, "Only one context in the result");
     assert_eq!(
         result[0],
         CoalesceContext {
@@ -490,7 +549,59 @@ fn coalesce_single_test() {
         },
         "Result has expected properties, including scoredist"
     );
-    // TODO: test with more than one result within bbox, to make sure results are still ordered by proximity?
+}
+
+#[test]
+fn coalesce_single_proximity_bbox_two_results_test() {
+    let store = create_store(vec![StoreEntryBuildingBlock {
+        grid_key: GridKey { phrase_id: 1, lang_set: 1 },
+        entries: vec![
+            GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 3, source_phrase_hash: 0 },
+            GridEntry { id: 2, x: 2, y: 2, relev: 1., score: 3, source_phrase_hash: 0 },
+            GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 3, source_phrase_hash: 0 },
+        ],
+    }]);
+    let subquery = PhrasematchSubquery {
+        store: &store,
+        weight: 1.,
+        match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 },
+        idx: 1,
+        zoom: 6,
+        mask: 1 << 0,
+    };
+    let stack = vec![subquery];
+
+    let match_opts = MatchOpts {
+        zoom: 6,
+        bbox: Some([1, 1, 2, 2]),
+        proximity: Some(Proximity { point: [3, 3], radius: 40. }),
+    };
+    let result = coalesce(stack.clone(), &match_opts).unwrap();
+    assert_eq!(result.len(), 2, "Two results is within the bbox");
+    assert_eq!(
+        result[0],
+        CoalesceContext {
+            mask: 1 << 0,
+            relev: 1.,
+            entries: vec![CoalesceEntry {
+                matches_language: true,
+                idx: 1,
+                tmp_id: 33554434,
+                mask: 1 << 0,
+                distance: std::f64::consts::SQRT_2,
+                scoredist: 1.109893833332405,
+                grid_entry: GridEntry {
+                    id: 2,
+                    x: 2,
+                    y: 2,
+                    relev: 1.,
+                    score: 3,
+                    source_phrase_hash: 0,
+                },
+            }],
+        },
+        "Result has expected properties, including scoredist"
+    );
 }
 
 #[test]
