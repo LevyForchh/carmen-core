@@ -211,10 +211,11 @@ struct QueueElement<T: Iterator<Item = MatchEntry>> {
 }
 
 impl<T: Iterator<Item = MatchEntry>> QueueElement<T> {
-    fn sort_key(&self) -> (OrderedFloat<f64>, OrderedFloat<f64>, u16, u16, u32) {
+    fn sort_key(&self) -> (OrderedFloat<f64>, OrderedFloat<f64>, bool, u16, u16, u32) {
         (
             OrderedFloat(self.next_entry.grid_entry.relev),
             OrderedFloat(self.next_entry.scoredist),
+            self.next_entry.matches_language,
             self.next_entry.grid_entry.x,
             self.next_entry.grid_entry.y,
             self.next_entry.grid_entry.id,
