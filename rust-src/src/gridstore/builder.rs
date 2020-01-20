@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use failure::{Error, Fail};
 use itertools::Itertools;
 use morton::interleave_morton;
-use rocksdb::{DBCompressionType, Options, DB};
+use rocksdb::{Options, DB};
 use smallvec::{smallvec, SmallVec};
 
 use crate::gridstore::common::*;
@@ -320,6 +320,27 @@ fn append_test() {
     assert_ne!(entry, None);
     assert_eq!(entry.unwrap().len(), 3, "Entry contains three grids");
 
+    builder.finish().unwrap();
+}
+
+#[test]
+fn compact_append_test() {
+    let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
+    let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
+
+    let key = GridKey { phrase_id: 1, lang_set: 1 };
+
+    builder
+        .insert(
+            &key,
+            vec![GridEntry { id: 2, x: 2, y: 2, relev: 1., score: 1, source_phrase_hash: 0 }],
+        )
+        .expect("Unable to insert record");
+
+    builder.compact_append(&key, 1., 1, 2, 0, &[(0, 0)]);
+    let entry = builder.data.get(&key);
+    assert_ne!(entry, None);
+    assert_eq!(entry.unwrap().len(), 1);
     builder.finish().unwrap();
 }
 

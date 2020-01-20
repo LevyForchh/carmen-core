@@ -9,7 +9,7 @@ use itertools::Itertools;
 use min_max_heap::MinMaxHeap;
 use morton::deinterleave_morton;
 use ordered_float::OrderedFloat;
-use rocksdb::{DBCompressionType, Direction, IteratorMode, Options, DB};
+use rocksdb::{Direction, IteratorMode, Options, DB};
 
 use crate::gridstore::common::*;
 use crate::gridstore::gridstore_format;
