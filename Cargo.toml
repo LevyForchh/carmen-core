@@ -37,6 +37,6 @@ harness = false
 # https://github.com/rust-rocksdb/rust-rocksdb/pull/268 lands
 [dependencies.rocksdb]
 git = "https://github.com/apendleton/rust-rocksdb.git"
-rev = "a456e3c5c5ecb512f8be3c2a429cd4358029a395"
+rev = "af197ad995eda9508f90ae96a625a33f83fce16d"
 default-features = false
 features = ["lz4"]
