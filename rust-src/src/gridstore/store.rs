@@ -109,41 +109,38 @@ fn decode_matching_value<T: AsRef<[u8]>>(
             let nested_ref = _ref.1;
             let coords_per_score = score_groups.into_iter().map(move |(_, score, rs_obj)| {
                 let coords_vec = gridstore_format::read_uniform_vec_raw(nested_ref, rs_obj.coords);
-                let coords = match &match_opts {
-                    MatchOpts { bbox: None, proximity: None, .. } => {
-                        Some(Box::new(coords_vec.into_iter())
-                            as Box<Iterator<Item = gridstore_format::Coord>>)
-                    }
-                    MatchOpts { bbox: Some(bbox), proximity: None, .. } => {
-                        // TODO should the bbox argument be changed to a reference in bbox? The compiler was complaining
-                        match spatial::bbox_filter(coords_vec, *bbox) {
-                            Some(v) => {
-                                Some(Box::new(v) as Box<Iterator<Item = gridstore_format::Coord>>)
-                            }
-                            None => None,
+                let coords =
+                    match &match_opts {
+                        MatchOpts { bbox: None, proximity: None, .. } => {
+                            Some(Box::new(coords_vec.into_iter())
+                                as Box<dyn Iterator<Item = gridstore_format::Coord>>)
                         }
-                    }
-                    MatchOpts { bbox: None, proximity: Some(prox_pt), .. } => {
-                        match spatial::proximity(coords_vec, prox_pt.point) {
-                            Some(v) => {
-                                Some(Box::new(v) as Box<Iterator<Item = gridstore_format::Coord>>)
+                        MatchOpts { bbox: Some(bbox), proximity: None, .. } => {
+                            match spatial::bbox_filter(coords_vec, *bbox) {
+                                Some(v) => Some(Box::new(v)
+                                    as Box<dyn Iterator<Item = gridstore_format::Coord>>),
+                                None => None,
                             }
-                            None => None,
                         }
-                    }
-                    MatchOpts { bbox: Some(bbox), proximity: Some(prox_pt), .. } => {
-                        match spatial::bbox_proximity_filter(coords_vec, *bbox, prox_pt.point) {
-                            Some(v) => {
-                                Some(Box::new(v) as Box<Iterator<Item = gridstore_format::Coord>>)
+                        MatchOpts { bbox: None, proximity: Some(prox_pt), .. } => {
+                            match spatial::proximity(coords_vec, prox_pt.point) {
+                                Some(v) => Some(Box::new(v)
+                                    as Box<dyn Iterator<Item = gridstore_format::Coord>>),
+                                None => None,
                             }
-                            None => None,
                         }
-                    }
-                };
+                        MatchOpts { bbox: Some(bbox), proximity: Some(prox_pt), .. } => {
+                            match spatial::bbox_proximity_filter(coords_vec, *bbox, prox_pt.point) {
+                                Some(v) => Some(Box::new(v)
+                                    as Box<dyn Iterator<Item = gridstore_format::Coord>>),
+                                None => None,
+                            }
+                        }
+                    };
 
                 let coords = coords.unwrap_or_else(|| {
                     Box::new((Option::<gridstore_format::Coord>::None).into_iter())
-                        as Box<Iterator<Item = gridstore_format::Coord>>
+                        as Box<dyn Iterator<Item = gridstore_format::Coord>>
                 });
                 let match_opts = match_opts.clone();
                 coords.map(move |coords_obj| {
@@ -214,10 +211,11 @@ struct QueueElement<T: Iterator<Item = MatchEntry>> {
 }
 
 impl<T: Iterator<Item = MatchEntry>> QueueElement<T> {
-    fn sort_key(&self) -> (OrderedFloat<f64>, OrderedFloat<f64>, u16, u16, u32) {
+    fn sort_key(&self) -> (OrderedFloat<f64>, OrderedFloat<f64>, bool, u16, u16, u32) {
         (
             OrderedFloat(self.next_entry.grid_entry.relev),
             OrderedFloat(self.next_entry.scoredist),
+            self.next_entry.matches_language,
             self.next_entry.grid_entry.x,
             self.next_entry.grid_entry.y,
             self.next_entry.grid_entry.id,
@@ -347,241 +345,6 @@ impl GridStore {
             }
         });
         Ok(iter)
-    }
-
-    // this is only called this because of inertia -- I'm open to a rename
-    #[inline(never)]
-    pub fn get_matching(
-        &self,
-        match_key: &MatchKey,
-        match_opts: &MatchOpts,
-    ) -> Result<impl Iterator<Item = MatchEntry>, Error> {
-        let (fetch_start, fetch_end, fetch_type_marker) = match match_key.match_phrase {
-            MatchPhrase::Exact(id) => (id, id + 1, 0),
-            MatchPhrase::Range { start, end } => {
-                if self.bin_boundaries.contains(&start) && self.bin_boundaries.contains(&end) {
-                    (start, end, 1)
-                } else {
-                    (start, end, 0)
-                }
-            }
-        };
-
-        let match_opts = match_opts.clone();
-        let mut record_refs: Vec<(Box<[u8]>, &'static [u8], bool)> = Vec::new();
-
-        let mut range_key = match_key.clone();
-        range_key.match_phrase = MatchPhrase::Range { start: fetch_start, end: fetch_end };
-        let mut db_key: Vec<u8> = Vec::new();
-        range_key.write_start_to(fetch_type_marker, &mut db_key)?;
-
-        let db_iter = self
-            .db
-            .iterator(IteratorMode::From(&db_key, Direction::Forward))
-            .take_while(|(k, _)| range_key.matches_key(fetch_type_marker, k).unwrap());
-
-        for (key, value) in db_iter {
-            let matches_language = match_key.matches_language(&key).unwrap();
-            let record_ref = {
-                let value_ref: &[u8] = value.as_ref();
-                // same approach as in get above -- maybe sketchy
-                let static_ref: &'static [u8] = unsafe { std::mem::transmute(value_ref) };
-                (value, static_ref, matches_language)
-            };
-            record_refs.push(record_ref);
-        }
-
-        // eagerly bucket all the relev/score chunks from all the groups
-        // DB entries into a single set
-        let mut coords_for_relev = BTreeMap::new();
-        for record_ref in &record_refs {
-            let record: gridstore_format::PhraseRecord = {
-                let reader = gridstore_format::Reader::new(&record_ref.1);
-                reader.read_root()
-            };
-
-            let rs_vec = gridstore_format::read_var_vec_raw(record_ref.1, record.relev_scores);
-            let matches_language = record_ref.2;
-
-            for rs_obj in rs_vec.into_iter() {
-                let relev_score = rs_obj.relev_score;
-                let relev = relev_int_to_float(relev_score >> 4);
-                // mask for the least significant four bits
-                let score = relev_score & 15;
-
-                let coords_vec =
-                    gridstore_format::read_uniform_vec_raw(record_ref.1, rs_obj.coords);
-                // TODO could this be a reference? The compiler was saying:
-                // "cannot move out of captured variable in an `FnMut` closure"
-                // "help: consider borrowing here: `&match_opts`rustc(E0507)""
-                let coords = match &match_opts {
-                    MatchOpts { bbox: None, proximity: None, .. } => {
-                        Some(Box::new(coords_vec.into_iter())
-                            as Box<Iterator<Item = gridstore_format::Coord>>)
-                    }
-                    MatchOpts { bbox: Some(bbox), proximity: None, .. } => {
-                        // TODO should the bbox argument be changed to a reference in bbox? The compiler was complaining
-                        match spatial::bbox_filter(coords_vec, *bbox) {
-                            Some(v) => {
-                                Some(Box::new(v) as Box<Iterator<Item = gridstore_format::Coord>>)
-                            }
-                            None => None,
-                        }
-                    }
-                    MatchOpts { bbox: None, proximity: Some(prox_pt), .. } => {
-                        match spatial::proximity(coords_vec, prox_pt.point) {
-                            Some(v) => {
-                                Some(Box::new(v) as Box<Iterator<Item = gridstore_format::Coord>>)
-                            }
-                            None => None,
-                        }
-                    }
-                    MatchOpts { bbox: Some(bbox), proximity: Some(prox_pt), .. } => {
-                        match spatial::bbox_proximity_filter(coords_vec, *bbox, prox_pt.point) {
-                            Some(v) => {
-                                Some(Box::new(v) as Box<Iterator<Item = gridstore_format::Coord>>)
-                            }
-                            None => None,
-                        }
-                    }
-                };
-
-                if coords.is_some() {
-                    let slot =
-                        coords_for_relev.entry(OrderedFloat(relev)).or_insert_with(|| vec![]);
-                    slot.push((score, matches_language, coords.unwrap(), record_ref.1));
-                }
-            }
-        }
-
-        struct SortGroup {
-            coord: gridstore_format::Coord,
-            buffer: &'static [u8],
-            scoredist: f64,
-            x: u16,
-            y: u16,
-            score: u8,
-            distance: f64,
-            matches_language: bool,
-            within_radius: bool,
-        }
-
-        let out = coords_for_relev.into_iter().rev().flat_map(move |(relev, coord_sets)| {
-            let match_opts = match_opts.clone();
-            // this is necessitated by the unsafe hackery above: we need to grab a reference
-            // to ref_set so that it gets moved into the closure, so that its memory doesn't
-            // get freed before we're done with it
-            let _ref_set = &record_refs;
-            let relev = relev.into_inner();
-            // for each relev/score, lazily k-way-merge the child entities by z-order curve value
-            let merged = coord_sets
-                .into_iter()
-                .map(move |(score, matches_language, coord_vec, buffer)| {
-                    let match_opts = match_opts.clone();
-                    coord_vec.map(move |coord| {
-                        let (x, y) = deinterleave_morton(coord.coord);
-                        let (distance, within_radius, scoredist) = match &match_opts {
-                            MatchOpts { proximity: Some(prox_pt), zoom, .. } => {
-                                let distance =
-                                    spatial::tile_dist(prox_pt.point[0], prox_pt.point[1], x, y);
-                                (
-                                    distance,
-                                    // The proximity radius calculation is also done in scoredist
-                                    // There could be an opportunity to optimize by doing it once
-                                    distance <= spatial::proximity_radius(*zoom, prox_pt.radius),
-                                    spatial::scoredist(*zoom, distance, score, prox_pt.radius),
-                                )
-                            }
-                            _ => (0f64, false, score as f64),
-                        };
-                        SortGroup {
-                            coord,
-                            buffer,
-                            scoredist,
-                            x,
-                            y,
-                            score,
-                            distance,
-                            matches_language,
-                            within_radius,
-                        }
-                    })
-                })
-                .kmerge_by(|a, b| {
-                    (a.matches_language || a.within_radius, a.scoredist)
-                        .partial_cmp(&(b.matches_language || b.within_radius, b.scoredist))
-                        .unwrap()
-                        == Ordering::Greater
-                });
-
-            // group together entries from different keys that have the same scoredist, x, and y
-            somewhat_eager_groupby(merged, |a| {
-                ((*a).scoredist, (*a).x, (*a).y, (*a).matches_language, (*a).within_radius)
-            })
-            .flat_map(
-                move |((scoredist, x, y, matches_language, within_radius), coords_obj_group)| {
-                    // get all the feature IDs from all the entries with the same scoredist/X/Y, and eagerly
-                    // combine them and sort descending if necessary (if there's only one entry,
-                    // it's already sorted)
-                    let mut distance = 0f64;
-                    let mut score = 0;
-                    let all_ids: Vec<u32> = match coords_obj_group.len() {
-                        0 => Vec::new(),
-                        1 => {
-                            score = coords_obj_group[0].score;
-                            distance = coords_obj_group[0].distance;
-
-                            let ids = gridstore_format::read_fixed_vec_raw(
-                                coords_obj_group[0].buffer,
-                                coords_obj_group[0].coord.ids,
-                            );
-
-                            ids.into_iter().collect()
-                        }
-                        _ => {
-                            let mut ids = Vec::new();
-                            score = coords_obj_group[0].score;
-                            distance = coords_obj_group[0].distance;
-                            for group in coords_obj_group {
-                                let ids_vec = gridstore_format::read_fixed_vec_raw(
-                                    group.buffer,
-                                    group.coord.ids,
-                                );
-                                ids.extend(ids_vec.into_iter());
-                            }
-                            ids.sort_by(|a, b| b.cmp(a));
-                            ids.dedup();
-                            ids
-                        }
-                    };
-
-                    all_ids.into_iter().map(move |id_comp| {
-                        let id = id_comp >> 8;
-                        let source_phrase_hash = (id_comp & 255) as u8;
-                        MatchEntry {
-                            grid_entry: GridEntry {
-                                relev: relev
-                                    * (if matches_language || within_radius {
-                                        1f64
-                                    } else {
-                                        0.96f64
-                                    }),
-                                score,
-                                x,
-                                y,
-                                id,
-                                source_phrase_hash,
-                            },
-                            matches_language,
-                            distance,
-                            scoredist,
-                        }
-                    })
-                },
-            )
-        });
-
-        Ok(out)
     }
 
     pub fn keys<'i>(&'i self) -> impl Iterator<Item = Result<GridKey, Error>> + 'i {
