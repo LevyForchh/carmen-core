@@ -57,21 +57,23 @@ fn get_encoded_value(value: BuilderEntry) -> Result<Vec<u8>, Error> {
     let mut builder = gridstore_format::Writer::new();
 
     let mut items: Vec<(_, _)> = value.into_iter().collect();
-    items.sort_by(|a, b| b.0.cmp(&a.0));
+    items.sort_by(|(relevance_score_a, _), (relevance_score_b, _)| {
+        relevance_score_b.cmp(&relevance_score_a)
+    });
 
-    let mut rses: Vec<_> = Vec::with_capacity(items.len());
+    let mut relevance_scores: Vec<_> = Vec::with_capacity(items.len());
 
     let mut id_lists: HashMap<_, gridstore_format::FixedVecOffset<u32>> = HashMap::new();
 
-    for (rs, coord_group) in items.into_iter() {
+    for (relevance_score, coord_group) in items.into_iter() {
         let mut inner_items: Vec<(_, _)> = coord_group.into_iter().collect();
-        inner_items.sort_by(|a, b| b.0.cmp(&a.0));
+        inner_items.sort_by(|(coord_a, _), (coord_b, _)| coord_b.cmp(&coord_a));
 
         let mut coords: Vec<_> = Vec::with_capacity(inner_items.len());
 
         for (coord, mut ids) in inner_items.into_iter() {
             // reverse sort
-            ids.sort_by(|a, b| b.cmp(a));
+            ids.sort_by(|id_a, id_b| id_b.cmp(id_a));
             ids.dedup();
 
             let encoded_ids =
@@ -81,13 +83,14 @@ fn get_encoded_value(value: BuilderEntry) -> Result<Vec<u8>, Error> {
             coords.push(encoded_coord);
         }
         let encoded_coords = builder.write_uniform_vec(&coords);
-        let encoded_rs = gridstore_format::RelevScore { relev_score: rs, coords: encoded_coords };
-        rses.push(encoded_rs);
+        let encoded_relevance_score =
+            gridstore_format::RelevScore { relev_score: relevance_score, coords: encoded_coords };
+        relevance_scores.push(encoded_relevance_score);
     }
 
-    let encoded_rses = builder.write_var_vec(&rses);
+    let encoded_relevance_scores = builder.write_var_vec(&relevance_scores);
 
-    let record = gridstore_format::PhraseRecord { relev_scores: encoded_rses };
+    let record = gridstore_format::PhraseRecord { relev_scores: encoded_relevance_scores };
     builder.write_fixed_scalar(record);
 
     Ok(builder.finish())
@@ -132,11 +135,11 @@ impl GridStoreBuilder {
 
         let relev_score = (relev_float_to_int(relev) << 4) | score;
         let id_hash = smallvec![(id << 8) | (source_phrase_hash as u32)];
-        let rs_entry =
+        let relevance_score_entry =
             to_append.entry(relev_score).or_insert_with(|| HashMap::with_capacity(coords.len()));
         for pair in coords {
             let zcoord = interleave_morton(pair.0, pair.1);
-            match rs_entry.entry(zcoord) {
+            match relevance_score_entry.entry(zcoord) {
                 HmEntry::Vacant(e) => {
                     e.insert(id_hash.clone());
                 }
