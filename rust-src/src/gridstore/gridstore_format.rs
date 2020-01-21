@@ -50,11 +50,13 @@ impl<T: FixedEncodable> FixedVecOffset<T> {
         Self { addr, phantom: PhantomData }
     }
 
+    #[allow(dead_code)]
     fn from_fixed_pointer(data: &[u8], offset: usize) -> Self {
         let ptr = u32::from_le_bytes(data[offset..(offset + 4)].try_into().unwrap());
         Self::new(ptr as usize)
     }
 
+    #[allow(dead_code)]
     fn from_var_pointer(data: &[u8], offset: usize) -> (Self, usize) {
         let (ptr, len_len) = u32::decode_var(&data[offset..]);
         (Self::new(ptr as usize), len_len)
@@ -77,6 +79,7 @@ impl<T: VarEncodable> VarVecOffset<T> {
         Self::new(ptr as usize)
     }
 
+    #[allow(dead_code)]
     fn from_var_pointer(data: &[u8], offset: usize) -> (Self, usize) {
         let (ptr, len_len) = u32::decode_var(&data[offset..]);
         (Self::new(ptr as usize), len_len)
@@ -94,6 +97,7 @@ impl<T: UniformEncodable> UniformVecOffset<T> {
         Self { addr, phantom: PhantomData }
     }
 
+    #[allow(dead_code)]
     fn from_fixed_pointer(data: &[u8], offset: usize) -> Self {
         let ptr = u32::from_le_bytes(data[offset..(offset + 4)].try_into().unwrap());
         Self::new(ptr as usize)
@@ -132,6 +136,7 @@ impl Writer {
         Writer { data: Vec::new() }
     }
 
+    #[allow(dead_code)]
     pub fn write_var_scalar<T: VarEncodable>(&mut self, s: T) -> VarScalarOffset<T> {
         let loc = self.data.len();
         s.write_to(&mut self.data);
@@ -144,6 +149,7 @@ impl Writer {
         FixedScalarOffset::new(loc)
     }
 
+    #[allow(dead_code)]
     pub fn write_uniform_scalar_with_size<T: UniformEncodable>(
         &mut self,
         s: T,
@@ -208,6 +214,7 @@ impl<U: AsRef<[u8]>> Reader<U> {
         T::read_fixed_from(self.data.as_ref(), offset)
     }
 
+    #[allow(dead_code)]
     pub fn read_var_scalar<'a, T: VarEncodable>(
         &'a self,
         offset: VarScalarOffset<T>,
@@ -215,6 +222,7 @@ impl<U: AsRef<[u8]>> Reader<U> {
         T::read_from(self.data.as_ref(), offset)
     }
 
+    #[allow(dead_code)]
     pub fn read_uniform_scalar<'a, T: UniformEncodable>(
         &'a self,
         size: usize,
@@ -223,6 +231,7 @@ impl<U: AsRef<[u8]>> Reader<U> {
         T::read_with_size_from(self.data.as_ref(), size, offset)
     }
 
+    #[allow(dead_code)]
     pub fn read_fixed_vec<'a, T: FixedEncodable>(
         &'a self,
         offset: FixedVecOffset<T>,
@@ -230,10 +239,12 @@ impl<U: AsRef<[u8]>> Reader<U> {
         FixedVec::new(self.data.as_ref(), offset)
     }
 
+    #[allow(dead_code)]
     pub fn read_var_vec<'a, T: VarEncodable>(&'a self, offset: VarVecOffset<T>) -> VarVec<'a, T> {
         VarVec::new(self.data.as_ref(), offset)
     }
 
+    #[allow(dead_code)]
     pub fn read_uniform_vec<'a, T: UniformEncodable>(
         &'a self,
         offset: UniformVecOffset<T>,
@@ -288,10 +299,12 @@ impl<'a, T: FixedEncodable> FixedVec<'a, T> {
         T::read_fixed_from(self.data, FixedScalarOffset::new(offset))
     }
 
+    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.len
     }
 
+    #[allow(dead_code)]
     pub fn iter(&self) -> impl Iterator<Item = T> + '_ {
         (0..self.len).map(move |idx| self.get(idx))
     }
@@ -316,10 +329,12 @@ impl<'a, T: VarEncodable> VarVec<'a, T> {
         VarVec { data, start, len: len.try_into().unwrap(), phantom: PhantomData }
     }
 
+    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.len
     }
 
+    #[allow(dead_code)]
     pub fn iter(&self) -> impl Iterator<Item = T> + '_ {
         let mut loc: usize = self.start;
         let mut i: usize = 0;
@@ -377,6 +392,7 @@ impl<'a, T: UniformEncodable> UniformVec<'a, T> {
         self.len
     }
 
+    #[allow(dead_code)]
     pub fn iter(&self) -> impl Iterator<Item = T> + '_ {
         (0..self.len).map(move |idx| self.get(idx))
     }
@@ -496,6 +512,10 @@ fn test_write() {
         Grid { relev_score: 210, coord: 15, id: 636 },
         Grid { relev_score: 250, coord: 8420, id: 1 },
         Grid { relev_score: 106, coord: 2, id: 8 },
+        Grid { relev_score: 65, coord: 3, id: 8 },
+        Grid { relev_score: 65, coord: 65536, id: 8 },
+        Grid { relev_score: 66, coord: 4, id: 8 },
+        Grid { relev_score: 66, coord: 16777215, id: 8 },
     ];
 
     grids.sort_by(|a, b| b.cmp(&a));
@@ -522,13 +542,25 @@ fn test_write() {
     let r_reader = read_phrase_record_from(&reader);
 
     let mut out_grids = Vec::new();
-    for rs in reader.read_var_vec(r_reader.relev_scores).iter() {
-        for coord in reader.read_uniform_vec(rs.coords).iter() {
-            for id in reader.read_fixed_vec(coord.ids).iter() {
-                out_grids.push(Grid { relev_score: rs.relev_score, coord: coord.coord, id })
+    let mut rs_count = 0;
+    let rses = reader.read_var_vec(r_reader.relev_scores);
+    for rs in rses.iter() {
+        let mut coord_count = 0;
+        let coords = reader.read_uniform_vec(rs.coords);
+        for coord in coords.iter() {
+            let mut id_count = 0;
+            let ids = reader.read_fixed_vec(coord.ids);
+            for id in ids.iter() {
+                out_grids.push(Grid { relev_score: rs.relev_score, coord: coord.coord, id });
+                id_count += 1;
             }
+            assert_eq!(id_count, ids.len());
+            coord_count += 1;
         }
+        assert_eq!(coord_count, coords.len());
+        rs_count += 1;
     }
+    assert_eq!(rs_count, rses.len());
 
     let deduped_grids: Vec<_> = grids.iter().cloned().dedup().collect();
     assert_eq!(deduped_grids, out_grids);

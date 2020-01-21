@@ -82,7 +82,7 @@ fn coalesce_single<T: Borrow<GridStore> + Clone>(
     let mut min_scoredist = std::f64::MAX;
     let mut feature_count: usize = 0;
 
-    let mut coalesced: HashMap<(u32), CoalesceEntry> = HashMap::new();
+    let mut coalesced: HashMap<u32, CoalesceEntry> = HashMap::new();
 
     for grid in grids {
         let coalesce_entry = grid_to_coalesce_entry(&grid, subquery, match_opts);

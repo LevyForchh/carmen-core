@@ -514,7 +514,7 @@ fn tiles_per_mile_by_zoom(zoom: u16) -> f64 {
         1.2000000000000002,
         1.8000000000000003,
     ];
-    if 0 <= zoom && zoom <= 16 {
+    if zoom <= 16 {
         TILES_PER_MILE_BY_ZOOM[zoom as usize]
     } else {
         0.8 * 1.5_f64.powi((zoom - 14) as i32)
