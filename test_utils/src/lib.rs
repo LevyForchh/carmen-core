@@ -152,13 +152,16 @@ pub fn ensure_downloaded(datafile: &str) -> PathBuf {
     path
 }
 
+pub const GRIDSTORE_DATA_SUFFIX: &'static str = ".gridstore.dat.lz4";
+pub const PREFIX_BOUNDARY_SUFFIX: &'static str = ".splits.lz4";
+
 pub fn ensure_store(datafile: &str) -> PathBuf {
     let tmp = std::env::temp_dir().join("carmen_core_data/indexes");
     std::fs::create_dir_all(&tmp).unwrap();
     let idx_path = tmp.join(Path::new(&datafile.replace(".dat.lz4", ".rocksdb")));
     if !idx_path.exists() {
         let grid_path = ensure_downloaded(datafile);
-        let splits_path = ensure_downloaded(&datafile.replace(".gridstore.dat.lz4", ".splits.lz4"));
+        let splits_path = ensure_downloaded(&datafile.replace(GRIDSTORE_DATA_SUFFIX, PREFIX_BOUNDARY_SUFFIX));
 
         let grid_decoder = Decoder::new(File::open(grid_path).unwrap()).unwrap();
         let grid_file = io::BufReader::new(grid_decoder);
