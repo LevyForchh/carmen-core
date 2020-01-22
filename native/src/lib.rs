@@ -68,7 +68,7 @@ declare_types! {
                 let mut gridstore = this.borrow_mut(&lock);
                 match gridstore.as_mut() {
                     Some(builder) => {
-                        builder.insert(&key, &values).map_err(|e| e.to_string())
+                        builder.insert(&key, values).map_err(|e| e.to_string())
                     }
                     None => {
                         Err("unable to insert()".to_string())
@@ -94,7 +94,48 @@ declare_types! {
                 let mut gridstore = this.borrow_mut(&lock);
                 match gridstore.as_mut() {
                     Some(builder) => {
-                        builder.append(&key, &values).map_err(|e| e.to_string())
+                        builder.append(&key, values).map_err(|e| e.to_string())
+                    }
+                    None => {
+                        Err("unable to insert()".to_string())
+                    }
+                }
+            };
+
+            match insert {
+                Ok(_) => Ok(JsUndefined::new().upcast()),
+                Err(e) => cx.throw_type_error(e)
+            }
+        }
+
+        method compactAppend(mut cx) {
+            let grid_key = cx.argument::<JsObject>(0)?;
+            let phrase_id: u32 = grid_key
+                .get(&mut cx, "phrase_id")?
+                .downcast::<JsNumber>()
+                .or_throw(&mut cx)?
+                .value() as u32;
+
+            let js_lang_set = grid_key.get(&mut cx, "lang_set")?;
+            let lang_set: u128 = langarray_to_langset(&mut cx, js_lang_set)?;
+
+            let key = GridKey { phrase_id, lang_set };
+
+            let relev = cx.argument::<JsNumber>(1)?.value() as f64;
+            let score = cx.argument::<JsNumber>(2)?.value() as u8;
+            let id = cx.argument::<JsNumber>(3)?.value() as u32;
+            let source_phrase_hash = cx.argument::<JsNumber>(4)?.value() as u8;
+            let js_coords = cx.argument::<JsValue>(5)?;
+            let coords: Vec<(u16, u16)> = neon_serde::from_value(&mut cx, js_coords)?;
+
+            let mut this = cx.this();
+
+            let insert: Result<(), String> = {
+                let lock = cx.lock();
+                let mut gridstore = this.borrow_mut(&lock);
+                match gridstore.as_mut() {
+                    Some(builder) => {
+                        Ok(builder.compact_append(&key, relev, score, id, source_phrase_hash, &coords))
                     }
                     None => {
                         Err("unable to insert()".to_string())
@@ -126,6 +167,39 @@ declare_types! {
                             }
                             None => {
                                 Err("can't call renumber after finish()".to_owned())
+                            }
+                        }
+                    },
+                    Err(e) => Err(e.to_string())
+                };
+
+                borrow_result
+            };
+
+            match result {
+                Ok(_) => Ok(JsUndefined::new().upcast()),
+                Err(e) => cx.throw_type_error(e)
+            }
+        }
+
+        method loadBinBoundaries(mut cx) {
+            let bin_boundaries = cx.argument::<JsArrayBuffer>(0)?;
+            let mut this = cx.this();
+
+            let result: Result<(), String> = {
+                let lock = cx.lock();
+
+                let borrow_result = match bin_boundaries.try_borrow(&lock) {
+                    Ok(data) => {
+                        let slice = data.as_slice::<u32>();
+
+                        let mut gridstore = this.borrow_mut(&lock);
+                        match gridstore.as_mut() {
+                            Some(builder) => {
+                                builder.load_bin_boundaries(slice.to_vec()).map_err(|e| e.to_string())
+                            }
+                            None => {
+                                Err("can't call loadBinBoundaries after finish()".to_owned())
                             }
                         }
                     },

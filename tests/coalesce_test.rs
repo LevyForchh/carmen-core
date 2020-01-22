@@ -16,7 +16,7 @@ fn coalesce_single_test_proximity_quadrants() {
         GridEntry { id: 3, x: 0, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },     // sw
         GridEntry { id: 4, x: 0, y: 200, relev: 1., score: 1, source_phrase_hash: 0 },   // nw
     ];
-    builder.insert(&key, &entries).expect("Unable to insert record");
+    builder.insert(&key, entries).expect("Unable to insert record");
 
     builder.finish().unwrap();
 
@@ -101,7 +101,7 @@ fn coalesce_single_test_proximity_basic() {
         GridEntry { id: 3, x: 0, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },
         GridEntry { id: 4, x: 0, y: 2, relev: 1., score: 1, source_phrase_hash: 0 },
     ];
-    builder.insert(&key, &entries).expect("Unable to insert record");
+    builder.insert(&key, entries).expect("Unable to insert record");
 
     builder.finish().unwrap();
 
@@ -151,7 +151,7 @@ fn coalesce_single_test_language_penalty() {
         GridEntry { id: 3, x: 0, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },
         GridEntry { id: 4, x: 0, y: 2, relev: 1., score: 1, source_phrase_hash: 0 },
     ];
-    builder.insert(&key, &entries).expect("Unable to insert record");
+    builder.insert(&key, entries).expect("Unable to insert record");
     builder.finish().unwrap();
 
     let store = GridStore::new(directory.path()).unwrap();
@@ -504,7 +504,7 @@ fn coalesce_single_languages_test() {
         let key = GridKey { phrase_id: 1, lang_set };
         let grid_entry =
             GridEntry { id: i as u32, x: 1, y: 1, relev: 1., score: 0, source_phrase_hash: 0 };
-        builder.insert(&key, &[grid_entry]).expect("Unable to insert record");
+        builder.insert(&key, vec![grid_entry]).expect("Unable to insert record");
     }
     builder.finish().unwrap();
 
@@ -530,19 +530,19 @@ fn coalesce_single_languages_test() {
     {
         assert_eq!(result.len(), 4, "Returns 4 results");
         assert_eq!(result[0].relev, 1., "1st result has relevance of 1");
-        assert_eq!(result[0].entries[0].grid_entry.id, 0, "1st result has lowest grid id, which is the tiebreaker for sorting");
+        assert_eq!(result[0].entries[0].grid_entry.id, 3, "1st result has highest grid id, which is the tiebreaker for sorting");
         assert_eq!(result[0].entries[0].grid_entry.relev, 1., "1st result grid has original relevance");
         assert_eq!(result[0].entries[0].matches_language, true, "1st result matches language");
         assert_eq!(result[1].relev, 1., "2nd result has original relevance");
-        assert_eq!(result[1].entries[0].grid_entry.id, 1, "2nd result is the 2nd highest grid id");
+        assert_eq!(result[1].entries[0].grid_entry.id, 2, "2nd result is the 2nd highest grid id");
         assert_eq!(result[1].entries[0].grid_entry.relev, 1., "2nd result grid has original relevance");
         assert_eq!(result[1].entries[0].matches_language, true, "2nd result matches language");
         assert_eq!(result[2].relev, 1., "3rd result has original relevance");
-        assert_eq!(result[2].entries[0].grid_entry.id, 2, "3rd result is the 3rd highest grid id");
+        assert_eq!(result[2].entries[0].grid_entry.id, 1, "3rd result is the 3rd highest grid id");
         assert_eq!(result[2].entries[0].grid_entry.relev, 1., "3rd result grid has original relevance");
         assert_eq!(result[2].entries[0].matches_language, true, "3rd result matches language");
         assert_eq!(result[3].relev, 1., "4th result has original relevance");
-        assert_eq!(result[3].entries[0].grid_entry.id, 3, "4th result is the 4th highest grid id");
+        assert_eq!(result[3].entries[0].grid_entry.id, 0, "4th result is the 4th highest grid id");
         assert_eq!(result[3].entries[0].grid_entry.relev, 1., "4th result grid has original relevance");
         assert_eq!(result[3].entries[0].matches_language, true, "4th result matches language");
     }
@@ -568,19 +568,19 @@ fn coalesce_single_languages_test() {
     {
         assert_eq!(result.len(), 4, "Returns 4 results");
         assert_eq!(result[0].relev, 1., "1st result has relevance of 1");
-        assert_eq!(result[0].entries[0].grid_entry.id, 0, "1st result is a grid with 0 in the lang set, and lowest grid id");
+        assert_eq!(result[0].entries[0].grid_entry.id, 2, "1st result is a grid with 0 in the lang set, and highest grid id");
         assert_eq!(result[0].entries[0].grid_entry.relev, 1., "1st result grid has original relevance");
         assert_eq!(result[0].entries[0].matches_language, true, "1st result matches language");
         assert_eq!(result[1].relev, 1., "2nd result has original relevance");
-        assert_eq!(result[1].entries[0].grid_entry.id, 2, "2nd result is a grid with 0 in the lang set");
+        assert_eq!(result[1].entries[0].grid_entry.id, 0, "2nd result is a grid with 0 in the lang set");
         assert_eq!(result[1].entries[0].grid_entry.relev, 1., "2nd result grid has original relevance");
         assert_eq!(result[1].entries[0].matches_language, true, "2nd result matches language");
         assert_eq!(result[2].relev, 0.96, "3rd result has reduced relevance");
-        assert_eq!(result[2].entries[0].grid_entry.id, 1, "3rd result is a grid that doesnt include lang 0");
+        assert_eq!(result[2].entries[0].grid_entry.id, 3, "3rd result is a grid that doesnt include lang 0");
         assert_eq!(result[2].entries[0].grid_entry.relev, 0.96, "3rd result grid has reduced relevance");
         assert_eq!(result[2].entries[0].matches_language, false, "3rd result does not match language");
         assert_eq!(result[3].relev, 0.96, "4th result has reduced relevance");
-        assert_eq!(result[3].entries[0].grid_entry.id, 3, "4th result is the 4th highest grid id");
+        assert_eq!(result[3].entries[0].grid_entry.id, 1, "4th result is the 4th highest grid id");
         assert_eq!(result[3].entries[0].grid_entry.relev, 0.96, "4th result grid has reduced relevance");
         assert_eq!(result[3].entries[0].matches_language, false, "4th result does not match language");
     }
@@ -606,19 +606,19 @@ fn coalesce_single_languages_test() {
     {
         assert_eq!(result.len(), 4, "Returns 4 results");
         assert_eq!(result[0].relev, 0.96, "1st result has reduced relevance");
-        assert_eq!(result[0].entries[0].grid_entry.id, 0, "1st result has lowest grid id, which is the tiebreaker for sorting");
+        assert_eq!(result[0].entries[0].grid_entry.id, 3, "1st result has highest grid id, which is the tiebreaker for sorting");
         assert_eq!(result[0].entries[0].grid_entry.relev, 0.96, "1st result grid has reduced relevance");
         assert_eq!(result[0].entries[0].matches_language, false, "1st result does not match language");
         assert_eq!(result[1].relev, 0.96, "2nd result has reduced relevance");
-        assert_eq!(result[1].entries[0].grid_entry.id, 1, "2nd result is the 2nd highest grid id");
+        assert_eq!(result[1].entries[0].grid_entry.id, 2, "2nd result is the 2nd highest grid id");
         assert_eq!(result[1].entries[0].grid_entry.relev, 0.96, "2nd result grid has reduced relevance");
         assert_eq!(result[1].entries[0].matches_language, false, "2nd result does not match language");
         assert_eq!(result[2].relev, 0.96, "3rd result has reduced relevance");
-        assert_eq!(result[2].entries[0].grid_entry.id, 2, "3rd result is the 3rd highest grid id");
+        assert_eq!(result[2].entries[0].grid_entry.id, 1, "3rd result is the 3rd highest grid id");
         assert_eq!(result[2].entries[0].grid_entry.relev, 0.96, "3rd result grid has reduced relevance");
         assert_eq!(result[2].entries[0].matches_language, false, "3rd result does not match language");
         assert_eq!(result[3].relev, 0.96, "4th result has reduced relevance");
-        assert_eq!(result[3].entries[0].grid_entry.id, 3, "4th result is the 4th highest grid id");
+        assert_eq!(result[3].entries[0].grid_entry.id, 0, "4th result is the 4th highest grid id");
         assert_eq!(result[3].entries[0].grid_entry.relev, 0.96, "4th result grid has reduced relevance");
         assert_eq!(result[3].entries[0].matches_language, false, "4th result does not match language");
     }
@@ -925,7 +925,7 @@ fn coalesce_multi_languages_test() {
         assert_eq!(result.len(), 2, "Two results are returned");
         assert_eq!(result[0].entries.len(), 2, "1st context has two entries");
         assert_eq!(result[0].relev, 1., "1st context has relevance of 1");
-        assert_eq!(result[0].entries[0].grid_entry.id, 2, "1st entry in 1st result has lowest grid id, which is the tiebreaker for sorting");
+        assert_eq!(result[0].entries[0].grid_entry.id, 3, "1st entry in 1st result has highest grid id, which is the tiebreaker for sorting");
         assert_eq!(result[0].entries[0].grid_entry.relev, 0.5, "1st entry in 1st result has original relevance" );
         assert_eq!(result[0].entries[0].matches_language, true, "1st entry in 1st result matches language" );
         assert_eq!(result[0].entries[1].grid_entry.id, 1, "2nd entry in 1st result is the overapping grid" );
@@ -933,7 +933,7 @@ fn coalesce_multi_languages_test() {
         assert_eq!(result[0].entries[1].matches_language, true, "2nd entry in 1st result matches language" );
         assert_eq!(result[1].entries.len(), 2, "2nd context has two entries");
         assert_eq!(result[1].relev, 1., "2nd context has relevance of 1");
-        assert_eq!(result[1].entries[0].grid_entry.id, 3, "1st entry in 2nd result is the higher grid id" );
+        assert_eq!(result[1].entries[0].grid_entry.id, 2, "1st entry in 2nd result is the lower grid id" );
         assert_eq!(result[1].entries[0].grid_entry.relev, 0.5, "1st entry in 2nd result has original relevance" );
         assert_eq!(result[1].entries[0].matches_language, true, "1st entry in 2nd result matches language" );
         assert_eq!(result[1].entries[1].grid_entry.id, 1, "2nd entry in 2nd result is the overlapping grid" );
@@ -1025,7 +1025,7 @@ fn coalesce_multi_languages_test() {
         assert_eq!(result.len(), 2, "Two results are returned");
         assert_eq!(result[0].entries.len(), 2, "1st context has two entries");
         assert_eq!(result[0].relev, 0.98, "1st context has lower overall relevance due to language penalty");
-        assert_eq!(result[0].entries[0].grid_entry.id, 2, "1st entry in 1st result has lowest grid id, which is the tiebreaker for sorting");
+        assert_eq!(result[0].entries[0].grid_entry.id, 3, "1st entry in 1st result has highest grid id, which is the tiebreaker for sorting");
         assert_eq!(result[0].entries[0].grid_entry.relev, 0.48, "1st entry in 1st result has lower relevance due to language penalty");
         assert_eq!(result[0].entries[0].matches_language, false, "1st entry in 1st result does not match language");
         assert_eq!(result[0].entries[1].grid_entry.id, 1, "2nd entry in 1st result is the overapping grid");
@@ -1033,7 +1033,7 @@ fn coalesce_multi_languages_test() {
         assert_eq!(result[0].entries[1].matches_language, true, "2nd entry in 1st result matches language");
         assert_eq!(result[1].entries.len(), 2, "2nd context has two entries");
         assert_eq!(result[1].relev, 0.98, "2nd context has lower overall relevance due to language penalty");
-        assert_eq!(result[1].entries[0].grid_entry.id, 3, "1st entry in 2nd result has the id of the other grid");
+        assert_eq!(result[1].entries[0].grid_entry.id, 2, "1st entry in 2nd result has the id of the other grid");
         assert_eq!(result[1].entries[0].grid_entry.relev, 0.48, "1st entry in 2nd result has lower relevance due to language penalty");
         assert_eq!(result[1].entries[0].matches_language, false, "1st entry in 2nd result does not match language");
         assert_eq!(result[1].entries[1].grid_entry.id, 1, "2nd entry in 2nd result is the overlapping grid");

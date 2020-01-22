@@ -4,10 +4,14 @@ matrix:
       sudo: required
       dist: xenial
       cache: cargo
-      rust: stable
+      rust:
+        - beta
 
       before_script:
       - rustup component add rustfmt
+
+      before_cache:
+      - cargo install cargo-tarpaulin
 
       script:
       - cargo clean
@@ -15,20 +19,8 @@ matrix:
       - cargo build
       - cargo test
 
-    - language: rust
-      sudo: required
-      dist: xenial
-      cache: cargo
-      rust: stable
-
-      before_install:
-      - sudo add-apt-repository ppa:sivakov512/kcov -y
-      - sudo apt-get update -q
-      - sudo apt-get install kcov nodejs
-
-      script: |
-        cargo install cargo-kcov -f
-        node keepalive.js cargo kcov -v
+      after_success: |
+        cargo tarpaulin --out Xml
         bash <(curl -s https://codecov.io/bash)
 
     - language: node_js

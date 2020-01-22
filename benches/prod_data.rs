@@ -91,14 +91,14 @@ pub fn benchmark(c: &mut Criterion) {
                 builder.replace(GridStoreBuilder::new(dir.as_mut().unwrap().path()).unwrap());
             }
             let record = &eur_records[i];
-            builder.as_mut().unwrap().insert(&record.grid_key, &record.entries).unwrap();
+            builder.as_mut().unwrap().insert(&record.grid_key, record.entries.clone()).unwrap();
 
             i = (i + 1) % (eur_records.len());
         })
     }));
 
-    let asi_records = Lazy::new(|| {
-        let dl_path = ensure_downloaded("asiopen_place_appends.ljson.lz4");
+    let us_records = Lazy::new(|| {
+        let dl_path = ensure_downloaded("us_south_address_appends.ljson.lz4");
         let decoder = Decoder::new(File::open(dl_path).unwrap()).unwrap();
         let file = io::BufReader::new(decoder);
 
@@ -116,7 +116,7 @@ pub fn benchmark(c: &mut Criterion) {
         records
     });
     to_bench.push(Fun::new("builder_append_logged", move |b: &mut Bencher, _i| {
-        Lazy::force(&asi_records);
+        Lazy::force(&us_records);
 
         let mut dir: Option<tempfile::TempDir> = None;
         let mut builder: Option<GridStoreBuilder> = None;
@@ -131,10 +131,10 @@ pub fn benchmark(c: &mut Criterion) {
                     dir.replace(tempfile::tempdir().unwrap());
                     builder.replace(GridStoreBuilder::new(dir.as_mut().unwrap().path()).unwrap());
                 }
-                let record = &asi_records[i];
-                builder.as_mut().unwrap().append(&record.0, &record.1).unwrap();
+                let record = &us_records[i];
+                builder.as_mut().unwrap().append(&record.0, record.1.clone()).unwrap();
 
-                i = (i + 1) % (asi_records.len());
+                i = (i + 1) % (us_records.len());
             },
             BatchSize::NumIterations(100_000),
         )

@@ -42,6 +42,13 @@ pub struct StoreEntryBuildingBlock {
     pub entries: Vec<GridEntry>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct PrefixBoundary {
+    prefix: String,
+    first: u32,
+    last: u32,
+}
+
 /// Utility to create stores
 /// Takes an vector, with each item mapping to a store to create
 /// Each item is a vector with maps of grid keys to the entries to insert into the store for that grid key
@@ -49,7 +56,7 @@ pub fn create_store(store_entries: Vec<StoreEntryBuildingBlock>) -> GridStore {
     let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
     let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
     for build_block in store_entries {
-        builder.insert(&build_block.grid_key, &build_block.entries).expect("Unable to insert");
+        builder.insert(&build_block.grid_key, build_block.entries).expect("Unable to insert");
     }
     builder.finish().unwrap();
     GridStore::new(directory.path()).unwrap()
@@ -70,10 +77,10 @@ pub fn load_db_from_json(json_path: &str, store_path: &str) {
     let f = File::open(path).expect("Error opening file");
     let file = io::BufReader::new(f);
 
-    load_db_from_json_reader(file, store_path);
+    load_db_from_json_reader(file, None, store_path);
 }
 
-fn load_db_from_json_reader<T: BufRead>(json_source: T, store_path: &str) {
+fn load_db_from_json_reader<T: BufRead>(json_source: T, split_source: Option<T>, store_path: &str) {
     // Set up new gridstore
     let directory = Path::new(store_path);
     let mut builder = GridStoreBuilder::new(directory).unwrap();
@@ -82,11 +89,25 @@ fn load_db_from_json_reader<T: BufRead>(json_source: T, store_path: &str) {
         if !record.is_empty() {
             let deserialized: StoreEntryBuildingBlock =
                 serde_json::from_str(&record).expect("Error deserializing json from string");
-            builder
-                .insert(&deserialized.grid_key, &deserialized.entries)
-                .expect("Unable to insert");
+            builder.insert(&deserialized.grid_key, deserialized.entries).expect("Unable to insert");
         }
     });
+
+    if let Some(splits) = split_source {
+        let boundary_records: Vec<PrefixBoundary> = splits
+            .lines()
+            .map(|l| {
+                serde_json::from_str(&l.unwrap()).expect("Error deserializing json from string")
+            })
+            .collect();
+
+        if boundary_records.len() > 0 {
+            let mut boundaries: Vec<u32> = boundary_records.iter().map(|r| r.first).collect();
+            boundaries.push(boundary_records.last().unwrap().last + 1);
+            builder.load_bin_boundaries(boundaries).unwrap();
+        }
+    }
+
     builder.finish().unwrap();
 }
 
@@ -108,7 +129,7 @@ pub fn dump_db_to_json(store_path: &str, json_path: &str) {
 
 pub fn ensure_downloaded(datafile: &str) -> PathBuf {
     let tmp = std::env::temp_dir().join("carmen_core_data/downloads");
-    std::fs::create_dir_all(&tmp);
+    std::fs::create_dir_all(&tmp).unwrap();
     let path = tmp.join(Path::new(datafile));
     if !path.exists() {
         let client = S3Client::new(Region::UsEast1);
@@ -131,15 +152,25 @@ pub fn ensure_downloaded(datafile: &str) -> PathBuf {
     path
 }
 
+pub const GRIDSTORE_DATA_SUFFIX: &'static str = ".gridstore.dat.lz4";
+pub const PREFIX_BOUNDARY_SUFFIX: &'static str = ".splits.lz4";
+
 pub fn ensure_store(datafile: &str) -> PathBuf {
     let tmp = std::env::temp_dir().join("carmen_core_data/indexes");
-    std::fs::create_dir_all(&tmp);
+    std::fs::create_dir_all(&tmp).unwrap();
     let idx_path = tmp.join(Path::new(&datafile.replace(".dat.lz4", ".rocksdb")));
     if !idx_path.exists() {
-        let dl_path = ensure_downloaded(datafile);
-        let decoder = Decoder::new(File::open(dl_path).unwrap()).unwrap();
-        let file = io::BufReader::new(decoder);
-        load_db_from_json_reader(file, idx_path.to_str().unwrap());
+        let grid_path = ensure_downloaded(datafile);
+        let splits_path =
+            ensure_downloaded(&datafile.replace(GRIDSTORE_DATA_SUFFIX, PREFIX_BOUNDARY_SUFFIX));
+
+        let grid_decoder = Decoder::new(File::open(grid_path).unwrap()).unwrap();
+        let grid_file = io::BufReader::new(grid_decoder);
+
+        let splits_decoder = Decoder::new(File::open(splits_path).unwrap()).unwrap();
+        let splits_file = io::BufReader::new(splits_decoder);
+
+        load_db_from_json_reader(grid_file, Some(splits_file), idx_path.to_str().unwrap());
     }
 
     idx_path
