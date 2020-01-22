@@ -161,7 +161,8 @@ pub fn ensure_store(datafile: &str) -> PathBuf {
     let idx_path = tmp.join(Path::new(&datafile.replace(".dat.lz4", ".rocksdb")));
     if !idx_path.exists() {
         let grid_path = ensure_downloaded(datafile);
-        let splits_path = ensure_downloaded(&datafile.replace(GRIDSTORE_DATA_SUFFIX, PREFIX_BOUNDARY_SUFFIX));
+        let splits_path =
+            ensure_downloaded(&datafile.replace(GRIDSTORE_DATA_SUFFIX, PREFIX_BOUNDARY_SUFFIX));
 
         let grid_decoder = Decoder::new(File::open(grid_path).unwrap()).unwrap();
         let grid_file = io::BufReader::new(grid_decoder);
