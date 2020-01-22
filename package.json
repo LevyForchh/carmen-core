@@ -1,6 +1,6 @@
 {
-  "name": "node-carmen-core",
-  "version": "0.1.0-nocomp-acadia-5",
+  "name": "@mapbox/carmen-core",
+  "version": "0.1.1",
   "description": "node bindings for carmen-core",
   "main": "index.js",
   "engines": {
@@ -34,7 +34,7 @@
   "binary": {
     "module_name": "index",
     "host": "https://mapbox-node-binary.s3.amazonaws.com",
-    "remote_path": "./{name}/v{version}/{configuration}/",
+    "remote_path": "./node-carmen-core/v{version}/{configuration}/",
     "package_name": "{node_abi}-{platform}-{arch}.tar.gz",
     "module_path": "./native/"
   }
