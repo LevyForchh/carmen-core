@@ -1,7 +1,6 @@
 use crate::gridstore::gridstore_format::{Coord, UniformVec};
 use itertools::Itertools;
 use morton::{deinterleave_morton, interleave_morton};
-use std::cmp::Ordering::{Equal, Greater, Less};
 
 #[cfg(test)]
 use crate::gridstore::common::relev_float_to_int;
@@ -96,9 +95,9 @@ pub fn proximity<'a>(
     let head = (0..prox_mid).rev().map(getter);
     let tail = (prox_mid..len).map(getter);
     let coord_sets = head.into_iter().merge_by(tail.into_iter(), move |a, b| {
-        let d1 = (a.coord as i64 - prox_pt) as i64;
-        let d2 = (b.coord as i64 - prox_pt) as i64;
-        d1.abs().cmp(&d2.abs()) == Less
+        let morton_distance_1 = (a.coord as i64 - prox_pt) as i64;
+        let morton_distance_2 = (b.coord as i64 - prox_pt) as i64;
+        morton_distance_1.abs() < morton_distance_2.abs()
     });
 
     Some(coord_sets)
@@ -137,9 +136,9 @@ pub fn bbox_proximity_filter<'a>(
     let head = (range.0..prox_mid).rev().filter_map(filtered_get);
     let tail = (prox_mid..=range.1).filter_map(filtered_get);
     let coord_sets = head.into_iter().merge_by(tail.into_iter(), move |a, b| {
-        let d1 = (a.coord as i64 - prox_pt) as i64;
-        let d2 = (b.coord as i64 - prox_pt) as i64;
-        d1.abs().cmp(&d2.abs()) == Less
+        let morton_distance_1 = (a.coord as i64 - prox_pt) as i64;
+        let morton_distance_2 = (b.coord as i64 - prox_pt) as i64;
+        morton_distance_1.abs() < morton_distance_2.abs()
     });
 
     Some(coord_sets)
@@ -173,19 +172,18 @@ fn coord_binary_search<'a>(
     while size > 1 {
         let half = size / 2;
         let mid = base + half;
-        let v = coords.get(mid as usize).coord;
-        let cmp = v.cmp(&val);
-        base = if cmp == Less { base } else { mid };
+        let coord = coords.get(mid as usize).coord;
+        base = if coord < val { base } else { mid };
         size -= half;
     }
-    if base.cmp(&(len - 1)) == Equal {
+    if base == len - 1 {
         return Ok(base);
     }
-    let cmp = coords.get(base as usize).coord.cmp(&val);
-    if cmp == Equal {
+    let base_coord = coords.get(base as usize).coord;
+    if base_coord == val {
         Ok(base)
     } else {
-        Ok(base + (cmp == Greater) as u32)
+        Ok(base + (base_coord > val) as u32)
     }
 }
 

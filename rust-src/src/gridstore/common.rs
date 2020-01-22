@@ -5,6 +5,12 @@ use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use failure::Error;
 use serde::{Deserialize, Serialize, Serializer};
 
+#[derive(Copy, Clone, Debug)]
+pub enum TypeMarker {
+    SinglePhrase = 0,
+    PrefixBin = 1,
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialOrd, Ord, PartialEq, Eq, Clone)]
 pub struct GridKey {
     pub phrase_id: u32,
@@ -12,8 +18,8 @@ pub struct GridKey {
 }
 
 impl GridKey {
-    pub fn write_to(&self, type_marker: u8, db_key: &mut Vec<u8>) -> Result<(), Error> {
-        db_key.push(type_marker);
+    pub fn write_to(&self, type_marker: TypeMarker, db_key: &mut Vec<u8>) -> Result<(), Error> {
+        db_key.push(type_marker as u8);
         // next goes the ID
         db_key.write_u32::<BigEndian>(self.phrase_id)?;
         // now the language ID
@@ -45,8 +51,12 @@ pub struct MatchKey {
 }
 
 impl MatchKey {
-    pub fn write_start_to(&self, type_marker: u8, db_key: &mut Vec<u8>) -> Result<(), Error> {
-        db_key.push(type_marker);
+    pub fn write_start_to(
+        &self,
+        type_marker: TypeMarker,
+        db_key: &mut Vec<u8>,
+    ) -> Result<(), Error> {
+        db_key.push(type_marker as u8);
         // next goes the ID
         let start = match self.match_phrase {
             MatchPhrase::Exact(phrase_id) => phrase_id,
@@ -56,9 +66,9 @@ impl MatchKey {
         Ok(())
     }
 
-    pub fn matches_key(&self, type_marker: u8, db_key: &[u8]) -> Result<bool, Error> {
+    pub fn matches_key(&self, type_marker: TypeMarker, db_key: &[u8]) -> Result<bool, Error> {
         let key_phrase = (&db_key[1..]).read_u32::<BigEndian>()?;
-        if db_key[0] != type_marker {
+        if db_key[0] != (type_marker as u8) {
             return Ok(false);
         }
         Ok(match self.match_phrase {
@@ -338,6 +348,11 @@ pub const MAX_KEY_LENGTH: usize = 1 + (32 / 8) + (128 / 8);
 
 // The max number of contexts to return from Coalesce
 pub const MAX_CONTEXTS: usize = 40;
+
+// limit to 100,000 records -- we may want to experiment with this number; it was 500k in
+// carmen-cache, but hopefully we're sorting more intelligently on the way in here so
+// shouldn't need as many records. Still, we should limit it somehow.
+pub const MAX_GRIDS_PER_PHRASE: usize = 100_000;
 
 #[derive(Serialize, Deserialize, Debug, PartialOrd, PartialEq, Clone)]
 pub struct GridEntry {

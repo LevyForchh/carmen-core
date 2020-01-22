@@ -274,7 +274,7 @@ impl GridStore {
     #[inline(never)]
     pub fn get(&self, key: &GridKey) -> Result<Option<impl Iterator<Item = GridEntry>>, Error> {
         let mut db_key: Vec<u8> = Vec::new();
-        key.write_to(0, &mut db_key)?;
+        key.write_to(TypeMarker::SinglePhrase, &mut db_key)?;
 
         Ok(match self.db.get(&db_key)? {
             Some(value) => Some(decode_value(value)),
@@ -289,12 +289,12 @@ impl GridStore {
         max_values: usize,
     ) -> Result<impl Iterator<Item = MatchEntry>, Error> {
         let (fetch_start, fetch_end, fetch_type_marker) = match match_key.match_phrase {
-            MatchPhrase::Exact(id) => (id, id + 1, 0),
+            MatchPhrase::Exact(id) => (id, id + 1, TypeMarker::SinglePhrase),
             MatchPhrase::Range { start, end } => {
                 if self.bin_boundaries.contains(&start) && self.bin_boundaries.contains(&end) {
-                    (start, end, 1)
+                    (start, end, TypeMarker::PrefixBin)
                 } else {
-                    (start, end, 0)
+                    (start, end, TypeMarker::SinglePhrase)
                 }
             }
         };

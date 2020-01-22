@@ -207,8 +207,7 @@ impl GridStoreBuilder {
             for (grid_key, value) in group_value.into_iter() {
                 // figure out the key
                 db_key.clear();
-                // type marker is 0 -- regular entry
-                grid_key.write_to(0, &mut db_key)?;
+                grid_key.write_to(TypeMarker::SinglePhrase, &mut db_key)?;
 
                 let mut grouped_entry =
                     lang_set_map.entry(grid_key.lang_set).or_insert_with(|| BuilderEntry::new());
@@ -221,7 +220,7 @@ impl GridStoreBuilder {
                 for (lang_set, builder_entry) in lang_set_map.into_iter() {
                     db_key.clear();
                     let group_key = GridKey { phrase_id: group_id, lang_set };
-                    group_key.write_to(1, &mut db_key)?;
+                    group_key.write_to(TypeMarker::PrefixBin, &mut db_key)?;
                     let grouped_db_data = get_encoded_value(builder_entry)?;
                     db.put(&db_key, &grouped_db_data)?;
                 }
