@@ -7,6 +7,7 @@ use std::fmt::Debug;
 use failure::Error;
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
+use rayon::prelude::*;
 
 use crate::gridstore::common::*;
 use crate::gridstore::store::GridStore;
@@ -17,10 +18,38 @@ pub fn coalesce<T: Borrow<GridStore> + Clone + Debug>(
     stack: Vec<PhrasematchSubquery<T>>,
     match_opts: &MatchOpts,
 ) -> Result<Vec<CoalesceContext>, Error> {
+    let bigger_max = 2 * MAX_CONTEXTS;
     let contexts = if stack.len() <= 1 {
-        coalesce_single(&stack[0], match_opts)?
+        let subquery = &stack[0];
+        let matching = subquery.store.borrow().streaming_get_matching(
+            &subquery.match_key,
+            match_opts,
+            bigger_max,
+        )?;
+        coalesce_single(subquery, matching, match_opts)?
     } else {
-        coalesce_multi(stack, match_opts)?
+        let stack_with_data: Result<
+            Vec<(PhrasematchSubquery<T>, Vec<MatchEntry>, MatchOpts)>,
+            Error,
+        > = stack
+            .into_iter()
+            .map(|subquery| {
+                let adjusted_match_opts = match_opts.adjust_to_zoom(subquery.zoom);
+                let matching = subquery.store.borrow().streaming_get_matching(
+                    &subquery.match_key,
+                    match_opts,
+                    bigger_max,
+                )?;
+
+                // limit to 100,000 records -- we may want to experiment with this number; it was 500k in
+                // carmen-cache, but hopefully we're sorting more intelligently on the way in here so
+                // shouldn't need as many records. Still, we should limit it somehow.
+                let grids: Vec<MatchEntry> = matching.take(100_000).collect();
+                Ok((subquery, grids, adjusted_match_opts))
+            })
+            .collect();
+
+        coalesce_multi(stack_with_data?)?
     };
 
     let mut out = Vec::with_capacity(MAX_CONTEXTS);
@@ -44,6 +73,141 @@ pub fn coalesce<T: Borrow<GridStore> + Clone + Debug>(
     Ok(out)
 }
 
+pub fn parallel_coalesce<T: Borrow<GridStore> + Clone + Debug + Send + Sync>(
+    stacks: &[(Vec<PhrasematchSubquery<T>>, MatchOpts)],
+) -> Result<Vec<Vec<CoalesceContext>>, Error> {
+    let bigger_max = 2 * MAX_CONTEXTS;
+    // let v: Vec<PhrasematchSubquery<T>> = Vec::new();
+    // let () = (&v).into_par_iter();
+
+    let mut tagged_subqueries: HashMap<(&PhrasematchSubquery<T>, &MatchOpts), (bool, bool)> =
+        HashMap::new();
+    for (stack, match_opts) in stacks.iter() {
+        if stack.len() == 1 {
+            tagged_subqueries
+                .entry((&stack[0], match_opts))
+                .and_modify(|e| e.0 = true)
+                .or_insert((true, false));
+        } else {
+            for subquery in stack.iter() {
+                // always insert, setting true regardless
+                tagged_subqueries
+                    .entry((subquery, match_opts))
+                    .and_modify(|e| e.1 = true)
+                    .or_insert((false, true));
+            }
+        }
+    }
+
+    let subqueries: Vec<
+        Result<
+            (
+                (&PhrasematchSubquery<T>, &MatchOpts),
+                (Option<Vec<CoalesceContext>>, Option<Vec<MatchEntry>>, MatchOpts),
+            ),
+            Error,
+        >,
+    > = tagged_subqueries
+        .into_par_iter()
+        .map(|((subquery, match_opts), (needs_single, needs_multi))| {
+            let output = if needs_multi {
+                let adjusted_match_opts = match_opts.adjust_to_zoom(subquery.zoom);
+                let matching = subquery.store.borrow().streaming_get_matching(
+                    &subquery.match_key,
+                    &adjusted_match_opts,
+                    bigger_max,
+                )?;
+
+                // limit to 100,000 records -- we may want to experiment with this number; it was 500k in
+                // carmen-cache, but hopefully we're sorting more intelligently on the way in here so
+                // shouldn't need as many records. Still, we should limit it somehow.
+                let multi_grids: Vec<MatchEntry> = matching.take(100_000).collect();
+
+                let single_results = if needs_single {
+                    Some(coalesce_single(
+                        &subquery,
+                        multi_grids.iter().cloned(),
+                        &adjusted_match_opts,
+                    )?)
+                } else {
+                    None
+                };
+                (single_results, Some(multi_grids), adjusted_match_opts)
+            } else {
+                let adjusted_match_opts = match_opts.adjust_to_zoom(subquery.zoom);
+                let matching = subquery.store.borrow().streaming_get_matching(
+                    &subquery.match_key,
+                    &adjusted_match_opts,
+                    bigger_max,
+                )?;
+                let single_results =
+                    Some(coalesce_single(subquery, matching, &adjusted_match_opts)?);
+
+                (single_results, None, adjusted_match_opts)
+            };
+
+            Ok(((subquery, match_opts), output))
+        })
+        .collect();
+    let subqueries: Result<
+        HashMap<
+            (&PhrasematchSubquery<T>, &MatchOpts),
+            (Option<Vec<CoalesceContext>>, Option<Vec<MatchEntry>>, MatchOpts),
+        >,
+        Error,
+    > = subqueries.into_iter().collect();
+    let subqueries = subqueries?;
+
+    let all_contexts: Result<Vec<Vec<CoalesceContext>>, Error> = (&stacks)
+        .into_par_iter()
+        .map(|(stack, match_opts)| {
+            let contexts = if stack.len() == 1 {
+                let subquery = &stack[0];
+                let (single_results, _, _) = subqueries.get(&(subquery, &match_opts)).unwrap();
+
+                single_results.as_ref().unwrap().clone()
+            } else {
+                let stack_with_data: Vec<(&PhrasematchSubquery<T>, &Vec<MatchEntry>, MatchOpts)> =
+                    stack
+                        .iter()
+                        .map(|subquery| {
+                            let (_, multi_grids, opts) =
+                                subqueries.get(&(subquery, &match_opts)).unwrap();
+
+                            let adjusted_opts = opts.clone();
+                            (subquery, multi_grids.as_ref().unwrap(), adjusted_opts)
+                        })
+                        .collect();
+
+                coalesce_multi(stack_with_data)?
+            };
+
+            let mut out = Vec::with_capacity(MAX_CONTEXTS);
+            if !contexts.is_empty() {
+                let relev_max = contexts[0].relev;
+                let mut sets: HashSet<u64> = HashSet::new();
+                for context in contexts {
+                    if out.len() >= MAX_CONTEXTS {
+                        break;
+                    }
+                    // 0.25 is the smallest allowed relevance
+                    if relev_max - context.relev >= 0.25 {
+                        break;
+                    }
+                    let inserted = sets.insert(context.entries[0].tmp_id.into());
+                    if inserted {
+                        out.push(context);
+                    }
+                }
+            }
+
+            Ok(out)
+        })
+        .collect();
+
+    all_contexts
+}
+
 fn grid_to_coalesce_entry<T: Borrow<GridStore> + Clone>(
     grid: &MatchEntry,
     subquery: &PhrasematchSubquery<T>,
@@ -64,17 +228,12 @@ fn grid_to_coalesce_entry<T: Borrow<GridStore> + Clone>(
     }
 }
 
-fn coalesce_single<T: Borrow<GridStore> + Clone>(
+fn coalesce_single<T: Borrow<GridStore> + Clone, U: Iterator<Item = MatchEntry>>(
     subquery: &PhrasematchSubquery<T>,
+    grids: U,
     match_opts: &MatchOpts,
 ) -> Result<Vec<CoalesceContext>, Error> {
     let bigger_max = 2 * MAX_CONTEXTS;
-
-    let grids = subquery.store.borrow().streaming_get_matching(
-        &subquery.match_key,
-        match_opts,
-        bigger_max,
-    )?;
     let mut max_relevance: f64 = 0.;
     let mut previous_id: u32 = 0;
     let mut previous_relevance: f64 = 0.;
@@ -167,25 +326,31 @@ fn coalesce_single<T: Borrow<GridStore> + Clone>(
     Ok(contexts)
 }
 
-fn coalesce_multi<T: Borrow<GridStore> + Clone>(
-    mut stack: Vec<PhrasematchSubquery<T>>,
-    match_opts: &MatchOpts,
+fn coalesce_multi<
+    T: Borrow<GridStore> + Clone,
+    U: AsRef<[MatchEntry]>,
+    V: Borrow<PhrasematchSubquery<T>>,
+>(
+    mut stack: Vec<(V, U, MatchOpts)>,
 ) -> Result<Vec<CoalesceContext>, Error> {
-    stack.sort_by_key(|subquery| (subquery.zoom, subquery.idx));
+    stack.sort_by_key(|(subquery, _, _)| {
+        let subquery = subquery.borrow();
+        (subquery.zoom, subquery.idx)
+    });
 
     let mut coalesced: HashMap<(u16, u16, u16), Vec<CoalesceContext>> = HashMap::new();
     let mut contexts: Vec<CoalesceContext> = Vec::new();
 
     let mut max_relevance: f64 = 0.;
 
-    let mut zoom_adjusted_match_options = match_opts.clone();
-
-    for (i, subquery) in stack.iter().enumerate() {
+    for (i, (subquery, grids, adjusted_match_opts)) in stack.iter().enumerate() {
         let mut to_add_to_coalesced: HashMap<(u16, u16, u16), Vec<CoalesceContext>> =
             HashMap::new();
+        let subquery = subquery.borrow();
         let compatible_zooms: Vec<u16> = stack
             .iter()
-            .filter_map(|subquery_b| {
+            .filter_map(|(subquery_b, _, _)| {
+                let subquery_b = subquery_b.borrow();
                 if subquery.idx == subquery_b.idx || subquery.zoom < subquery_b.zoom {
                     None
                 } else {
@@ -195,19 +360,8 @@ fn coalesce_multi<T: Borrow<GridStore> + Clone>(
             .dedup()
             .collect();
 
-        if zoom_adjusted_match_options.zoom != subquery.zoom {
-            zoom_adjusted_match_options = match_opts.adjust_to_zoom(subquery.zoom);
-        }
-
-        let grids = subquery.store.borrow().streaming_get_matching(
-            &subquery.match_key,
-            &zoom_adjusted_match_options,
-            MAX_GRIDS_PER_PHRASE,
-        )?;
-
-        for grid in grids.take(MAX_GRIDS_PER_PHRASE) {
-            let coalesce_entry =
-                grid_to_coalesce_entry(&grid, subquery, &zoom_adjusted_match_options);
+        for grid in grids.as_ref().iter() {
+            let coalesce_entry = grid_to_coalesce_entry(&grid, subquery, &adjusted_match_opts);
 
             let zxy = (subquery.zoom, grid.grid_entry.x, grid.grid_entry.y);
 

@@ -1,7 +1,7 @@
-use carmen_core::gridstore::coalesce;
+use carmen_core::gridstore::{coalesce, parallel_coalesce};
 use carmen_core::gridstore::PhrasematchSubquery;
 use carmen_core::gridstore::{
-    CoalesceContext, GridEntry, GridKey, GridStore, GridStoreBuilder, MatchOpts, MatchKey,
+    CoalesceContext, GridEntry, GridKey, GridStore, GridStoreBuilder, MatchOpts, MatchKey
 };
 
 use neon::prelude::*;
@@ -11,7 +11,6 @@ use owning_ref::OwningHandle;
 use failure::Error;
 
 use std::sync::Arc;
-
 type ArcGridStore = Arc<GridStore>;
 
 struct CoalesceTask {
@@ -31,6 +30,36 @@ impl Task for CoalesceTask {
         self,
         mut cx: TaskContext<'a>,
         result: Result<Vec<CoalesceContext>, String>,
+    ) -> JsResult<JsArray> {
+        let converted_result = {
+            match &result {
+                Ok(r) => r,
+                Err(s) => return cx.throw_error(s),
+            }
+        };
+        Ok(neon_serde::to_value(&mut cx, converted_result)?
+            .downcast::<JsArray>()
+            .or_throw(&mut cx)?)
+    }
+}
+
+struct ParallelCoalesceTask {
+    argument: Vec<(Vec<PhrasematchSubquery<ArcGridStore>>, MatchOpts)>,
+}
+
+impl Task for ParallelCoalesceTask {
+    type Output = Vec<Vec<CoalesceContext>>;
+    type Error = String;
+    type JsEvent = JsArray;
+
+    fn perform(&self) -> Result<Vec<Vec<CoalesceContext>>, String> {
+        parallel_coalesce(&self.argument).map_err(|err| err.to_string())
+    }
+
+    fn complete<'a>(
+        self,
+        mut cx: TaskContext<'a>,
+        result: Result<Vec<Vec<CoalesceContext>>, String>,
     ) -> JsResult<JsArray> {
         let converted_result = {
             match &result {
@@ -344,6 +373,30 @@ declare_types! {
     }
 }
 
+pub fn js_parallel_coalesce(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let js_stacks = { cx.argument::<JsArray>(0)? };
+    let num_stacks = js_stacks.len();
+
+    let mut parallel_arg: Vec<(Vec<PhrasematchSubquery<ArcGridStore>>, MatchOpts)> =
+        Vec::with_capacity(num_stacks as usize);
+
+    for i in 0..num_stacks {
+        let stack_set = js_stacks.get(&mut cx, i)?.downcast::<JsObject>().or_throw(&mut cx)?;
+        let js_phrase_subq = stack_set.get(&mut cx, "stack")?.downcast::<JsArray>().or_throw(&mut cx)?;
+        let js_match_ops = stack_set.get(&mut cx, "match_opts")?.downcast::<JsValue>().or_throw(&mut cx)?;
+        let phrase_subq: Vec<PhrasematchSubquery<ArcGridStore>> =
+            deserialize_phrasesubq(&mut cx, js_phrase_subq)?;
+        let match_opts: MatchOpts = neon_serde::from_value(&mut cx, js_match_ops)?;
+        parallel_arg.push((phrase_subq, match_opts));
+    }
+    let cb = cx.argument::<JsFunction>(1)?;
+
+    let task = ParallelCoalesceTask { argument: parallel_arg };
+    task.schedule(cb);
+
+    Ok(cx.undefined())
+}
+
 fn langarray_to_langset<'j, C>(cx: &mut C, maybe_lang_array: Handle<'j, JsValue>) -> Result<u128, neon_serde::errors::Error>
 where
     C: Context<'j>,
@@ -465,5 +518,6 @@ register_module!(mut m, {
     m.export_class::<JsGridStore>("GridStore")?;
     m.export_class::<JsGridKeyStoreKeyIterator>("GridStoreKeyIterator")?;
     m.export_function("coalesce", js_coalesce)?;
+    m.export_function("parallelCoalesce", js_parallel_coalesce)?;
     Ok(())
 });
