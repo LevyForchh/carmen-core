@@ -344,6 +344,26 @@ declare_types! {
     }
 }
 
+pub fn js_all_stacks_coalesce(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let js_stacks = { cx.argument::<JsArray>(0)? };
+    let stacks_len = js_stacks.len();
+
+    let mut stacks_vec: Vec<(Vec<PhrasematchSubquery<ArcGridStore>>, MatchOpts)> =
+        Vec::with_capacity(stacks_len as usize);
+
+    for i in 0..stacks_len {
+        let stacks = js_stacks.get(&mut cx, i)?.downcast::<JsObject>().or_throw(&mut cx)?;
+        let js_phrase_subq = stacks.get(&mut cx, "stack")?.downcast::<JsArray>().or_throw(&mut cx)?;
+        let js_match_ops = stacks.get(&mut cx, "match_opts")?.downcast::<JsValue>().or_throw(&mut cx)?;
+        let phrase_subq: Vec<PhrasematchSubquery<ArcGridStore>> =
+            deserialize_phrasesubq(&mut cx, js_phrase_subq)?;
+        let match_opts: MatchOpts = neon_serde::from_value(&mut cx, js_match_ops)?;
+        stacks_vec.push((phrase_subq, match_opts));
+    }
+
+    Ok(cx.undefined())
+}
+
 fn langarray_to_langset<'j, C>(cx: &mut C, maybe_lang_array: Handle<'j, JsValue>) -> Result<u128, neon_serde::errors::Error>
 where
     C: Context<'j>,
@@ -465,5 +485,6 @@ register_module!(mut m, {
     m.export_class::<JsGridStore>("GridStore")?;
     m.export_class::<JsGridKeyStoreKeyIterator>("GridStoreKeyIterator")?;
     m.export_function("coalesce", js_coalesce)?;
+    m.export_function("coalesce", js_all_stacks_coalesce)?;
     Ok(())
 });
