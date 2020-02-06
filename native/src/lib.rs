@@ -485,6 +485,6 @@ register_module!(mut m, {
     m.export_class::<JsGridStore>("GridStore")?;
     m.export_class::<JsGridKeyStoreKeyIterator>("GridStoreKeyIterator")?;
     m.export_function("coalesce", js_coalesce)?;
-    m.export_function("js_all_stacks_coalesce", js_all_stacks_coalesce)?;
+    m.export_function("allStacks", js_all_stacks_coalesce)?;
     Ok(())
 });
