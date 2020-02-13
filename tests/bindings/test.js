@@ -454,4 +454,73 @@ tape('Bin boundaries', (t) => {
         t.deepEquals(results[2], results[3], 'things that start with bc are the same with and without bins');
         t.end();
     });
-})
+});
+
+tape('Deserialize phrasematcheresults', (t) => {
+
+    const tmpDir = tmp.dirSync();
+    const builder = new addon.GridStoreBuilder(tmpDir.name);
+    builder.insert({ phrase_id: 1, lang_set: [1] },
+        [
+            { id: 1, x: 1, y: 1, relev: 1., score: 1, source_phrase_hash: 0 }
+        ]
+    );
+    builder.finish();
+    const store = new addon.GridStore(tmpDir.name);
+    let phrasematchResults = [
+        {
+            'phrasematches': [
+                new Phrasematch(store, ['main', 'street'], 'main street', 1, 14, undefined, [0, 2], 1, 0, 14, 6, 1, false, false, false, 0, ['main', 'street'], 0, 14, [0])
+            ]
+        }
+    ];
+    t.end();
+});
+
+
+
+function Phrasematch(store, subquery, phrase, weight, mask, radius, phrase_id_range, scorefactor, prefix, idx, zoom, edit_multiplier, prox_match, cat_match, partial_number, subquery_edit_distance, original_phrase, original_phrase_ender, original_phrase_mask, languages) {
+    this.store = store;
+    this.subquery = subquery;
+    this.phrase = phrase;
+    this.weight = weight;
+    this.mask = mask;
+    this.radius = radius;
+    this.phrase_id_range = phrase_id_range;
+    this.scorefactor = scorefactor;
+    this.prefix = prefix;
+    this.idx = idx;
+    this.zoom = zoom;
+    this.edit_multiplier = edit_multiplier || 1;
+    this.prox_match = prox_match || false;
+    this.cat_match = cat_match || false;
+    this.partial_number = partial_number || false;
+    this.subquery_edit_distance = subquery_edit_distance;
+    this.original_phrase = original_phrase;
+    this.original_phrase_ender = original_phrase_ender;
+    this.original_phrase_mask = original_phrase_mask;
+    this.languages = languages;
+
+    if (languages) {
+        // carmen-cache gives special treatment to the "languages" property
+        // being absent, so if we don't get one passed in, don't pass it through
+        this.languages = languages;
+    }
+
+    // format a couple of the items the way carmen-core expects them
+    this.match_key = {
+        lang_set: this.languages,
+        match_phrase: {
+            'Range': {
+                start: this.phrase_id_range[0],
+                end: this.phrase_id_range[1] + 1
+            }
+        }
+    };
+}
+
+Phrasematch.prototype.clone = function() {
+    return new Phrasematch(this.subquery.slice(), this.weight, this.mask, this.phrase, this.phrase_id_range, this.scorefactor, this.idx, this.store, this.zoom, this.radius, this.prefix, this.languages, this.editMultiplier, this.proxMatch, this.catMatch, this.partialNumber, this.extendedScan, this.address);
+};
+
+module.exports.Phrasematch = Phrasematch;

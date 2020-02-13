@@ -441,6 +441,12 @@ where
     Ok(phrasematches)
 }
 
+fn deserialize_phrasematch_results(js_phrasematch_results: Handle<JsArray>) -> JsObject {
+    let js_phrasematch_results_array = js_phrasematch_results[0];
+    let js_phrasematch = js_phrasematch_results_array.get(cx, i)?.downcast::<JsObject>().or_throw(cx);
+    Ok(js_phrasematch)
+}
+
 #[inline(always)]
 fn prep_for_insert<'j, T: neon::object::This>(cx: &mut CallContext<'j, T>) -> Result<(GridKey, Vec<GridEntry>), neon_serde::errors::Error> {
     let grid_key = cx.argument::<JsObject>(0)?;
@@ -465,5 +471,6 @@ register_module!(mut m, {
     m.export_class::<JsGridStore>("GridStore")?;
     m.export_class::<JsGridKeyStoreKeyIterator>("GridStoreKeyIterator")?;
     m.export_function("coalesce", js_coalesce)?;
+    // m.export_function
     Ok(())
 });

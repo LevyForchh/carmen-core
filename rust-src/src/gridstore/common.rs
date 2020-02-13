@@ -407,6 +407,32 @@ pub struct PhrasematchSubquery<T: Borrow<GridStore> + Clone> {
     pub mask: u32,
 }
 
+#[derive(Serialize, Debug, Clone)]
+pub struct PhrasematchResults<T: Borrow<GridStore> + Clone> {
+    #[serde(serialize_with = "serialize_path")]
+    pub store: T,
+    pub subquery: Vec<String>,
+    pub languages: Vec<u16>,
+    pub phrase: String,
+    pub scorefactor: u16,
+    pub prefix: u8,
+    pub weight: f64,
+    pub match_key: MatchKey,
+    pub idx: u16,
+    pub zoom: u16,
+    pub mask: u32,
+    pub radius: u8,
+    pub edit_multiplier: f64,
+    pub prox_match: bool,
+    pub cat_match: bool,
+    pub partial_number: bool,
+    pub extended_scan: bool,
+    pub subquery_edit_distance: u8,
+    pub original_phrase: u16,
+    pub original_phrase_ender: bool,
+    pub original_phrase_mask: u32
+}
+
 #[inline]
 pub fn relev_float_to_int(relev: f64) -> u8 {
     if relev == 0.4 {
