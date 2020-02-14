@@ -1,7 +1,7 @@
 use carmen_core::gridstore::coalesce;
 use carmen_core::gridstore::PhrasematchSubquery;
 use carmen_core::gridstore::{
-    CoalesceContext, GridEntry, GridKey, GridStore, GridStoreBuilder, MatchOpts, MatchKey,
+    CoalesceContext, GridEntry, GridKey, GridStore, GridStoreBuilder, MatchOpts, MatchKey, PhrasematchResults
 };
 
 use neon::prelude::*;
@@ -441,10 +441,75 @@ where
     Ok(phrasematches)
 }
 
-fn deserialize_phrasematch_results(js_phrasematch_results: Handle<JsArray>) -> JsObject {
-    let js_phrasematch_results_array = js_phrasematch_results[0];
-    let js_phrasematch = js_phrasematch_results_array.get(cx, i)?.downcast::<JsObject>().or_throw(cx);
-    Ok(js_phrasematch)
+fn deserialize_phrasematch_results(mut cx: FunctionContext, js_phrasematch_results: JsArray) -> LibResult<Vec<PhrasematchResults<ArcGridStore>>> {
+    let js_phrasematch = cx.argument::<JsArray>(0)?;
+    for i in 0..js_phrasematch.len() {
+        let js_phrasematch_obj = js_phrasematch.get(cx, i)?.downcast::<JsObject>().or_throw(cx)?;
+        let phrasematches = js_phrasematch_obj.get(cx, "phrasematches").downcast::<JsArray>().or_throw(cx?);
+        let ph_length = phrasematches.len();
+        let phrasematches: Vec<PhrasematchResults<ArcGridStore>> = Vec::with_capacity(ph_length as usize);
+        for j in 0..ph_length {
+        let js_gridstore =
+            phrasematches.get(cx, "store")?.downcast::<JsGridStore>().or_throw(cx)?;
+            let gridstore = {
+                let guard = cx.lock();
+                // shallow clone of the Arc
+                let gridstore_clone = js_gridstore.borrow(&guard).clone();
+                gridstore_clone
+            };
+
+        let weight = phrasematches.get(cx, "weight")?;
+        let idx = phrasematches.get(cx, "idx")?;
+        let zoom = phrasematches.get(cx, "zoom")?;
+        let mask = phrasematches.get(cx, "mask")?;
+
+        let match_key = phrasematches.get(cx, "match_key")?.downcast::<JsObject>().or_throw(cx)?;
+        let match_phrase = match_key.get(cx, "match_phrase")?;
+
+        let js_lang_set = match_key.get(cx, "lang_set")?;
+        let lang_set: u128 = langarray_to_langset(cx, js_lang_set)?;
+        let subquery = phrasematches.get(cx, "subquery")?;
+        let phrase = phrasematches.get(cx, "phrase")?;
+        let radius = phrasematches.get(cx, "radius")?;
+        let scorefactor = phrasematches.get(cx, "scorefactor")?;
+        let prefix = phrasematches.get(cx, "prefix")?;
+        let edit_multiplier = phrasematches.get(cx, "edit_multiplier")?;
+        let prox_match = phrasematches.get(cx, "prox_match")?;
+        let cat_match = phrasematches.get(cx, "cat_match")?;
+        let partial_number = phrasematches.get(cx, "partial_number")?;
+        let subquery_edit_distance = phrasematches.get(cx, "subquery_edit_distance")?;
+        let original_phrase = phrasematches.get(cx, "original_phrase")?;
+        let original_phrase_ender = phrasematches.get(cx, "original_phrase_ender")?;
+        let original_phrase_mask = phrasematches.get(cx, "original_phrase_mask")?;
+
+        let phrasematch_result = PhrasematchResults
+            {
+                store: store,
+                subquery: subquery,
+                languages: lang_set,
+                phrase: phrase,
+                scorefactor: scorefactor,
+                prefix: prefix,
+                weight: weight,
+                match_key: MatchKey,
+                idx: idx,
+                zoom: zoom,
+                mask: mask,
+                radius: radius,
+                edit_multiplier: edit_multiplier,
+                prox_match: prox_match,
+                cat_match: cat_match,
+                partial_number: partial_number,
+                extended_scan: extended_scan,
+                subquery_edit_distance: subquery_edit_distance,
+                original_phrase: original_phrase,
+                original_phrase_ender: original_phrase_ender,
+                original_phrase_mask: original_phrase_mask
+            }
+            phrasematches.push(phrasematch_result);
+        }
+    }
+    Ok(phrasematch_result)
 }
 
 #[inline(always)]
