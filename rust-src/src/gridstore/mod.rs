@@ -1,5 +1,6 @@
 mod builder;
 mod coalesce;
+mod stackable;
 mod common;
 mod gridstore_format;
 mod spatial;
