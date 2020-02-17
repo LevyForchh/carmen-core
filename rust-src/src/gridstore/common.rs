@@ -419,15 +419,15 @@ pub struct PhrasematchResults<T: Borrow<GridStore> + Clone> {
     pub match_key: MatchKey,
     pub idx: u16,
     pub zoom: u16,
-    pub mask: u32,
-    pub radius: u8,
+    pub nmask: u32,
+    pub bmask: Vec<u32>,
     pub edit_multiplier: f64,
     pub prox_match: bool,
     pub cat_match: bool,
     pub partial_number: bool,
     pub subquery_edit_distance: u8,
-    pub original_phrase: u16,
-    pub original_phrase_ender: bool,
+    pub original_phrase: Vec<String>,
+    pub original_phrase_ender: u8,
     pub original_phrase_mask: u32
 }
 

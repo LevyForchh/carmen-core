@@ -456,7 +456,7 @@ tape('Bin boundaries', (t) => {
     });
 });
 
-tape('Deserialize phrasematcheresults', (t) => {
+tape('Deserialize phrasematch results', (t) => {
 
     const tmpDir = tmp.dirSync();
     const builder = new addon.GridStoreBuilder(tmpDir.name);
@@ -470,23 +470,23 @@ tape('Deserialize phrasematcheresults', (t) => {
     let phrasematchResults = [
         {
             'phrasematches': [
-                new Phrasematch(store, ['main', 'street'], 'main street', 1, 14, undefined, [0, 2], 1, 0, 14, 6, 1, false, false, false, 0, ['main', 'street'], 0, 14, [0])
+                new Phrasematch(store, ['main', 'street'], 'main street', 1, 14, [0, 2], 1, 0, 14, 4, [0], 6, 1, false, false, false, 0, ['main', 'street'], 0, 14, [0])
             ]
         }
     ];
-    addon.deserialize_phrasematch_results(phrasematchResults);
+    addon.stack_to_trees(phrasematchResults);
     t.end();
 });
 
 
 
-function Phrasematch(store, subquery, phrase, weight, mask, radius, phrase_id_range, scorefactor, prefix, idx, zoom, edit_multiplier, prox_match, cat_match, partial_number, subquery_edit_distance, original_phrase, original_phrase_ender, original_phrase_mask, languages) {
+function Phrasematch(store, subquery, phrase, weight, mask, phrase_id_range, scorefactor, prefix, idx, nmask, bmask, zoom, edit_multiplier, prox_match, cat_match, partial_number, subquery_edit_distance, original_phrase, original_phrase_ender, original_phrase_mask, languages) {
     this.store = store;
     this.subquery = subquery;
     this.phrase = phrase;
     this.weight = weight;
-    this.mask = mask;
-    this.radius = radius;
+    this.nmask = nmask;
+    this.bmask = bmask;
     this.phrase_id_range = phrase_id_range;
     this.scorefactor = scorefactor;
     this.prefix = prefix;
