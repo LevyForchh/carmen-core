@@ -441,16 +441,18 @@ where
     Ok(phrasematches)
 }
 
-fn deserialize_phrasematch_results(mut cx: FunctionContext, js_phrasematch_results: JsArray) -> LibResult<Vec<PhrasematchResults<ArcGridStore>>> {
+fn deserialize_phrasematch_results(mut cx: FunctionContext) -> LibResult<Vec<Vec<PhrasematchResults<ArcGridStore>>>> {
     let js_phrasematch = cx.argument::<JsArray>(0)?;
+    let mut phrasematch_results_by_index: Vec<Vec<PhrasematchResults<ArcGridStore>>> = Vec::new();
     for i in 0..js_phrasematch.len() {
-        let js_phrasematch_obj = js_phrasematch.get(cx, i)?.downcast::<JsObject>().or_throw(cx)?;
-        let phrasematches = js_phrasematch_obj.get(cx, "phrasematches").downcast::<JsArray>().or_throw(cx?);
+        let phrasematches_sub = js_phrasematch.get(&mut cx, i)?.downcast::<JsObject>().or_throw(&mut cx)?;
+        let phrasematches = phrasematches_sub.get(&mut cx, "phrasematches")?.downcast::<JsArray>().or_throw(&mut cx)?;
         let ph_length = phrasematches.len();
-        let phrasematches: Vec<PhrasematchResults<ArcGridStore>> = Vec::with_capacity(ph_length as usize);
-        for j in 0..ph_length {
+        let mut phrasematch_results: Vec<PhrasematchResults<ArcGridStore>> = Vec::with_capacity(ph_length as usize);
+
+        for _j in 0..ph_length {
         let js_gridstore =
-            phrasematches.get(cx, "store")?.downcast::<JsGridStore>().or_throw(cx)?;
+            phrasematches.get(&mut cx, "store")?.downcast::<JsGridStore>().or_throw(&mut cx)?;
             let gridstore = {
                 let guard = cx.lock();
                 // shallow clone of the Arc
@@ -458,58 +460,57 @@ fn deserialize_phrasematch_results(mut cx: FunctionContext, js_phrasematch_resul
                 gridstore_clone
             };
 
-        let weight = phrasematches.get(cx, "weight")?;
-        let idx = phrasematches.get(cx, "idx")?;
-        let zoom = phrasematches.get(cx, "zoom")?;
-        let mask = phrasematches.get(cx, "mask")?;
+        let weight = phrasematches.get(&mut cx, "weight")?;
+        let idx = phrasematches.get(&mut cx, "idx")?;
+        let zoom = phrasematches.get(&mut cx, "zoom")?;
+        let mask = phrasematches.get(&mut cx, "mask")?;
 
-        let match_key = phrasematches.get(cx, "match_key")?.downcast::<JsObject>().or_throw(cx)?;
-        let match_phrase = match_key.get(cx, "match_phrase")?;
+        let match_key = phrasematches.get(&mut cx, "match_key")?.downcast::<JsObject>().or_throw(&mut cx)?;
+        let match_phrase = match_key.get(&mut cx, "match_phrase")?;
 
-        let js_lang_set = match_key.get(cx, "lang_set")?;
-        let lang_set: u128 = langarray_to_langset(cx, js_lang_set)?;
-        let subquery = phrasematches.get(cx, "subquery")?;
-        let phrase = phrasematches.get(cx, "phrase")?;
-        let radius = phrasematches.get(cx, "radius")?;
-        let scorefactor = phrasematches.get(cx, "scorefactor")?;
-        let prefix = phrasematches.get(cx, "prefix")?;
-        let edit_multiplier = phrasematches.get(cx, "edit_multiplier")?;
-        let prox_match = phrasematches.get(cx, "prox_match")?;
-        let cat_match = phrasematches.get(cx, "cat_match")?;
-        let partial_number = phrasematches.get(cx, "partial_number")?;
-        let subquery_edit_distance = phrasematches.get(cx, "subquery_edit_distance")?;
-        let original_phrase = phrasematches.get(cx, "original_phrase")?;
-        let original_phrase_ender = phrasematches.get(cx, "original_phrase_ender")?;
-        let original_phrase_mask = phrasematches.get(cx, "original_phrase_mask")?;
+        let js_lang_set = match_key.get(&mut cx, "lang_set")?;
+        let lang_set: u128 = langarray_to_langset(&mut cx, js_lang_set)?;
+        let subquery = phrasematches.get(&mut cx, "subquery")?;
+        let phrase = phrasematches.get(&mut cx, "phrase")?;
+        let radius = phrasematches.get(&mut cx, "radius")?;
+        let scorefactor = phrasematches.get(&mut cx, "scorefactor")?;
+        let prefix = phrasematches.get(&mut cx, "prefix")?;
+        let edit_multiplier = phrasematches.get(&mut cx, "edit_multiplier")?;
+        let prox_match = phrasematches.get(&mut cx, "prox_match")?;
+        let cat_match = phrasematches.get(&mut cx, "cat_match")?;
+        let partial_number = phrasematches.get(&mut cx, "partial_number")?;
+        let subquery_edit_distance = phrasematches.get(&mut cx, "subquery_edit_distance")?;
+        let original_phrase = phrasematches.get(&mut cx, "original_phrase")?;
+        let original_phrase_ender = phrasematches.get(&mut cx, "original_phrase_ender")?;
+        let original_phrase_mask = phrasematches.get(&mut cx, "original_phrase_mask")?;
 
         let phrasematch_result = PhrasematchResults
             {
-                store: store,
-                subquery: subquery,
-                languages: lang_set,
-                phrase: phrase,
-                scorefactor: scorefactor,
-                prefix: prefix,
-                weight: weight,
-                match_key: MatchKey,
-                idx: idx,
-                zoom: zoom,
-                mask: mask,
-                radius: radius,
-                edit_multiplier: edit_multiplier,
-                prox_match: prox_match,
-                cat_match: cat_match,
-                partial_number: partial_number,
-                extended_scan: extended_scan,
-                subquery_edit_distance: subquery_edit_distance,
-                original_phrase: original_phrase,
-                original_phrase_ender: original_phrase_ender,
-                original_phrase_mask: original_phrase_mask
-            }
-            phrasematches.push(phrasematch_result);
+                store: gridstore,
+                subquery: neon_serde::from_value(&mut cx, subquery)?,
+                phrase: neon_serde::from_value(&mut cx, phrase)?,
+                scorefactor: neon_serde::from_value(&mut cx, scorefactor)?,
+                prefix: neon_serde::from_value(&mut cx, prefix)?,
+                weight: neon_serde::from_value(&mut cx, weight)?,
+                match_key: MatchKey { match_phrase: neon_serde::from_value(&mut cx, match_phrase)?, lang_set },
+                idx: neon_serde::from_value(&mut cx, idx)?,
+                zoom: neon_serde::from_value(&mut cx, zoom)?,
+                mask: neon_serde::from_value(&mut cx, mask)?,
+                radius: neon_serde::from_value(&mut cx, radius)?,
+                edit_multiplier: neon_serde::from_value(&mut cx, edit_multiplier)?,
+                prox_match: neon_serde::from_value(&mut cx, prox_match)?,
+                cat_match: neon_serde::from_value(&mut cx, cat_match)?,
+                partial_number: neon_serde::from_value(&mut cx, partial_number)?,
+                subquery_edit_distance: neon_serde::from_value(&mut cx, subquery_edit_distance)?,
+                original_phrase: neon_serde::from_value(&mut cx, original_phrase)?,
+                original_phrase_ender: neon_serde::from_value(&mut cx, original_phrase_ender)?,
+                original_phrase_mask: neon_serde::from_value(&mut cx, original_phrase_mask)?
+            };
+            phrasematch_results.push(phrasematch_result);
         }
+        phrasematch_results_by_index.push(phrasematch_results);
     }
-    Ok(phrasematch_result)
+    Ok(phrasematch_results_by_index)
 }
 
 #[inline(always)]
@@ -536,6 +537,5 @@ register_module!(mut m, {
     m.export_class::<JsGridStore>("GridStore")?;
     m.export_class::<JsGridKeyStoreKeyIterator>("GridStoreKeyIterator")?;
     m.export_function("coalesce", js_coalesce)?;
-    // m.export_function
     Ok(())
 });

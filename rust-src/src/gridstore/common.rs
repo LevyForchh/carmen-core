@@ -412,7 +412,6 @@ pub struct PhrasematchResults<T: Borrow<GridStore> + Clone> {
     #[serde(serialize_with = "serialize_path")]
     pub store: T,
     pub subquery: Vec<String>,
-    pub languages: Vec<u16>,
     pub phrase: String,
     pub scorefactor: u16,
     pub prefix: u8,
@@ -426,7 +425,6 @@ pub struct PhrasematchResults<T: Borrow<GridStore> + Clone> {
     pub prox_match: bool,
     pub cat_match: bool,
     pub partial_number: bool,
-    pub extended_scan: bool,
     pub subquery_edit_distance: u8,
     pub original_phrase: u16,
     pub original_phrase_ender: bool,

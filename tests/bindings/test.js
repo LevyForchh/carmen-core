@@ -474,6 +474,7 @@ tape('Deserialize phrasematcheresults', (t) => {
             ]
         }
     ];
+    addon.deserialize_phrasematch_results(phrasematchResults);
     t.end();
 });
 
@@ -499,7 +500,6 @@ function Phrasematch(store, subquery, phrase, weight, mask, radius, phrase_id_ra
     this.original_phrase = original_phrase;
     this.original_phrase_ender = original_phrase_ender;
     this.original_phrase_mask = original_phrase_mask;
-    this.languages = languages;
 
     if (languages) {
         // carmen-cache gives special treatment to the "languages" property
