@@ -475,6 +475,7 @@ fn deserialize_phrasematch_results<'j, C: Context<'j>>(
         let idx = js_obj.get(cx, "idx")?;
         let zoom = js_obj.get(cx, "zoom")?;
         let nmask = js_obj.get(cx, "nmask")?;
+        let mask = js_obj.get(cx, "mask")?;
         let bmask = js_obj.get(cx, "bmask")?;
         let match_key = js_obj.get(cx, "match_key")?.downcast::<JsObject>().or_throw(cx)?;
         let match_phrase = match_key.get(cx, "match_phrase")?;
@@ -506,6 +507,7 @@ fn deserialize_phrasematch_results<'j, C: Context<'j>>(
                 idx: neon_serde::from_value(cx, idx)?,
                 zoom: neon_serde::from_value(cx, zoom)?,
                 nmask: neon_serde::from_value(cx, nmask)?,
+                nmask: neon_serde::from_value(cx, mask)?,
                 bmask: neon_serde::from_value(cx, bmask)?,
                 edit_multiplier: neon_serde::from_value(cx, edit_multiplier)?,
                 prox_match: neon_serde::from_value(cx, prox_match)?,
