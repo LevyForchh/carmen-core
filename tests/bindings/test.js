@@ -470,7 +470,7 @@ tape('Deserialize phrasematch results', (t) => {
     let phrasematchResults = [
         {
             'phrasematches': [
-                new Phrasematch(store, ['main', 'street'], 'main street', 1, 14, [0, 2], 1, 0, 14, 4, [0], 6, 1, false, false, false, 0, ['main', 'street'], 0, 14, [0])
+                new Phrasematch(store, ['main', 'street'], 'main street', 1, 14, [0, 2], 1, 0, 14, 4, 1, [0], 6, 1, false, false, false, 0, ['main', 'street'], 0, 14, [0])
             ]
         }
     ];
@@ -480,12 +480,13 @@ tape('Deserialize phrasematch results', (t) => {
 
 
 
-function Phrasematch(store, subquery, phrase, weight, mask, phrase_id_range, scorefactor, prefix, idx, nmask, bmask, zoom, edit_multiplier, prox_match, cat_match, partial_number, subquery_edit_distance, original_phrase, original_phrase_ender, original_phrase_mask, languages) {
+function Phrasematch(store, subquery, phrase, weight, mask, phrase_id_range, scorefactor, prefix, idx, nmask, mask, bmask, zoom, edit_multiplier, prox_match, cat_match, partial_number, subquery_edit_distance, original_phrase, original_phrase_ender, original_phrase_mask, languages) {
     this.store = store;
     this.subquery = subquery;
     this.phrase = phrase;
     this.weight = weight;
     this.nmask = nmask;
+    this.mask = mask;
     this.bmask = bmask;
     this.phrase_id_range = phrase_id_range;
     this.scorefactor = scorefactor;
