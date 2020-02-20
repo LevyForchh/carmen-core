@@ -2,8 +2,6 @@
 use std::fmt::Debug;
 use std::borrow::Borrow;
 
-use std::rc::Rc;
-use std::cell::RefCell;
 use crate::gridstore::store::*;
 use crate::gridstore::builder::*;
 use crate::gridstore::common::*;
@@ -18,42 +16,27 @@ pub struct StackableNode<'a, T: Borrow<GridStore> + Clone + Debug> {
     pub mask: u32
 }
 
-impl<'a, T: Borrow<GridStore> + Clone + Debug> StackableNode<'a, T> {
-    pub fn new(phrasematch_results: Option<PhrasematchResults<'a, T>>, nmask: u32, bmask: Vec<u32>, mask: u32) -> StackableNode<'a, T> {
-        StackableNode {
-            phrasematch: phrasematch_results,
-            children: vec![],
-            nmask: nmask,
-            bmask: bmask,
-            mask: mask
-        }
-    }
+pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(phrasematch_results: &Vec<Vec<PhrasematchResults<'a, T>>>, phrasematch_result: Option<PhrasematchResults<'a, T>>, nmask: u32, bmask: Vec<u32>, mask: u32) -> StackableNode<'a, T> {
+    let mut children: Vec<StackableNode<'a, T>> = vec![];
+    let mut node = StackableNode {
+        phrasematch: phrasematch_result,
+        children: vec![],
+        mask: nmask,
+        bmask: bmask,
+        nmask: mask,
+    };
 
-    pub fn is_leaf(&self) -> bool {
-        self.children.len() == 0
-    }
-}
-
-pub fn stackable<T: Borrow<GridStore> + Clone + Debug>(phrasematch_results: Vec<Vec<PhrasematchResults<T>>>) {
-    let mut root: Rc<StackableNode<T>> = Rc::new(StackableNode::new(None, 0, vec![0], 0));
-    let mut nodes_to_visit: Vec<Rc<StackableNode<T>>> = vec![Rc::clone(&root)];
-    while nodes_to_visit.len() != 0 {
-        let top_node = nodes_to_visit.pop();
-        let mut node = top_node.unwrap();
-        for phrasematch_per_index in phrasematch_results.iter() {
-            for phrasematches in phrasematch_per_index.iter() {
-                if ((node.nmask & phrasematches.nmask) != 0 && (node.mask & phrasematches.mask) != 0) || node.phrasematch.is_none() {
-                let nm = node.nmask & phrasematches.nmask;
-                let m = node.mask & phrasematches.mask;
-                    let target_nmask = phrasematches.nmask | node.nmask;
-                    let target_mask = phrasematches.idx | node.mask;
-                    let new_child_node = Rc::new(StackableNode::new(Some(phrasematches.clone()), target_nmask, phrasematches.clone().bmask, target_mask));
-                    nodes_to_visit.push(Rc::clone(&new_child_node));
-                    node.children.push(RefCell::new(Rc::clone(&new_child_node)));
-                }
+    for phrasematch_per_index in phrasematch_results.iter() {
+        for phrasematches in phrasematch_per_index.iter() {
+            if (node.nmask & &phrasematches.nmask) != 0 && (node.mask & &phrasematches.mask) != 0 {
+            let target_nmask = &phrasematches.nmask | node.nmask;
+            let target_mask = &phrasematches.idx | node.mask;
+            node.children.push(stackable(&phrasematch_results, Some(phrasematches.clone()), target_nmask, phrasematches.clone().bmask, target_mask));
             }
         }
     }
+    println!("{:?}", node);
+    node
 }
 
 #[cfg(test)]
@@ -120,8 +103,8 @@ mod test {
         original_phrase_ender: 0,
         original_phrase_mask: 14
     };
-    let phrasematch_results = vec![vec![phrasematch_1, phrasematch_2]];
-    stackable(phrasematch_results);
 
+    let phrasematch_results = vec![vec![phrasematch_1, phrasematch_2]];
+    stackable(&phrasematch_results, None, 0, vec![0], 0);
     }
 }
