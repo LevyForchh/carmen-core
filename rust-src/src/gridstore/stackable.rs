@@ -28,14 +28,13 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(phrasematch_results: 
 
     for phrasematch_per_index in phrasematch_results.iter() {
         for phrasematches in phrasematch_per_index.iter() {
-            if (node.nmask & &phrasematches.nmask) != 0 && (node.mask & &phrasematches.mask) != 0 {
+            if (node.nmask & phrasematches.nmask) == 0  && (node.mask & phrasematches.mask) == 0 {
             let target_nmask = &phrasematches.nmask | node.nmask;
             let target_mask = &phrasematches.idx | node.mask;
             node.children.push(stackable(&phrasematch_results, Some(phrasematches.clone()), target_nmask, phrasematches.clone().bmask, target_mask));
             }
         }
     }
-    println!("{:?}", node);
     node
 }
 
