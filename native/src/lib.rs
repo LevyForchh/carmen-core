@@ -1,4 +1,5 @@
 use carmen_core::gridstore::coalesce;
+use carmen_core::gridstore::stackable;
 use carmen_core::gridstore::PhrasematchSubquery;
 use carmen_core::gridstore::{
     CoalesceContext, GridEntry, GridKey, GridStore, GridStoreBuilder, MatchOpts, MatchKey, PhrasematchResults
@@ -441,29 +442,35 @@ where
     Ok(phrasematches)
 }
 
-pub fn js_stack_to_trees(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+pub fn js_stackable(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let js_phrasematch_result = { cx.argument::<JsArray>(0)? };
-    let phrasematches: Vec<Vec<PhrasematchResults<ArcGridStore>>> =
+    let phrasematches_results: Vec<Vec<PhrasematchResults<ArcGridStore>>> =
         deserialize_phrasematch_results(&mut cx, js_phrasematch_result)?;
+    stackable(&phrasematches_results, None, 0, vec![0], 0);
+
     Ok(cx.undefined())
 }
 
 
 fn deserialize_phrasematch_results<'j, C: Context<'j>>(
     cx: &mut C,
-    js_phrasematch: Handle<'j, JsArray>,
+    js_phrasematch_per_index: Handle<'j, JsArray>,
 ) -> LibResult<Vec<Vec<PhrasematchResults<ArcGridStore>>>> {
     let mut phrasematch_results_by_index: Vec<Vec<PhrasematchResults<ArcGridStore>>> = Vec::new();
-    for i in 0..js_phrasematch.len() {
-        let phrasematches_sub = js_phrasematch.get(cx, i)?.downcast::<JsObject>().or_throw(cx)?;
-        let phrasematches = phrasematches_sub.get(cx, "phrasematches")?.downcast::<JsArray>().or_throw(cx)?;
-        let ph_length = phrasematches.len();
-        let mut phrasematch_results: Vec<PhrasematchResults<ArcGridStore>> = Vec::with_capacity(ph_length as usize);
+    for i in 0..js_phrasematch_per_index.len() {
+        let js_phrasematch = js_phrasematch_per_index.get(cx, i)?.downcast::<JsObject>().or_throw(cx)?;
+        let phrasematch_array = js_phrasematch.get(cx, "phrasematches")?.downcast::<JsArray>().or_throw(cx)?;
+        let nmask = js_phrasematch.get(cx, "nmask")?;
+        let idx = js_phrasematch.get(cx, "idx")?;
+        let bmask = js_phrasematch.get(cx, "bmask")?;
 
-        for j in 0..ph_length {
-        let js_obj =
-            phrasematches.get(cx, j)?.downcast::<JsObject>().or_throw(cx)?;
-        let js_gridstore = js_obj.get(cx, "store")?.downcast::<JsGridStore>().or_throw(cx)?;
+        let phrasematch_array_length = phrasematch_array.len();
+        let mut phrasematches: Vec<PhrasematchResults<ArcGridStore>> = Vec::with_capacity(phrasematch_array_length as usize);
+
+        for j in 0..phrasematch_array_length {
+        let js_phrasematch_obj =
+            phrasematch_array.get(cx, j)?.downcast::<JsObject>().or_throw(cx)?;
+        let js_gridstore = js_phrasematch_obj.get(cx, "store")?.downcast::<JsGridStore>().or_throw(cx)?;
             let gridstore = {
                 let guard = cx.lock();
                 // shallow clone of the Arc
@@ -471,35 +478,21 @@ fn deserialize_phrasematch_results<'j, C: Context<'j>>(
                 gridstore_clone
             };
 
-        let weight = js_obj.get(cx, "weight")?;
-        let idx = js_obj.get(cx, "idx")?;
-        let zoom = js_obj.get(cx, "zoom")?;
-        let nmask = js_obj.get(cx, "nmask")?;
-        let mask = js_obj.get(cx, "mask")?;
-        let bmask = js_obj.get(cx, "bmask")?;
-        let match_key = js_obj.get(cx, "match_key")?.downcast::<JsObject>().or_throw(cx)?;
+        let weight = js_phrasematch_obj.get(cx, "weight")?;
+        let zoom = js_phrasematch_obj.get(cx, "zoom")?;
+        let mask = js_phrasematch_obj.get(cx, "mask")?;
+        let match_key = js_phrasematch_obj.get(cx, "match_key")?.downcast::<JsObject>().or_throw(cx)?;
         let match_phrase = match_key.get(cx, "match_phrase")?;
-
         let js_lang_set = match_key.get(cx, "lang_set")?;
         let lang_set: u128 = langarray_to_langset(cx, js_lang_set)?;
-        let subquery = js_obj.get(cx, "subquery")?;
-        let phrase = js_obj.get(cx, "phrase")?;
-        let scorefactor = js_obj.get(cx, "scorefactor")?;
-        let prefix = js_obj.get(cx, "prefix")?;
-        let edit_multiplier = js_obj.get(cx, "edit_multiplier")?;
-        let prox_match = js_obj.get(cx, "prox_match")?;
-        let cat_match = js_obj.get(cx, "cat_match")?;
-        let partial_number = js_obj.get(cx, "partial_number")?;
-        let subquery_edit_distance = js_obj.get(cx, "subquery_edit_distance")?;
-        let original_phrase = js_obj.get(cx, "original_phrase")?;
-        let original_phrase_ender = js_obj.get(cx, "original_phrase_ender")?;
-        let original_phrase_mask = js_obj.get(cx, "original_phrase_mask")?;
+        let scorefactor = js_phrasematch_obj.get(cx, "scorefactor")?;
+        let prefix = js_phrasematch_obj.get(cx, "prefix")?;
+        let edit_multiplier = js_phrasematch_obj.get(cx, "edit_multiplier")?;
+        let subquery_edit_distance = js_phrasematch_obj.get(cx, "subquery_edit_distance")?;
 
         let phrasematch_result = PhrasematchResults
             {
                 store: gridstore,
-                subquery: neon_serde::from_value(cx, subquery)?,
-                phrase: neon_serde::from_value(cx, phrase)?,
                 scorefactor: neon_serde::from_value(cx, scorefactor)?,
                 prefix: neon_serde::from_value(cx, prefix)?,
                 weight: neon_serde::from_value(cx, weight)?,
@@ -507,20 +500,14 @@ fn deserialize_phrasematch_results<'j, C: Context<'j>>(
                 idx: neon_serde::from_value(cx, idx)?,
                 zoom: neon_serde::from_value(cx, zoom)?,
                 nmask: neon_serde::from_value(cx, nmask)?,
-                nmask: neon_serde::from_value(cx, mask)?,
+                mask: neon_serde::from_value(cx, mask)?,
                 bmask: neon_serde::from_value(cx, bmask)?,
                 edit_multiplier: neon_serde::from_value(cx, edit_multiplier)?,
-                prox_match: neon_serde::from_value(cx, prox_match)?,
-                cat_match: neon_serde::from_value(cx, cat_match)?,
-                partial_number: neon_serde::from_value(cx, partial_number)?,
                 subquery_edit_distance: neon_serde::from_value(cx, subquery_edit_distance)?,
-                original_phrase: neon_serde::from_value(cx, original_phrase)?,
-                original_phrase_ender: neon_serde::from_value(cx, original_phrase_ender)?,
-                original_phrase_mask: neon_serde::from_value(cx, original_phrase_mask)?
             };
-            phrasematch_results.push(phrasematch_result);
+            phrasematches.push(phrasematch_result);
         }
-        phrasematch_results_by_index.push(phrasematch_results);
+        phrasematch_results_by_index.push(phrasematches);
     }
     Ok(phrasematch_results_by_index)
 }
@@ -549,6 +536,6 @@ register_module!(mut m, {
     m.export_class::<JsGridStore>("GridStore")?;
     m.export_class::<JsGridKeyStoreKeyIterator>("GridStoreKeyIterator")?;
     m.export_function("coalesce", js_coalesce)?;
-    m.export_function("stack_to_trees", js_stack_to_trees)?;
+    m.export_function("stackable", js_stackable)?;
     Ok(())
 });
