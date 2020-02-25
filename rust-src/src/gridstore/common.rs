@@ -408,11 +408,9 @@ pub struct PhrasematchSubquery<T: Borrow<GridStore> + Clone> {
 }
 
 #[derive(Serialize, Debug, Clone)]
-pub struct PhrasematchResults<'a, T: Borrow<GridStore> + Clone> {
+pub struct PhrasematchResults<T: Borrow<GridStore> + Clone> {
     #[serde(serialize_with = "serialize_path")]
     pub store: T,
-    pub subquery: Vec<&'a str>,
-    pub phrase: &'a str,
     pub scorefactor: u16,
     pub prefix: u8,
     pub weight: f64,
@@ -423,13 +421,7 @@ pub struct PhrasematchResults<'a, T: Borrow<GridStore> + Clone> {
     pub mask: u32,
     pub bmask: Vec<u32>,
     pub edit_multiplier: f64,
-    pub prox_match: bool,
-    pub cat_match: bool,
-    pub partial_number: bool,
     pub subquery_edit_distance: u8,
-    pub original_phrase: Vec<&'a str>,
-    pub original_phrase_ender: u8,
-    pub original_phrase_mask: u32
 }
 
 #[inline]

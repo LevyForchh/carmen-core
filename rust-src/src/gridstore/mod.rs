@@ -1,14 +1,15 @@
 mod builder;
 mod coalesce;
-mod stackable;
 mod common;
 mod gridstore_format;
 mod spatial;
+mod stackable;
 mod store;
 
 pub use builder::*;
 pub use coalesce::coalesce;
 pub use common::*;
+pub use stackable::stackable;
 pub use store::*;
 
 #[cfg(test)]

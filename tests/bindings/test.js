@@ -470,28 +470,28 @@ tape('Deserialize phrasematch results', (t) => {
     let phrasematchResults = [
         {
             'phrasematches': [
-                new Phrasematch(store, ['main', 'street'], 'main street', 1, 14, [0, 2], 1, 0, 14, 4, 1, [0], 6, 1, false, false, false, 0, ['main', 'street'], 0, 14, [0])
-            ]
+                new Phrasematch(store, ['main', 'street'], 'main street', 1, [0, 2], 1, 0, 14, 6, 1, false, false, false, 0, ['main', 'street'], 0, 14, [0])
+            ],
+            idx: 0,
+            nmask: 14,
+            bmask: [0]
         }
     ];
-    addon.stack_to_trees(phrasematchResults);
+    addon.stackable(phrasematchResults);
     t.end();
 });
 
 
 
-function Phrasematch(store, subquery, phrase, weight, mask, phrase_id_range, scorefactor, prefix, idx, nmask, mask, bmask, zoom, edit_multiplier, prox_match, cat_match, partial_number, subquery_edit_distance, original_phrase, original_phrase_ender, original_phrase_mask, languages) {
+function Phrasematch(store, subquery, phrase, weight, phrase_id_range, scorefactor, prefix, mask, zoom, edit_multiplier, prox_match, cat_match, partial_number, subquery_edit_distance, original_phrase, original_phrase_ender, original_phrase_mask, languages) {
     this.store = store;
     this.subquery = subquery;
     this.phrase = phrase;
     this.weight = weight;
-    this.nmask = nmask;
     this.mask = mask;
-    this.bmask = bmask;
     this.phrase_id_range = phrase_id_range;
     this.scorefactor = scorefactor;
     this.prefix = prefix;
-    this.idx = idx;
     this.zoom = zoom;
     this.edit_multiplier = edit_multiplier || 1;
     this.prox_match = prox_match || false;
@@ -521,7 +521,7 @@ function Phrasematch(store, subquery, phrase, weight, mask, phrase_id_range, sco
 }
 
 Phrasematch.prototype.clone = function() {
-    return new Phrasematch(this.subquery.slice(), this.weight, this.mask, this.phrase, this.phrase_id_range, this.scorefactor, this.idx, this.store, this.zoom, this.radius, this.prefix, this.languages, this.editMultiplier, this.proxMatch, this.catMatch, this.partialNumber, this.extendedScan, this.address);
+    return new Phrasematch(this.store, this.subquery.slice(), this.phrase, this.weight, this.phrase_id_range, this.scorefactor, this.prefix, this.mask, this.zoom, this.edit_multiplier, this.prox_match, this.cat_match, this.partial_number, this.subquery_edit_distance, this.original_phrase, this.original_phrase_ender, this.original_phrase_mask, this.languages);
 };
 
 module.exports.Phrasematch = Phrasematch;
