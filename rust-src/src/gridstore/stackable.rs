@@ -14,6 +14,10 @@ pub struct StackableNode<T: Borrow<GridStore> + Clone + Debug> {
     pub nmask: u32,
     pub bmask: Vec<u32>,
     pub mask: u32,
+    pub idx: u32,
+    pub relev: f64,
+    pub max_relev: f64,
+    pub adjusted_relev: f64,
 }
 
 pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
@@ -22,30 +26,47 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
     nmask: u32,
     bmask: Vec<u32>,
     mask: u32,
+    idx: u32,
+    relev: f64,
+    max_relev: f64,
+    adjusted_relev: f64
 ) -> StackableNode<T> {
     let mut node = StackableNode {
         phrasematch: phrasematch_result,
         children: vec![],
-        mask: nmask,
+        mask: mask,
         bmask: bmask,
-        nmask: mask,
+        nmask: nmask,
+        idx: idx,
+        relev: relev,
+        max_relev: max_relev,
+        adjusted_relev: adjusted_relev,
     };
 
     for phrasematch_per_index in phrasematch_results.iter() {
         for phrasematches in phrasematch_per_index.iter() {
-            if (node.nmask & phrasematches.nmask) == 0 && (node.mask & phrasematches.mask) == 0 {
+            if (node.nmask & phrasematches.nmask) == 0 && (node.mask & phrasematches.mask) == 0  &&  phrasematches.bmask.contains(&node.idx) == false {
                 let target_nmask = &phrasematches.nmask | node.nmask;
-                let target_mask = &phrasematches.idx | node.mask;
+                let target_mask = &phrasematches.mask | node.mask;
+                let target_bmask = &phrasematches.bmask;
+                let target_max_relev = &node.relev + &phrasematches.weight;
+                let target_adjusted_relev = node.adjusted_relev + (&phrasematches.weight * &phrasematches.edit_multiplier);
+
                 node.children.push(stackable(
                     &phrasematch_results,
                     Some(phrasematches.clone()),
                     target_nmask,
-                    phrasematches.clone().bmask,
+                    target_bmask.to_vec(),
                     target_mask,
+                    node.idx,
+                    node.relev,
+                    target_max_relev,
+                    target_adjusted_relev
                 ));
             }
         }
     }
+    println!("{:?}", node);
     node
 }
 
@@ -72,13 +93,13 @@ mod test {
             store: &store,
             scorefactor: 1,
             prefix: 0,
-            weight: 1.0,
+            weight: 0.333,
             match_key: MatchKey { match_phrase: Range { start: 0, end: 3 }, lang_set: 1 },
-            idx: 14,
+            idx: 1,
             zoom: 6,
             nmask: 4,
             mask: 1,
-            bmask: vec![0],
+            bmask: vec![],
             edit_multiplier: 1.0,
             subquery_edit_distance: 0,
         };
@@ -87,18 +108,18 @@ mod test {
             store: &store,
             scorefactor: 1,
             prefix: 0,
-            weight: 1.0,
+            weight: 0.333,
             match_key: MatchKey { match_phrase: Range { start: 0, end: 3 }, lang_set: 1 },
-            idx: 14,
+            idx: 0,
             zoom: 6,
             nmask: 6,
             mask: 1,
-            bmask: vec![0],
+            bmask: vec![],
             edit_multiplier: 1.0,
             subquery_edit_distance: 0,
         };
 
         let phrasematch_results = vec![vec![phrasematch_1, phrasematch_2]];
-        stackable(&phrasematch_results, None, 0, vec![0], 0);
+        stackable(&phrasematch_results, None, 0, vec![], 0, 129, 0.0, 0.0, 0.0);
     }
 }
