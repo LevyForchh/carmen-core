@@ -424,6 +424,14 @@ pub struct PhrasematchResults<T: Borrow<GridStore> + Clone> {
     pub subquery_edit_distance: u8,
 }
 
+/*
+impl PartialOrd for PhrasematchResults {
+    fn partial_cmp(&self, other: &PhrasematchResults) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+*/
+
 #[inline]
 pub fn relev_float_to_int(relev: f64) -> u8 {
     if relev == 0.4 {

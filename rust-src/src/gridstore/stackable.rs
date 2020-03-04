@@ -1,5 +1,7 @@
 #![allow(dead_code)]
+use ordered_float::OrderedFloat;
 use std::borrow::Borrow;
+use std::cmp::Reverse;
 use std::fmt::Debug;
 
 use crate::gridstore::builder::*;
@@ -15,7 +17,6 @@ pub struct StackableNode<T: Borrow<GridStore> + Clone + Debug> {
     pub bmask: Vec<u32>,
     pub mask: u32,
     pub idx: u32,
-    pub relev: f64,
     pub max_relev: f64,
     pub adjusted_relev: f64,
 }
@@ -27,9 +28,8 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
     bmask: Vec<u32>,
     mask: u32,
     idx: u32,
-    relev: f64,
     max_relev: f64,
-    adjusted_relev: f64
+    adjusted_relev: f64,
 ) -> StackableNode<T> {
     let mut node = StackableNode {
         phrasematch: phrasematch_result,
@@ -38,19 +38,25 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
         bmask: bmask,
         nmask: nmask,
         idx: idx,
-        relev: relev,
         max_relev: max_relev,
         adjusted_relev: adjusted_relev,
     };
 
     for phrasematch_per_index in phrasematch_results.iter() {
         for phrasematches in phrasematch_per_index.iter() {
-            if (node.nmask & phrasematches.nmask) == 0 && (node.mask & phrasematches.mask) == 0  &&  phrasematches.bmask.contains(&node.idx) == false {
+            if phrasematches.idx >= node.idx {
+                continue;
+            }
+            if (node.nmask & phrasematches.nmask) == 0
+                && (node.mask & phrasematches.mask) == 0
+                && phrasematches.bmask.contains(&node.idx) == false
+            {
                 let target_nmask = &phrasematches.nmask | node.nmask;
                 let target_mask = &phrasematches.mask | node.mask;
                 let target_bmask = &phrasematches.bmask;
-                let target_max_relev = &node.relev + &phrasematches.weight;
-                let target_adjusted_relev = node.adjusted_relev + (&phrasematches.weight * &phrasematches.edit_multiplier);
+                let target_relev = 0.0 + &phrasematches.weight;
+                let target_adjusted_relev =
+                    node.adjusted_relev + (&phrasematches.weight * &phrasematches.edit_multiplier);
 
                 node.children.push(stackable(
                     &phrasematch_results,
@@ -58,15 +64,19 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
                     target_nmask,
                     target_bmask.to_vec(),
                     target_mask,
-                    node.idx,
-                    node.relev,
-                    target_max_relev,
-                    target_adjusted_relev
+                    phrasematches.idx,
+                    target_relev,
+                    target_adjusted_relev,
                 ));
             }
         }
     }
-    println!("{:?}", node);
+
+    node.children.sort_by_key(|node| Reverse(OrderedFloat(node.max_relev)));
+    if !node.children.is_empty() {
+        node.max_relev = node.max_relev + node.children[0].max_relev;
+    }
+
     node
 }
 
@@ -89,37 +99,52 @@ mod test {
         builder.finish().unwrap();
         let store = GridStore::new(directory.path()).unwrap();
 
-        let phrasematch_1 = PhrasematchResults {
+        let a1 = PhrasematchResults {
             store: &store,
-            scorefactor: 1,
+            scorefactor: 0,
             prefix: 0,
-            weight: 0.333,
-            match_key: MatchKey { match_phrase: Range { start: 0, end: 3 }, lang_set: 1 },
+            weight: 0.5,
+            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+            idx: 0,
+            zoom: 0,
+            nmask: 0,
+            mask: 2,
+            bmask: vec![],
+            edit_multiplier: 1.0,
+            subquery_edit_distance: 0,
+        };
+
+        let b1 = PhrasematchResults {
+            store: &store,
+            scorefactor: 0,
+            prefix: 0,
+            weight: 0.5,
+            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+            idx: 1,
+            zoom: 1,
+            nmask: 1,
+            mask: 1,
+            bmask: vec![],
+            edit_multiplier: 1.0,
+            subquery_edit_distance: 0,
+        };
+
+        let b2 = PhrasematchResults {
+            store: &store,
+            scorefactor: 0,
+            prefix: 0,
+            weight: 0.5,
+            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
             idx: 1,
             zoom: 6,
-            nmask: 4,
+            nmask: 1,
             mask: 1,
             bmask: vec![],
             edit_multiplier: 1.0,
             subquery_edit_distance: 0,
         };
 
-        let phrasematch_2 = PhrasematchResults {
-            store: &store,
-            scorefactor: 1,
-            prefix: 0,
-            weight: 0.333,
-            match_key: MatchKey { match_phrase: Range { start: 0, end: 3 }, lang_set: 1 },
-            idx: 0,
-            zoom: 6,
-            nmask: 6,
-            mask: 1,
-            bmask: vec![],
-            edit_multiplier: 1.0,
-            subquery_edit_distance: 0,
-        };
-
-        let phrasematch_results = vec![vec![phrasematch_1, phrasematch_2]];
-        stackable(&phrasematch_results, None, 0, vec![], 0, 129, 0.0, 0.0, 0.0);
+        let phrasematch_results = vec![vec![a1, b1, b2]];
+        stackable(&phrasematch_results, None, 0, vec![], 0, 129, 0.0, 0.0);
     }
 }
