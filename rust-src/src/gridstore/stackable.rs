@@ -2,6 +2,7 @@
 use ordered_float::OrderedFloat;
 use std::borrow::Borrow;
 use std::cmp::Reverse;
+use std::collections::HashSet;
 use std::fmt::Debug;
 
 use crate::gridstore::builder::*;
@@ -14,7 +15,7 @@ pub struct StackableNode<T: Borrow<GridStore> + Clone + Debug> {
     pub phrasematch: Option<PhrasematchResults<T>>,
     pub children: Vec<StackableNode<T>>,
     pub nmask: u32,
-    pub bmask: Vec<u32>,
+    pub bmask: HashSet<u32>,
     pub mask: u32,
     pub idx: u32,
     pub max_relev: f64,
@@ -25,7 +26,7 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
     phrasematch_results: &Vec<Vec<PhrasematchResults<T>>>,
     phrasematch_result: Option<PhrasematchResults<T>>,
     nmask: u32,
-    bmask: Vec<u32>,
+    bmask: HashSet<u32>,
     mask: u32,
     idx: u32,
     max_relev: f64,
@@ -53,7 +54,9 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
             {
                 let target_nmask = &phrasematches.nmask | node.nmask;
                 let target_mask = &phrasematches.mask | node.mask;
-                let target_bmask = &phrasematches.bmask;
+                let mut target_bmask: HashSet<u32> = node.bmask.iter().cloned().collect();
+                let phrasematch_bmask: HashSet<u32> = phrasematches.bmask.iter().cloned().collect();
+                target_bmask.extend(&phrasematch_bmask);
                 let target_relev = 0.0 + &phrasematches.weight;
                 let target_adjusted_relev =
                     node.adjusted_relev + (&phrasematches.weight * &phrasematches.edit_multiplier);
@@ -62,7 +65,7 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
                     &phrasematch_results,
                     Some(phrasematches.clone()),
                     target_nmask,
-                    target_bmask.to_vec(),
+                    target_bmask,
                     target_mask,
                     phrasematches.idx,
                     target_relev,
@@ -73,6 +76,8 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
     }
 
     node.children.sort_by_key(|node| Reverse(OrderedFloat(node.max_relev)));
+    node.children.sort_by_key(|node| (node.idx, node.phrasematch.clone().unwrap().zoom));
+
     if !node.children.is_empty() {
         node.max_relev = node.max_relev + node.children[0].max_relev;
     }
@@ -109,7 +114,7 @@ mod test {
             zoom: 0,
             nmask: 0,
             mask: 2,
-            bmask: vec![],
+            bmask: HashSet::new(),
             edit_multiplier: 1.0,
             subquery_edit_distance: 0,
         };
@@ -124,7 +129,7 @@ mod test {
             zoom: 1,
             nmask: 1,
             mask: 1,
-            bmask: vec![],
+            bmask: HashSet::new(),
             edit_multiplier: 1.0,
             subquery_edit_distance: 0,
         };
@@ -139,12 +144,12 @@ mod test {
             zoom: 6,
             nmask: 1,
             mask: 1,
-            bmask: vec![],
+            bmask: HashSet::new(),
             edit_multiplier: 1.0,
             subquery_edit_distance: 0,
         };
 
         let phrasematch_results = vec![vec![a1, b1, b2]];
-        stackable(&phrasematch_results, None, 0, vec![], 0, 129, 0.0, 0.0);
+        stackable(&phrasematch_results, None, 0, HashSet::new(), 0, 129, 0.0, 0.0);
     }
 }
