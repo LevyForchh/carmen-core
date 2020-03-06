@@ -20,6 +20,7 @@ pub struct StackableNode<T: Borrow<GridStore> + Clone + Debug> {
     pub idx: u32,
     pub max_relev: f64,
     pub adjusted_relev: f64,
+    pub zoom: u16,
 }
 
 pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
@@ -31,6 +32,7 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
     idx: u32,
     max_relev: f64,
     adjusted_relev: f64,
+    zoom: u16,
 ) -> StackableNode<T> {
     let mut node = StackableNode {
         phrasematch: phrasematch_result,
@@ -41,13 +43,18 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
         idx: idx,
         max_relev: max_relev,
         adjusted_relev: adjusted_relev,
+        zoom: zoom,
     };
 
     for phrasematch_per_index in phrasematch_results.iter() {
         for phrasematches in phrasematch_per_index.iter() {
-            if phrasematches.idx >= node.idx {
+            if node.zoom > phrasematches.zoom {
+                if phrasematches.idx >= node.idx {
+                    continue;
+                }
                 continue;
             }
+
             if (node.nmask & phrasematches.nmask) == 0
                 && (node.mask & phrasematches.mask) == 0
                 && phrasematches.bmask.contains(&node.idx) == false
@@ -70,13 +77,13 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
                     phrasematches.idx,
                     target_relev,
                     target_adjusted_relev,
+                    phrasematches.zoom
                 ));
             }
         }
     }
 
     node.children.sort_by_key(|node| Reverse(OrderedFloat(node.max_relev)));
-    node.children.sort_by_key(|node| (node.idx, node.phrasematch.clone().unwrap().zoom));
 
     if !node.children.is_empty() {
         node.max_relev = node.max_relev + node.children[0].max_relev;
@@ -150,6 +157,6 @@ mod test {
         };
 
         let phrasematch_results = vec![vec![a1, b1, b2]];
-        stackable(&phrasematch_results, None, 0, HashSet::new(), 0, 129, 0.0, 0.0);
+        stackable(&phrasematch_results, None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
     }
 }
