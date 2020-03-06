@@ -77,7 +77,7 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
                     phrasematches.idx,
                     target_relev,
                     target_adjusted_relev,
-                    phrasematches.zoom
+                    phrasematches.zoom,
                 ));
             }
         }
