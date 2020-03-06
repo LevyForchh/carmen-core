@@ -8,6 +8,7 @@ use carmen_core::gridstore::{
 use neon::prelude::*;
 use neon::{class_definition, declare_types, impl_managed, register_module};
 use neon_serde::errors::Result as LibResult;
+use std::collections::HashSet;
 use owning_ref::OwningHandle;
 use failure::Error;
 
