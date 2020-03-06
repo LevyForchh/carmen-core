@@ -49,10 +49,11 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
     for phrasematch_per_index in phrasematch_results.iter() {
         for phrasematches in phrasematch_per_index.iter() {
             if node.zoom > phrasematches.zoom {
-                if phrasematches.idx >= node.idx {
+                continue;
+            } else if node.zoom == phrasematches.zoom {
+                if node.idx < phrasematches.idx {
                     continue;
                 }
-                continue;
             }
 
             if (node.nmask & phrasematches.nmask) == 0
