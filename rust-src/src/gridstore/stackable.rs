@@ -1,5 +1,8 @@
 #![allow(dead_code)]
+use ordered_float::OrderedFloat;
 use std::borrow::Borrow;
+use std::cmp::Reverse;
+use std::collections::HashSet;
 use std::fmt::Debug;
 
 use crate::gridstore::builder::*;
@@ -12,40 +15,81 @@ pub struct StackableNode<T: Borrow<GridStore> + Clone + Debug> {
     pub phrasematch: Option<PhrasematchResults<T>>,
     pub children: Vec<StackableNode<T>>,
     pub nmask: u32,
-    pub bmask: Vec<u32>,
+    pub bmask: HashSet<u32>,
     pub mask: u32,
+    pub idx: u32,
+    pub max_relev: f64,
+    pub adjusted_relev: f64,
+    pub zoom: u16,
 }
 
 pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
     phrasematch_results: &Vec<Vec<PhrasematchResults<T>>>,
     phrasematch_result: Option<PhrasematchResults<T>>,
     nmask: u32,
-    bmask: Vec<u32>,
+    bmask: HashSet<u32>,
     mask: u32,
+    idx: u32,
+    max_relev: f64,
+    adjusted_relev: f64,
+    zoom: u16,
 ) -> StackableNode<T> {
     let mut node = StackableNode {
         phrasematch: phrasematch_result,
         children: vec![],
-        mask: nmask,
+        mask: mask,
         bmask: bmask,
-        nmask: mask,
+        nmask: nmask,
+        idx: idx,
+        max_relev: max_relev,
+        adjusted_relev: adjusted_relev,
+        zoom: zoom,
     };
 
     for phrasematch_per_index in phrasematch_results.iter() {
         for phrasematches in phrasematch_per_index.iter() {
-            if (node.nmask & phrasematches.nmask) == 0 && (node.mask & phrasematches.mask) == 0 {
+            if node.zoom > phrasematches.zoom {
+                continue;
+            } else if node.zoom == phrasematches.zoom {
+                if node.idx < phrasematches.idx {
+                    continue;
+                }
+            }
+
+            if (node.nmask & phrasematches.nmask) == 0
+                && (node.mask & phrasematches.mask) == 0
+                && phrasematches.bmask.contains(&node.idx) == false
+            {
                 let target_nmask = &phrasematches.nmask | node.nmask;
-                let target_mask = &phrasematches.idx | node.mask;
+                let target_mask = &phrasematches.mask | node.mask;
+                let mut target_bmask: HashSet<u32> = node.bmask.iter().cloned().collect();
+                let phrasematch_bmask: HashSet<u32> = phrasematches.bmask.iter().cloned().collect();
+                target_bmask.extend(&phrasematch_bmask);
+                let target_relev = 0.0 + &phrasematches.weight;
+                let target_adjusted_relev =
+                    node.adjusted_relev + (&phrasematches.weight * &phrasematches.edit_multiplier);
+
                 node.children.push(stackable(
                     &phrasematch_results,
                     Some(phrasematches.clone()),
                     target_nmask,
-                    phrasematches.clone().bmask,
+                    target_bmask,
                     target_mask,
+                    phrasematches.idx,
+                    target_relev,
+                    target_adjusted_relev,
+                    phrasematches.zoom,
                 ));
             }
         }
     }
+
+    node.children.sort_by_key(|node| Reverse(OrderedFloat(node.max_relev)));
+
+    if !node.children.is_empty() {
+        node.max_relev = node.max_relev + node.children[0].max_relev;
+    }
+
     node
 }
 
@@ -68,37 +112,52 @@ mod test {
         builder.finish().unwrap();
         let store = GridStore::new(directory.path()).unwrap();
 
-        let phrasematch_1 = PhrasematchResults {
+        let a1 = PhrasematchResults {
             store: &store,
-            scorefactor: 1,
+            scorefactor: 0,
             prefix: 0,
-            weight: 1.0,
-            match_key: MatchKey { match_phrase: Range { start: 0, end: 3 }, lang_set: 1 },
-            idx: 14,
-            zoom: 6,
-            nmask: 4,
-            mask: 1,
-            bmask: vec![0],
+            weight: 0.5,
+            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+            idx: 0,
+            zoom: 0,
+            nmask: 0,
+            mask: 2,
+            bmask: HashSet::new(),
             edit_multiplier: 1.0,
             subquery_edit_distance: 0,
         };
 
-        let phrasematch_2 = PhrasematchResults {
+        let b1 = PhrasematchResults {
             store: &store,
-            scorefactor: 1,
+            scorefactor: 0,
             prefix: 0,
-            weight: 1.0,
-            match_key: MatchKey { match_phrase: Range { start: 0, end: 3 }, lang_set: 1 },
-            idx: 14,
-            zoom: 6,
-            nmask: 6,
+            weight: 0.5,
+            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+            idx: 1,
+            zoom: 1,
+            nmask: 1,
             mask: 1,
-            bmask: vec![0],
+            bmask: HashSet::new(),
             edit_multiplier: 1.0,
             subquery_edit_distance: 0,
         };
 
-        let phrasematch_results = vec![vec![phrasematch_1, phrasematch_2]];
-        stackable(&phrasematch_results, None, 0, vec![0], 0);
+        let b2 = PhrasematchResults {
+            store: &store,
+            scorefactor: 0,
+            prefix: 0,
+            weight: 0.5,
+            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+            idx: 1,
+            zoom: 6,
+            nmask: 1,
+            mask: 1,
+            bmask: HashSet::new(),
+            edit_multiplier: 1.0,
+            subquery_edit_distance: 0,
+        };
+
+        let phrasematch_results = vec![vec![a1, b1, b2]];
+        stackable(&phrasematch_results, None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
     }
 }

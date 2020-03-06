@@ -1,4 +1,5 @@
 use std::borrow::Borrow;
+use std::collections::HashSet;
 
 use crate::gridstore::store::GridStore;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
@@ -419,7 +420,7 @@ pub struct PhrasematchResults<T: Borrow<GridStore> + Clone> {
     pub zoom: u16,
     pub nmask: u32,
     pub mask: u32,
-    pub bmask: Vec<u32>,
+    pub bmask: HashSet<u32>,
     pub edit_multiplier: f64,
     pub subquery_edit_distance: u8,
 }
