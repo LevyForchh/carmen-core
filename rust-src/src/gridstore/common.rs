@@ -386,7 +386,7 @@ pub struct CoalesceEntry {
     pub scoredist: f64,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialOrd, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialOrd, PartialEq, Clone)]
 pub struct CoalesceContext {
     pub mask: u32,
     pub relev: f64,
@@ -416,11 +416,11 @@ pub struct PhrasematchResults<T: Borrow<GridStore> + Clone> {
     pub prefix: u8,
     pub weight: f64,
     pub match_key: MatchKey,
-    pub idx: u32,
+    pub idx: u16,
     pub zoom: u16,
     pub nmask: u32,
     pub mask: u32,
-    pub bmask: HashSet<u32>,
+    pub bmask: HashSet<u16>,
     pub edit_multiplier: f64,
     pub subquery_edit_distance: u8,
 }

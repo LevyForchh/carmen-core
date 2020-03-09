@@ -15,9 +15,9 @@ pub struct StackableNode<T: Borrow<GridStore> + Clone + Debug> {
     pub phrasematch: Option<PhrasematchResults<T>>,
     pub children: Vec<StackableNode<T>>,
     pub nmask: u32,
-    pub bmask: HashSet<u32>,
+    pub bmask: HashSet<u16>,
     pub mask: u32,
-    pub idx: u32,
+    pub idx: u16,
     pub max_relev: f64,
     pub adjusted_relev: f64,
     pub zoom: u16,
@@ -27,9 +27,9 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
     phrasematch_results: &Vec<Vec<PhrasematchResults<T>>>,
     phrasematch_result: Option<PhrasematchResults<T>>,
     nmask: u32,
-    bmask: HashSet<u32>,
+    bmask: HashSet<u16>,
     mask: u32,
-    idx: u32,
+    idx: u16,
     max_relev: f64,
     adjusted_relev: f64,
     zoom: u16,
@@ -62,8 +62,8 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
             {
                 let target_nmask = &phrasematches.nmask | node.nmask;
                 let target_mask = &phrasematches.mask | node.mask;
-                let mut target_bmask: HashSet<u32> = node.bmask.iter().cloned().collect();
-                let phrasematch_bmask: HashSet<u32> = phrasematches.bmask.iter().cloned().collect();
+                let mut target_bmask: HashSet<u16> = node.bmask.iter().cloned().collect();
+                let phrasematch_bmask: HashSet<u16> = phrasematches.bmask.iter().cloned().collect();
                 target_bmask.extend(&phrasematch_bmask);
                 let target_relev = 0.0 + &phrasematches.weight;
                 let target_adjusted_relev =
