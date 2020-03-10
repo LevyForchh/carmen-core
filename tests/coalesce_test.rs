@@ -24,7 +24,12 @@ fn coalesce_single_test_proximity_quadrants() {
 
     let store = GridStore::new(directory.path()).unwrap();
     let subquery = PhrasematchResults {
-scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0, subquery_edit_distance: 0,
+        scorefactor: 0,
+        prefix: 0,
+        nmask: 1,
+        bmask: HashSet::new(),
+        edit_multiplier: 1.0,
+        subquery_edit_distance: 0,
         store: &store,
         weight: 1.,
         match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 },
@@ -41,9 +46,9 @@ scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0
         ..MatchOpts::default()
     };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-	let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
-	let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
-	assert_eq!(result, tree_result);
+    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+    let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
+    assert_eq!(result, tree_result);
     let result_ids: Vec<u32> =
         result.iter().map(|context| context.entries[0].grid_entry.id).collect();
     let result_distances: Vec<f64> =
@@ -58,9 +63,9 @@ scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0
         ..MatchOpts::default()
     };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-	let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
-	let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
-	assert_eq!(result, tree_result);
+    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+    let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
+    assert_eq!(result, tree_result);
     let result_ids: Vec<u32> =
         result.iter().map(|context| context.entries[0].grid_entry.id).collect();
     let result_distances: Vec<f64> =
@@ -75,9 +80,9 @@ scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0
         ..MatchOpts::default()
     };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-	let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
-	let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
-	assert_eq!(result, tree_result);
+    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+    let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
+    assert_eq!(result, tree_result);
     let result_ids: Vec<u32> =
         result.iter().map(|context| context.entries[0].grid_entry.id).collect();
     let result_distances: Vec<f64> =
@@ -92,9 +97,9 @@ scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0
         ..MatchOpts::default()
     };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-	let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
-	let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
-	assert_eq!(result, tree_result);
+    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+    let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
+    assert_eq!(result, tree_result);
     let result_ids: Vec<u32> =
         result.iter().map(|context| context.entries[0].grid_entry.id).collect();
     let result_distances: Vec<f64> =
@@ -122,7 +127,12 @@ fn coalesce_single_test_proximity_basic() {
 
     let store = GridStore::new(directory.path()).unwrap();
     let subquery = PhrasematchResults {
-scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0, subquery_edit_distance: 0,
+        scorefactor: 0,
+        prefix: 0,
+        nmask: 1,
+        bmask: HashSet::new(),
+        edit_multiplier: 1.0,
+        subquery_edit_distance: 0,
         store: &store,
         weight: 1.,
         match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 },
@@ -137,9 +147,9 @@ scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0
         ..MatchOpts::default()
     };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-	let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
-	let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
-	assert_eq!(result, tree_result);
+    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+    let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
+    assert_eq!(result, tree_result);
     let result_ids: Vec<u32> =
         result.iter().map(|context| context.entries[0].grid_entry.id).collect();
     assert_eq!(
@@ -175,7 +185,12 @@ fn coalesce_single_test_language_penalty() {
 
     let store = GridStore::new(directory.path()).unwrap();
     let subquery = PhrasematchResults {
-scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0, subquery_edit_distance: 0,
+        scorefactor: 0,
+        prefix: 0,
+        nmask: 1,
+        bmask: HashSet::new(),
+        edit_multiplier: 1.0,
+        subquery_edit_distance: 0,
         store: &store,
         weight: 1.,
         match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 2 },
@@ -190,9 +205,9 @@ scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0
         ..MatchOpts::default()
     };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-	let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
-	let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
-	assert_eq!(result, tree_result);
+    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+    let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
+    assert_eq!(result, tree_result);
     #[cfg_attr(rustfmt, rustfmt::skip)]
     {
         assert_eq!(result[0].relev, 1., "Contexts inside the proximity radius don't get a cross langauge penalty");
@@ -205,9 +220,9 @@ scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0
     let match_opts = MatchOpts { zoom: 14, ..MatchOpts::default() };
     let stack = vec![subquery.clone()];
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-	let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
-	let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
-	assert_eq!(result, tree_result);
+    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+    let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
+    assert_eq!(result, tree_result);
     #[cfg_attr(rustfmt, rustfmt::skip)]
     {
         assert_eq!(result[0].relev, 0.96, "With no proximity, cross language contexts get a penalty");
@@ -240,7 +255,12 @@ fn coalesce_multi_test_language_penalty() {
     println!("Coalesce multi - Subqueries with different language set from grids, with proximity");
     let stack = vec![
         PhrasematchResults {
-scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0, subquery_edit_distance: 0,
+            scorefactor: 0,
+            prefix: 0,
+            nmask: 1,
+            bmask: HashSet::new(),
+            edit_multiplier: 1.0,
+            subquery_edit_distance: 0,
             store: &store1,
             weight: 0.5,
             match_key: MatchKey {
@@ -252,7 +272,12 @@ scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0
             mask: 1 << 0,
         },
         PhrasematchResults {
-scorefactor: 0, prefix: 0, nmask: 2, bmask: HashSet::new(), edit_multiplier: 1.0, subquery_edit_distance: 0,
+            scorefactor: 0,
+            prefix: 0,
+            nmask: 2,
+            bmask: HashSet::new(),
+            edit_multiplier: 1.0,
+            subquery_edit_distance: 0,
             store: &store2,
             weight: 0.5,
             match_key: MatchKey {
@@ -271,9 +296,9 @@ scorefactor: 0, prefix: 0, nmask: 2, bmask: HashSet::new(), edit_multiplier: 1.0
         ..MatchOpts::default()
     };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-	let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
-	let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
-	assert_eq!(result, tree_result);
+    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+    let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
+    assert_eq!(result, tree_result);
     #[cfg_attr(rustfmt, rustfmt::skip)]
     {
         assert_eq!(result[0].relev, 1., "Contexts inside the proximity radius don't get a cross langauge penalty");
@@ -288,9 +313,9 @@ scorefactor: 0, prefix: 0, nmask: 2, bmask: HashSet::new(), edit_multiplier: 1.0
     println!("Coalesce multi - Subqueires with different lang set from grids, no proximity");
     let match_opts = MatchOpts { zoom: 14, ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-	let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
-	let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
-	assert_eq!(result, tree_result);
+    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+    let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
+    assert_eq!(result, tree_result);
     #[cfg_attr(rustfmt, rustfmt::skip)]
     {
         assert_eq!(result[0].relev, 0.96, "Cross language contexts get a penalty");
@@ -310,7 +335,12 @@ fn coalesce_single_test() {
         ],
     }]);
     let subquery = PhrasematchResults {
-scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0, subquery_edit_distance: 0,
+        scorefactor: 0,
+        prefix: 0,
+        nmask: 1,
+        bmask: HashSet::new(),
+        edit_multiplier: 1.0,
+        subquery_edit_distance: 0,
         store: &store,
         weight: 1.,
         match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 },
@@ -324,9 +354,9 @@ scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0
     println!("Coalsece single - no proximity, no bbox");
     let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-	let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
-	let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
-	assert_eq!(result, tree_result);
+    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+    let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
+    assert_eq!(result, tree_result);
 
     #[cfg_attr(rustfmt, rustfmt::skip)]
     {
@@ -384,9 +414,9 @@ scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0
         ..MatchOpts::default()
     };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-	let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
-	let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
-	assert_eq!(result, tree_result);
+    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+    let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
+    assert_eq!(result, tree_result);
     #[cfg_attr(rustfmt, rustfmt::skip)]
     {
         assert_eq!(result[0].entries[0].grid_entry.id, 3, "1st result is the closest, even if its a slightly lower score");
@@ -471,9 +501,9 @@ scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0
     println!("Coalsece single - with bbox");
     let match_opts = MatchOpts { zoom: 6, bbox: Some([1, 1, 1, 1]), ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-	let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
-	let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
-	assert_eq!(result, tree_result);
+    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+    let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
+    assert_eq!(result, tree_result);
     assert_eq!(result[0].entries.len(), 1, "Only one result is within the bbox");
     assert_eq!(result[0].entries[0].grid_entry.id, 1, "Result is the one that's within the bbox");
     assert_eq!(
@@ -509,9 +539,9 @@ scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0
         proximity: Some(Proximity { point: [1, 1], radius: 40. }),
     };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-	let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
-	let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
-	assert_eq!(result, tree_result);
+    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+    let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
+    assert_eq!(result, tree_result);
     assert_eq!(result[0].entries.len(), 1, "Only one result is within the bbox");
     assert_eq!(
         result[0],
@@ -559,7 +589,12 @@ fn coalesce_single_languages_test() {
     // Test query with all languages
     println!("Coalesce single - all languages");
     let subquery = PhrasematchResults {
-scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0, subquery_edit_distance: 0,
+        scorefactor: 0,
+        prefix: 0,
+        nmask: 1,
+        bmask: HashSet::new(),
+        edit_multiplier: 1.0,
+        subquery_edit_distance: 0,
         store: &store,
         weight: 1.,
         match_key: MatchKey {
@@ -573,9 +608,9 @@ scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0
     let stack = vec![subquery];
     let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-	let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
-	let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
-	assert_eq!(result, tree_result);
+    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+    let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
+    assert_eq!(result, tree_result);
 
     #[cfg_attr(rustfmt, rustfmt::skip)]
     {
@@ -601,7 +636,12 @@ scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0
     // Test lanuage 0
     println!("Coalesce single - language 0, language matching 2 grids");
     let subquery = PhrasematchResults {
-scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0, subquery_edit_distance: 0,
+        scorefactor: 0,
+        prefix: 0,
+        nmask: 1,
+        bmask: HashSet::new(),
+        edit_multiplier: 1.0,
+        subquery_edit_distance: 0,
         store: &store,
         weight: 1.,
         match_key: MatchKey {
@@ -615,9 +655,9 @@ scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0
     let stack = vec![subquery];
     let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-	let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
-	let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
-	assert_eq!(result, tree_result);
+    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+    let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
+    assert_eq!(result, tree_result);
 
     #[cfg_attr(rustfmt, rustfmt::skip)]
     {
@@ -643,7 +683,12 @@ scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0
     println!("Coalesce single - language 3, language matching no grids");
 
     let subquery = PhrasematchResults {
-scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0, subquery_edit_distance: 0,
+        scorefactor: 0,
+        prefix: 0,
+        nmask: 1,
+        bmask: HashSet::new(),
+        edit_multiplier: 1.0,
+        subquery_edit_distance: 0,
         store: &store,
         weight: 1.,
         match_key: MatchKey {
@@ -657,9 +702,9 @@ scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0
     let stack = vec![subquery];
     let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-	let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
-	let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
-	assert_eq!(result, tree_result);
+    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+    let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
+    assert_eq!(result, tree_result);
 
     #[cfg_attr(rustfmt, rustfmt::skip)]
     {
@@ -706,7 +751,12 @@ fn coalesce_multi_test() {
 
     let stack = vec![
         PhrasematchResults {
-scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0, subquery_edit_distance: 0,
+            scorefactor: 0,
+            prefix: 0,
+            nmask: 1,
+            bmask: HashSet::new(),
+            edit_multiplier: 1.0,
+            subquery_edit_distance: 0,
             store: &store1,
             weight: 0.5,
             match_key: MatchKey {
@@ -718,7 +768,12 @@ scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0
             mask: 1 << 1,
         },
         PhrasematchResults {
-scorefactor: 0, prefix: 0, nmask: 2, bmask: HashSet::new(), edit_multiplier: 1.0, subquery_edit_distance: 0,
+            scorefactor: 0,
+            prefix: 0,
+            nmask: 2,
+            bmask: HashSet::new(),
+            edit_multiplier: 1.0,
+            subquery_edit_distance: 0,
             store: &store2,
             weight: 0.5,
             match_key: MatchKey {
@@ -735,9 +790,9 @@ scorefactor: 0, prefix: 0, nmask: 2, bmask: HashSet::new(), edit_multiplier: 1.0
     println!("Coalsece multi - no proximity no bbox");
     let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-	let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
-	let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
-	assert_eq!(result, tree_result);
+    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+    let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
+    assert_eq!(result, tree_result);
     assert_eq!(result[0].relev, 1., "1st result has relevance 1");
     assert_eq!(result[0].mask, 3, "1st result context has correct mask");
     assert_eq!(result[0].entries.len(), 2, "1st result has 2 coalesce entries");
@@ -833,9 +888,9 @@ scorefactor: 0, prefix: 0, nmask: 2, bmask: HashSet::new(), edit_multiplier: 1.0
         ..MatchOpts::default()
     };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-	let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
-	let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
-	assert_eq!(result, tree_result);
+    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+    let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
+    assert_eq!(result, tree_result);
     assert_eq!(result[0].relev, 1., "1st result context has relevance 1");
     assert_eq!(result[0].mask, 3, "1st result context has correct mask");
     assert_eq!(result[0].entries.len(), 2, "1st result has 2 coalesce entries");
@@ -962,7 +1017,12 @@ fn coalesce_multi_languages_test() {
     println!("Coalesce multi - all languages");
     let stack = vec![
         PhrasematchResults {
-scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0, subquery_edit_distance: 0,
+            scorefactor: 0,
+            prefix: 0,
+            nmask: 1,
+            bmask: HashSet::new(),
+            edit_multiplier: 1.0,
+            subquery_edit_distance: 0,
             store: &store1,
             weight: 0.5,
             match_key: MatchKey {
@@ -974,7 +1034,12 @@ scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0
             mask: 1 << 1,
         },
         PhrasematchResults {
-scorefactor: 0, prefix: 0, nmask: 2, bmask: HashSet::new(), edit_multiplier: 1.0, subquery_edit_distance: 0,
+            scorefactor: 0,
+            prefix: 0,
+            nmask: 2,
+            bmask: HashSet::new(),
+            edit_multiplier: 1.0,
+            subquery_edit_distance: 0,
             store: &store2,
             weight: 0.5,
             match_key: MatchKey {
@@ -989,9 +1054,9 @@ scorefactor: 0, prefix: 0, nmask: 2, bmask: HashSet::new(), edit_multiplier: 1.0
     ];
     let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-	let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
-	let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
-	assert_eq!(result, tree_result);
+    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+    let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
+    assert_eq!(result, tree_result);
     #[cfg_attr(rustfmt, rustfmt::skip)]
     {
         assert_eq!(result.len(), 2, "Two results are returned");
@@ -1017,7 +1082,12 @@ scorefactor: 0, prefix: 0, nmask: 2, bmask: HashSet::new(), edit_multiplier: 1.0
     println!("Coalesce multi - language 0");
     let stack = vec![
         PhrasematchResults {
-scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0, subquery_edit_distance: 0,
+            scorefactor: 0,
+            prefix: 0,
+            nmask: 1,
+            bmask: HashSet::new(),
+            edit_multiplier: 1.0,
+            subquery_edit_distance: 0,
             store: &store1,
             weight: 0.5,
             match_key: MatchKey {
@@ -1029,7 +1099,12 @@ scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0
             mask: 1 << 1,
         },
         PhrasematchResults {
-scorefactor: 0, prefix: 0, nmask: 2, bmask: HashSet::new(), edit_multiplier: 1.0, subquery_edit_distance: 0,
+            scorefactor: 0,
+            prefix: 0,
+            nmask: 2,
+            bmask: HashSet::new(),
+            edit_multiplier: 1.0,
+            subquery_edit_distance: 0,
             store: &store2,
             weight: 0.5,
             match_key: MatchKey {
@@ -1044,9 +1119,9 @@ scorefactor: 0, prefix: 0, nmask: 2, bmask: HashSet::new(), edit_multiplier: 1.0
     ];
     let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-	let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
-	let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
-	assert_eq!(result, tree_result);
+    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+    let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
+    assert_eq!(result, tree_result);
     #[cfg_attr(rustfmt, rustfmt::skip)]
     {
         assert_eq!(result.len(), 2, "Two results are returned");
@@ -1072,7 +1147,12 @@ scorefactor: 0, prefix: 0, nmask: 2, bmask: HashSet::new(), edit_multiplier: 1.0
     println!("Coalsece multi - language 3");
     let stack = vec![
         PhrasematchResults {
-scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0, subquery_edit_distance: 0,
+            scorefactor: 0,
+            prefix: 0,
+            nmask: 1,
+            bmask: HashSet::new(),
+            edit_multiplier: 1.0,
+            subquery_edit_distance: 0,
             store: &store1,
             weight: 0.5,
             match_key: MatchKey {
@@ -1084,7 +1164,12 @@ scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0
             mask: 1 << 1,
         },
         PhrasematchResults {
-scorefactor: 0, prefix: 0, nmask: 2, bmask: HashSet::new(), edit_multiplier: 1.0, subquery_edit_distance: 0,
+            scorefactor: 0,
+            prefix: 0,
+            nmask: 2,
+            bmask: HashSet::new(),
+            edit_multiplier: 1.0,
+            subquery_edit_distance: 0,
             store: &store2,
             weight: 0.5,
             match_key: MatchKey {
@@ -1099,9 +1184,9 @@ scorefactor: 0, prefix: 0, nmask: 2, bmask: HashSet::new(), edit_multiplier: 1.0
     ];
     let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-	let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
-	let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
-	assert_eq!(result, tree_result);
+    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+    let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
+    assert_eq!(result, tree_result);
     #[cfg_attr(rustfmt, rustfmt::skip)]
     {
         assert_eq!(result.len(), 2, "Two results are returned");
@@ -1143,7 +1228,12 @@ fn coalesce_multi_scoredist() {
 
     let stack = vec![
         PhrasematchResults {
-scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0, subquery_edit_distance: 0,
+            scorefactor: 0,
+            prefix: 0,
+            nmask: 1,
+            bmask: HashSet::new(),
+            edit_multiplier: 1.0,
+            subquery_edit_distance: 0,
             store: &store1,
             weight: 0.5,
             match_key: MatchKey {
@@ -1155,7 +1245,12 @@ scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0
             mask: 1 << 1,
         },
         PhrasematchResults {
-scorefactor: 0, prefix: 0, nmask: 2, bmask: HashSet::new(), edit_multiplier: 1.0, subquery_edit_distance: 0,
+            scorefactor: 0,
+            prefix: 0,
+            nmask: 2,
+            bmask: HashSet::new(),
+            edit_multiplier: 1.0,
+            subquery_edit_distance: 0,
             store: &store2,
             weight: 0.5,
             match_key: MatchKey {
@@ -1175,9 +1270,9 @@ scorefactor: 0, prefix: 0, nmask: 2, bmask: HashSet::new(), edit_multiplier: 1.0
         ..MatchOpts::default()
     };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-	let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
-	let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
-	assert_eq!(result, tree_result);
+    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+    let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
+    assert_eq!(result, tree_result);
     assert_eq!(result[0].entries[0].grid_entry.id, 3, "Closer feature is 1st");
     assert_eq!(result[1].entries[0].grid_entry.id, 2, "Farther feature is 2nd");
     assert_eq!(
@@ -1194,9 +1289,9 @@ scorefactor: 0, prefix: 0, nmask: 2, bmask: HashSet::new(), edit_multiplier: 1.0
         ..MatchOpts::default()
     };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-	let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
-	let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
-	assert_eq!(result, tree_result);
+    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+    let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
+    assert_eq!(result, tree_result);
     assert_eq!(result[0].entries[0].grid_entry.id, 3, "Farther feature with higher score is 1st");
     assert_eq!(result[1].entries[0].grid_entry.id, 2, "Closer feature with lower score is 2nd");
     assert_eq!(
@@ -1234,7 +1329,12 @@ fn coalesce_multi_test_bbox() {
 
     let stack = vec![
         PhrasematchResults {
-scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0, subquery_edit_distance: 0,
+            scorefactor: 0,
+            prefix: 0,
+            nmask: 1,
+            bmask: HashSet::new(),
+            edit_multiplier: 1.0,
+            subquery_edit_distance: 0,
             store: &store1,
             weight: 0.5,
             match_key: MatchKey {
@@ -1246,7 +1346,12 @@ scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0
             mask: 1 << 1,
         },
         PhrasematchResults {
-scorefactor: 0, prefix: 0, nmask: 2, bmask: HashSet::new(), edit_multiplier: 1.0, subquery_edit_distance: 0,
+            scorefactor: 0,
+            prefix: 0,
+            nmask: 2,
+            bmask: HashSet::new(),
+            edit_multiplier: 1.0,
+            subquery_edit_distance: 0,
             store: &store2,
             weight: 0.5,
             match_key: MatchKey {
@@ -1262,9 +1367,9 @@ scorefactor: 0, prefix: 0, nmask: 2, bmask: HashSet::new(), edit_multiplier: 1.0
     println!("Coalesce multi - bbox at lower zoom of subquery");
     let match_opts = MatchOpts { zoom: 1, bbox: Some([0, 0, 1, 0]), ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-	let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
-	let _tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
-	// assert_eq!(result, tree_result);
+    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+    let _tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
+    // assert_eq!(result, tree_result);
     assert_eq!(result.len(), 2, "Bbox [1,0,0,1,0] - 2 results are within the bbox");
     assert_eq!(
         (result[0].entries[0].grid_entry.x, result[0].entries[0].grid_entry.y),
@@ -1280,9 +1385,9 @@ scorefactor: 0, prefix: 0, nmask: 2, bmask: HashSet::new(), edit_multiplier: 1.0
     println!("Coalesce multi - bbox at higher zoom of subquery");
     let match_opts = MatchOpts { zoom: 2, bbox: Some([0, 0, 1, 3]), ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-	let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
-	let _tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
-	// assert_eq!(result, tree_result);
+    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+    let _tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
+    // assert_eq!(result, tree_result);
     assert_eq!(result.len(), 2, "Bbox [2,0,0,1,3] - 2 results are within the bbox");
     assert_eq!(
         (result[0].entries[0].grid_entry.x, result[0].entries[0].grid_entry.y),
@@ -1299,9 +1404,9 @@ scorefactor: 0, prefix: 0, nmask: 2, bmask: HashSet::new(), edit_multiplier: 1.0
     println!("Coalesce multi - bbox at zoom 6");
     let match_opts = MatchOpts { zoom: 6, bbox: Some([14, 30, 15, 64]), ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-	let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
-	let _tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
-	// assert_eq!(result, tree_result);
+    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+    let _tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
+    // assert_eq!(result, tree_result);
     assert_eq!(result.len(), 2, "Bbox [6,14,30,15,64] - 2 results are within the bbox");
     assert_eq!(
         (result[0].entries[0].grid_entry.x, result[0].entries[0].grid_entry.y),
@@ -1318,7 +1423,12 @@ scorefactor: 0, prefix: 0, nmask: 2, bmask: HashSet::new(), edit_multiplier: 1.0
     println!("Coalesce multi - bbox at lower zoom than either of the expected results");
     let stack = vec![
         PhrasematchResults {
-scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0, subquery_edit_distance: 0,
+            scorefactor: 0,
+            prefix: 0,
+            nmask: 1,
+            bmask: HashSet::new(),
+            edit_multiplier: 1.0,
+            subquery_edit_distance: 0,
             store: &store2,
             weight: 0.5,
             match_key: MatchKey {
@@ -1330,7 +1440,12 @@ scorefactor: 0, prefix: 0, nmask: 1, bmask: HashSet::new(), edit_multiplier: 1.0
             mask: 1 << 1,
         },
         PhrasematchResults {
-scorefactor: 0, prefix: 0, nmask: 2, bmask: HashSet::new(), edit_multiplier: 1.0, subquery_edit_distance: 0,
+            scorefactor: 0,
+            prefix: 0,
+            nmask: 2,
+            bmask: HashSet::new(),
+            edit_multiplier: 1.0,
+            subquery_edit_distance: 0,
             store: &store3,
             weight: 0.5,
             match_key: MatchKey {
@@ -1344,9 +1459,9 @@ scorefactor: 0, prefix: 0, nmask: 2, bmask: HashSet::new(), edit_multiplier: 1.0
     ];
     let match_opts = MatchOpts { zoom: 1, bbox: Some([0, 0, 1, 0]), ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-	let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
-	let _tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
-	// assert_eq!(result, tree_result);
+    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+    let _tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
+    // assert_eq!(result, tree_result);
     assert_eq!(result.len(), 2, "Bbox [1,0,0,1,0] - 2 results are within the bbox");
     assert_eq!(
         (result[0].entries[0].grid_entry.x, result[0].entries[0].grid_entry.y),

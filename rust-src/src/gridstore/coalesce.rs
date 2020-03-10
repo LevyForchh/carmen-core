@@ -9,8 +9,8 @@ use itertools::Itertools;
 use ordered_float::OrderedFloat;
 
 use crate::gridstore::common::*;
-use crate::gridstore::store::GridStore;
 use crate::gridstore::stackable::StackableNode;
+use crate::gridstore::store::GridStore;
 
 /// Takes a vector of phrasematch subqueries (stack) and match options, gets matching grids, sorts the grids,
 /// and returns a result of a sorted vector of contexts (lists of grids with added metadata)
@@ -48,28 +48,6 @@ pub fn coalesce<T: Borrow<GridStore> + Clone + Debug>(
 fn grid_to_coalesce_entry<T: Borrow<GridStore> + Clone>(
     grid: &MatchEntry,
     subquery: &PhrasematchSubquery<T>,
-    match_opts: &MatchOpts,
-) -> CoalesceEntry {
-    // Zoom has been adjusted in coalesce_multi, or correct zoom has been passed in for coalesce_single
-    debug_assert!(match_opts.zoom == subquery.zoom);
-    let relevance = grid.grid_entry.relev * subquery.weight;
-
-    CoalesceEntry {
-        grid_entry: GridEntry { relev: relevance, ..grid.grid_entry },
-        matches_language: grid.matches_language,
-        idx: subquery.idx,
-        tmp_id: ((subquery.idx as u32) << 25) + grid.grid_entry.id,
-        mask: subquery.mask,
-        distance: grid.distance,
-        scoredist: grid.scoredist,
-    }
-}
-
-// this is the same as the above but temporarily necessitated by the PhrasematchSubquery vs.
-// PhrasematchResults split -- ick. we need to clean this up asap.
-fn grid_to_coalesce_entry_alt<T: Borrow<GridStore> + Clone>(
-    grid: &MatchEntry,
-    subquery: &PhrasematchResults<T>,
     match_opts: &MatchOpts,
 ) -> CoalesceEntry {
     // Zoom has been adjusted in coalesce_multi, or correct zoom has been passed in for coalesce_single
@@ -349,7 +327,6 @@ fn coalesce_multi<T: Borrow<GridStore> + Clone>(
     Ok(contexts)
 }
 
-
 type TreeCoalesceState = HashMap<(u16, u16), Vec<CoalesceContext>>;
 
 pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug>(
@@ -362,7 +339,12 @@ pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug>(
     let mut contexts: Vec<CoalesceContext> = Vec::new();
 
     for node in &stack_tree.children {
-        let subquery = node.phrasematch.as_ref().expect("phrasematch must be set on non-root tree nodes");
+        let subquery: PhrasematchSubquery<T> = node
+            .phrasematch
+            .as_ref()
+            .expect("phrasematch must be set on non-root tree nodes")
+            .clone()
+            .into();
 
         let mut zoom_adjusted_match_options = match_opts.clone();
         if zoom_adjusted_match_options.zoom != subquery.zoom {
@@ -381,11 +363,7 @@ pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug>(
                 bigger_max,
             )?;
 
-            let coalesced = tree_coalesce_single(
-                subquery,
-                &zoom_adjusted_match_options,
-                grids
-            )?;
+            let coalesced = tree_coalesce_single(&subquery, &zoom_adjusted_match_options, grids)?;
 
             contexts.extend(coalesced);
         } else {
@@ -399,7 +377,7 @@ pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug>(
             )?;
 
             for grid in grids.take(MAX_GRIDS_PER_PHRASE) {
-                let entry = grid_to_coalesce_entry_alt(&grid, subquery, &zoom_adjusted_match_options);
+                let entry = grid_to_coalesce_entry(&grid, &subquery, &zoom_adjusted_match_options);
                 let context = CoalesceContext {
                     mask: subquery.mask,
                     relev: entry.grid_entry.relev,
@@ -408,7 +386,8 @@ pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug>(
 
                 contexts.push(context.clone());
 
-                let state_vec = prev_state.entry((grid.grid_entry.x, grid.grid_entry.y))
+                let state_vec = prev_state
+                    .entry((grid.grid_entry.x, grid.grid_entry.y))
                     .or_insert_with(|| vec![]);
                 state_vec.push(context);
             }
@@ -449,9 +428,9 @@ pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug>(
 }
 
 fn tree_coalesce_single<T: Borrow<GridStore> + Clone, U: Iterator<Item = MatchEntry>>(
-    subquery: &PhrasematchResults<T>,
+    subquery: &PhrasematchSubquery<T>,
     match_opts: &MatchOpts,
-    grids: U
+    grids: U,
 ) -> Result<impl Iterator<Item = CoalesceContext>, Error> {
     let bigger_max = 2 * MAX_CONTEXTS;
 
@@ -464,8 +443,10 @@ fn tree_coalesce_single<T: Borrow<GridStore> + Clone, U: Iterator<Item = MatchEn
 
     let mut coalesced: HashMap<u32, CoalesceEntry> = HashMap::new();
 
+    let subquery: PhrasematchSubquery<T> = subquery.clone().into();
+
     for grid in grids {
-        let coalesce_entry = grid_to_coalesce_entry_alt(&grid, subquery, match_opts);
+        let coalesce_entry = grid_to_coalesce_entry(&grid, &subquery, match_opts);
 
         // If it's the same feature as the last one, but a lower scoredist don't add it
         if previous_id == coalesce_entry.grid_entry.id
@@ -524,13 +505,11 @@ fn tree_coalesce_single<T: Borrow<GridStore> + Clone, U: Iterator<Item = MatchEn
         previous_scoredist = current_scoredist;
     }
 
-    let contexts = coalesced
-        .into_iter()
-        .map(|(_, entry)| CoalesceContext {
-            entries: vec![entry.clone()],
-            mask: entry.mask,
-            relev: entry.grid_entry.relev,
-        });
+    let contexts = coalesced.into_iter().map(|(_, entry)| CoalesceContext {
+        entries: vec![entry.clone()],
+        mask: entry.mask,
+        relev: entry.grid_entry.relev,
+    });
 
     Ok(contexts)
 }
@@ -540,12 +519,17 @@ fn tree_recurse<T: Borrow<GridStore> + Clone + Debug>(
     match_opts: &MatchOpts,
     prev_state: &TreeCoalesceState,
     prev_zoom: u16,
-    mut contexts: &mut Vec<CoalesceContext>
+    mut contexts: &mut Vec<CoalesceContext>,
 ) -> Result<(), Error> {
     for child in &node.children {
         // we need lots of grids because we don't know where the things we're stacking on top
         // will be
-        let subquery = child.phrasematch.as_ref().expect("phrasematch must be set on non-root tree nodes");
+        let subquery: PhrasematchSubquery<T> = child
+            .phrasematch
+            .as_ref()
+            .expect("phrasematch must be set on non-root tree nodes")
+            .clone()
+            .into();
 
         let mut zoom_adjusted_match_options = match_opts.clone();
         if zoom_adjusted_match_options.zoom != subquery.zoom {
@@ -562,14 +546,10 @@ fn tree_recurse<T: Borrow<GridStore> + Clone + Debug>(
         )?;
 
         for grid in grids.take(MAX_GRIDS_PER_PHRASE) {
-            let prev_zoom_xy = (
-                grid.grid_entry.x / scale_factor,
-                grid.grid_entry.y / scale_factor,
-            );
-
+            let prev_zoom_xy = (grid.grid_entry.x / scale_factor, grid.grid_entry.y / scale_factor);
 
             if let Some(already_coalesced) = prev_state.get(&prev_zoom_xy) {
-                let entry = grid_to_coalesce_entry_alt(&grid, subquery, &zoom_adjusted_match_options);
+                let entry = grid_to_coalesce_entry(&grid, &subquery, &zoom_adjusted_match_options);
                 for parent_context in already_coalesced {
                     let mut new_context = parent_context.clone();
                     new_context.entries.insert(0, entry.clone());
@@ -582,7 +562,9 @@ fn tree_recurse<T: Borrow<GridStore> + Clone + Debug>(
                     if child.children.len() > 0 {
                         // only bother with getting ready to recurse if we have any children to
                         // operate on
-                        let state_vec = state.entry((grid.grid_entry.x, grid.grid_entry.y)).or_insert_with(|| vec![]);
+                        let state_vec = state
+                            .entry((grid.grid_entry.x, grid.grid_entry.y))
+                            .or_insert_with(|| vec![]);
                         state_vec.push(new_context);
                     }
                 }
