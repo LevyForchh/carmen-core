@@ -383,7 +383,7 @@ pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug>(
 
             let coalesced = tree_coalesce_single(
                 subquery,
-                match_opts,
+                &zoom_adjusted_match_options,
                 grids
             )?;
 
@@ -399,7 +399,7 @@ pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug>(
             )?;
 
             for grid in grids.take(MAX_GRIDS_PER_PHRASE) {
-                let entry = grid_to_coalesce_entry_alt(&grid, subquery, match_opts);
+                let entry = grid_to_coalesce_entry_alt(&grid, subquery, &zoom_adjusted_match_options);
                 let context = CoalesceContext {
                     mask: subquery.mask,
                     relev: entry.grid_entry.relev,
@@ -412,7 +412,17 @@ pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug>(
                     .or_insert_with(|| vec![]);
                 state_vec.push(context);
             }
-            tree_recurse(&node, match_opts, &prev_state, subquery.zoom, &mut contexts)?;
+
+            let mut multi_contexts = Vec::new();
+            tree_recurse(&node, match_opts, &prev_state, subquery.zoom, &mut multi_contexts)?;
+
+            // penalize singnle-entry stacks and ascending stacks for... some reason?
+            for mut context in multi_contexts {
+                if context.entries.len() == 1 || context.entries[0].mask > context.entries[1].mask {
+                    context.relev -= 0.01
+                }
+                contexts.push(context);
+            }
         }
     }
 
@@ -557,13 +567,15 @@ fn tree_recurse<T: Borrow<GridStore> + Clone + Debug>(
                 grid.grid_entry.y / scale_factor,
             );
 
+
             if let Some(already_coalesced) = prev_state.get(&prev_zoom_xy) {
-                let entry = grid_to_coalesce_entry_alt(&grid, subquery, match_opts);
+                let entry = grid_to_coalesce_entry_alt(&grid, subquery, &zoom_adjusted_match_options);
                 for parent_context in already_coalesced {
                     let mut new_context = parent_context.clone();
-                    new_context.entries.push(entry.clone());
+                    new_context.entries.insert(0, entry.clone());
+
                     new_context.mask = new_context.mask | subquery.mask;
-                    new_context.relev += new_context.relev;
+                    new_context.relev += entry.grid_entry.relev;
 
                     contexts.push(new_context.clone());
 

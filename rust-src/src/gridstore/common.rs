@@ -425,6 +425,19 @@ pub struct PhrasematchResults<T: Borrow<GridStore> + Clone> {
     pub subquery_edit_distance: u8,
 }
 
+impl<T: Borrow<GridStore> + Clone> From<PhrasematchResults<T>> for PhrasematchSubquery<T> {
+    fn from(phrasematch_results: PhrasematchResults<T>) -> Self {
+        PhrasematchSubquery {
+            store: phrasematch_results.store,
+            weight: phrasematch_results.weight,
+            match_key: phrasematch_results.match_key,
+            idx: phrasematch_results.idx,
+            zoom: phrasematch_results.zoom,
+            mask: phrasematch_results.mask,
+        }
+    }
+}
+
 #[inline]
 pub fn relev_float_to_int(relev: f64) -> u8 {
     if relev == 0.4 {
