@@ -306,8 +306,8 @@ mod test {
         let phrasematch_results = vec![vec![a1, b1]];
         let tree = stackable(&phrasematch_results, None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
         let bmask_stacks: Vec<bool> = bfs(tree).iter().map(|node| node.is_leaf()).collect();
-        assert_eq!(bmask_stacks[1], true, "a1 and b1 cannot stack since they have the same nmask - so they don't have any children");
-        assert_eq!(bmask_stacks[2], true, "a1 and b1 cannot stack since they have the same nmask - so they don't have any children");
+        assert_eq!(bmask_stacks[1], true, "a1 cannot stack with b1 since a1's bmask contains the idx of b1 - so they don't have any children");
+        assert_eq!(bmask_stacks[2], true, "b1 cannot stack with a1 since b1's bmask contains the idx of a1 - so they don't have any children");
     }
 
 }
