@@ -23,6 +23,23 @@ pub struct StackableNode<T: Borrow<GridStore> + Clone + Debug> {
     pub zoom: u16,
 }
 
+//tree traversal used only for tests
+pub fn bfs<T: Borrow<GridStore> + Clone + Debug>(root: StackableNode<T>) -> Vec<StackableNode<T>> {
+    let mut node_vec: Vec<StackableNode<T>> = vec![];
+    let mut stack: Vec<_> = vec![];
+
+    stack.push(root);
+
+    while stack.len() > 0 {
+        let node = stack.pop().unwrap();
+        node_vec.push(node.clone());
+        for child in node.children {
+            stack.push(child);
+        }
+    }
+    return node_vec;
+}
+
 pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
     phrasematch_results: &Vec<Vec<PhrasematchResults<T>>>,
     phrasematch_result: Option<PhrasematchResults<T>>,
@@ -48,11 +65,14 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
 
     for phrasematch_per_index in phrasematch_results.iter() {
         for phrasematches in phrasematch_per_index.iter() {
-            if node.zoom > phrasematches.zoom {
-                if phrasematches.idx >= node.idx {
+            if node.phrasematch.is_some() {
+                if node.zoom > phrasematches.zoom {
                     continue;
+                } else if node.zoom == phrasematches.zoom {
+                    if node.idx > phrasematches.idx {
+                        continue;
+                    }
                 }
-                continue;
             }
 
             if (node.nmask & phrasematches.nmask) == 0
@@ -77,7 +97,7 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
                     phrasematches.idx,
                     target_relev,
                     target_adjusted_relev,
-                    phrasematches.zoom
+                    phrasematches.zoom,
                 ));
             }
         }
@@ -95,8 +115,9 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
 #[cfg(test)]
 mod test {
     use super::*;
+
     #[test]
-    fn stackable_test() {
+    fn simple_stackable_test() {
         let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
         let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
 
@@ -157,6 +178,19 @@ mod test {
         };
 
         let phrasematch_results = vec![vec![a1, b1, b2]];
-        stackable(&phrasematch_results, None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+        let tree = stackable(&phrasematch_results, None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+        let result_ids: Vec<u32> = bfs(tree).iter().map(|node| node.idx).collect();
+        assert_eq!(
+            result_ids,
+            [129, 1, 1, 0, 1, 1],
+            "idx stacked in the right order, no duplicate branches"
+        );
+        let tree = stackable(&phrasematch_results, None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+        let result_max_relev: Vec<f64> = bfs(tree).iter().map(|node| node.max_relev).collect();
+        assert_eq!(
+            result_max_relev,
+            [1.0, 0.5, 0.5, 1.0, 0.5, 0.5],
+            "max_relev for parent nodes is the summation of it's relevance and max of the children"
+        );
     }
 }
