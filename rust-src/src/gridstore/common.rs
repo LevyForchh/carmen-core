@@ -384,6 +384,7 @@ pub struct CoalesceEntry {
     pub mask: u32,
     pub distance: f64,
     pub scoredist: f64,
+    pub phrasematch_id: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialOrd, PartialEq, Clone)]
@@ -412,7 +413,7 @@ pub struct PhrasematchSubquery<T: Borrow<GridStore> + Clone> {
 pub struct PhrasematchResults<T: Borrow<GridStore> + Clone> {
     #[serde(serialize_with = "serialize_path")]
     pub store: T,
-    pub scorefactor: u16,
+    pub scorefactor: u32,
     pub prefix: u8,
     pub weight: f64,
     pub match_key: MatchKey,
@@ -423,6 +424,7 @@ pub struct PhrasematchResults<T: Borrow<GridStore> + Clone> {
     pub bmask: HashSet<u16>,
     pub edit_multiplier: f64,
     pub subquery_edit_distance: u8,
+    pub id: u32,
 }
 
 impl<T: Borrow<GridStore> + Clone> From<PhrasematchResults<T>> for PhrasematchSubquery<T> {

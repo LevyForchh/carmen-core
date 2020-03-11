@@ -115,6 +115,7 @@ mod test {
         let store = GridStore::new(directory.path()).unwrap();
 
         let a1 = PhrasematchResults {
+            id: 0,
             store: &store,
             scorefactor: 0,
             prefix: 0,
@@ -130,6 +131,7 @@ mod test {
         };
 
         let b1 = PhrasematchResults {
+            id: 0,
             store: &store,
             scorefactor: 0,
             prefix: 0,
@@ -145,6 +147,7 @@ mod test {
         };
 
         let b2 = PhrasematchResults {
+            id: 0,
             store: &store,
             scorefactor: 0,
             prefix: 0,

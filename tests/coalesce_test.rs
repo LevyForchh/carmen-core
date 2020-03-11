@@ -24,6 +24,7 @@ fn coalesce_single_test_proximity_quadrants() {
 
     let store = GridStore::new(directory.path()).unwrap();
     let subquery = PhrasematchResults {
+        id: 0,
         scorefactor: 0,
         prefix: 0,
         nmask: 1,
@@ -127,6 +128,7 @@ fn coalesce_single_test_proximity_basic() {
 
     let store = GridStore::new(directory.path()).unwrap();
     let subquery = PhrasematchResults {
+        id: 0,
         scorefactor: 0,
         prefix: 0,
         nmask: 1,
@@ -185,6 +187,7 @@ fn coalesce_single_test_language_penalty() {
 
     let store = GridStore::new(directory.path()).unwrap();
     let subquery = PhrasematchResults {
+        id: 0,
         scorefactor: 0,
         prefix: 0,
         nmask: 1,
@@ -255,6 +258,7 @@ fn coalesce_multi_test_language_penalty() {
     println!("Coalesce multi - Subqueries with different language set from grids, with proximity");
     let stack = vec![
         PhrasematchResults {
+            id: 0,
             scorefactor: 0,
             prefix: 0,
             nmask: 1,
@@ -272,6 +276,7 @@ fn coalesce_multi_test_language_penalty() {
             mask: 1 << 0,
         },
         PhrasematchResults {
+            id: 0,
             scorefactor: 0,
             prefix: 0,
             nmask: 2,
@@ -335,6 +340,7 @@ fn coalesce_single_test() {
         ],
     }]);
     let subquery = PhrasematchResults {
+        id: 0,
         scorefactor: 0,
         prefix: 0,
         nmask: 1,
@@ -429,6 +435,7 @@ fn coalesce_single_test() {
             mask: 1 << 0,
             relev: 1.,
             entries: vec![CoalesceEntry {
+                phrasematch_id: 0,
                 matches_language: true,
                 idx: 1,
                 tmp_id: 33554435,
@@ -453,6 +460,7 @@ fn coalesce_single_test() {
             mask: 1 << 0,
             relev: 1.,
             entries: vec![CoalesceEntry {
+                phrasematch_id: 0,
                 matches_language: true,
                 idx: 1,
                 tmp_id: 33554433,
@@ -477,6 +485,7 @@ fn coalesce_single_test() {
             mask: 1 << 0,
             relev: 0.8,
             entries: vec![CoalesceEntry {
+                phrasematch_id: 0,
                 matches_language: true,
                 idx: 1,
                 tmp_id: 33554434,
@@ -512,6 +521,7 @@ fn coalesce_single_test() {
             mask: 1 << 0,
             relev: 1.,
             entries: vec![CoalesceEntry {
+                phrasematch_id: 0,
                 matches_language: true,
                 idx: 1,
                 tmp_id: 33554433,
@@ -549,6 +559,7 @@ fn coalesce_single_test() {
             mask: 1 << 0,
             relev: 1.,
             entries: vec![CoalesceEntry {
+                phrasematch_id: 0,
                 matches_language: true,
                 idx: 1,
                 tmp_id: 33554433,
@@ -589,6 +600,7 @@ fn coalesce_single_languages_test() {
     // Test query with all languages
     println!("Coalesce single - all languages");
     let subquery = PhrasematchResults {
+        id: 0,
         scorefactor: 0,
         prefix: 0,
         nmask: 1,
@@ -636,6 +648,7 @@ fn coalesce_single_languages_test() {
     // Test lanuage 0
     println!("Coalesce single - language 0, language matching 2 grids");
     let subquery = PhrasematchResults {
+        id: 0,
         scorefactor: 0,
         prefix: 0,
         nmask: 1,
@@ -683,6 +696,7 @@ fn coalesce_single_languages_test() {
     println!("Coalesce single - language 3, language matching no grids");
 
     let subquery = PhrasematchResults {
+        id: 0,
         scorefactor: 0,
         prefix: 0,
         nmask: 1,
@@ -751,6 +765,7 @@ fn coalesce_multi_test() {
 
     let stack = vec![
         PhrasematchResults {
+            id: 0,
             scorefactor: 0,
             prefix: 0,
             nmask: 1,
@@ -768,6 +783,7 @@ fn coalesce_multi_test() {
             mask: 1 << 1,
         },
         PhrasematchResults {
+            id: 0,
             scorefactor: 0,
             prefix: 0,
             nmask: 2,
@@ -799,6 +815,7 @@ fn coalesce_multi_test() {
     assert_eq!(
         result[0].entries[0],
         CoalesceEntry {
+            phrasematch_id: 0,
             matches_language: true,
             idx: 1,
             tmp_id: 33554434,
@@ -819,6 +836,7 @@ fn coalesce_multi_test() {
     assert_eq!(
         result[0].entries[1],
         CoalesceEntry {
+            phrasematch_id: 0,
             matches_language: true,
             idx: 0,
             tmp_id: 1,
@@ -842,6 +860,7 @@ fn coalesce_multi_test() {
     assert_eq!(
         result[1].entries[0],
         CoalesceEntry {
+            phrasematch_id: 0,
             matches_language: true,
             idx: 1,
             tmp_id: 33554435,
@@ -862,6 +881,7 @@ fn coalesce_multi_test() {
     assert_eq!(
         result[0].entries[1],
         CoalesceEntry {
+            phrasematch_id: 0,
             matches_language: true,
             idx: 0,
             tmp_id: 1,
@@ -897,6 +917,7 @@ fn coalesce_multi_test() {
     assert_eq!(
         result[0].entries[0],
         CoalesceEntry {
+            phrasematch_id: 0,
             matches_language: true,
             idx: 1,
             tmp_id: 33554435,
@@ -917,6 +938,7 @@ fn coalesce_multi_test() {
     assert_eq!(
         result[0].entries[1],
         CoalesceEntry {
+            phrasematch_id: 0,
             matches_language: true,
             idx: 0,
             tmp_id: 1,
@@ -938,6 +960,7 @@ fn coalesce_multi_test() {
     assert_eq!(
         result[1].entries[0],
         CoalesceEntry {
+            phrasematch_id: 0,
             matches_language: true,
             idx: 1,
             tmp_id: 33554434,
@@ -958,6 +981,7 @@ fn coalesce_multi_test() {
     assert_eq!(
         result[1].entries[1],
         CoalesceEntry {
+            phrasematch_id: 0,
             matches_language: true,
             idx: 0,
             tmp_id: 1,
@@ -1017,6 +1041,7 @@ fn coalesce_multi_languages_test() {
     println!("Coalesce multi - all languages");
     let stack = vec![
         PhrasematchResults {
+            id: 0,
             scorefactor: 0,
             prefix: 0,
             nmask: 1,
@@ -1034,6 +1059,7 @@ fn coalesce_multi_languages_test() {
             mask: 1 << 1,
         },
         PhrasematchResults {
+            id: 0,
             scorefactor: 0,
             prefix: 0,
             nmask: 2,
@@ -1082,6 +1108,7 @@ fn coalesce_multi_languages_test() {
     println!("Coalesce multi - language 0");
     let stack = vec![
         PhrasematchResults {
+            id: 0,
             scorefactor: 0,
             prefix: 0,
             nmask: 1,
@@ -1099,6 +1126,7 @@ fn coalesce_multi_languages_test() {
             mask: 1 << 1,
         },
         PhrasematchResults {
+            id: 0,
             scorefactor: 0,
             prefix: 0,
             nmask: 2,
@@ -1147,6 +1175,7 @@ fn coalesce_multi_languages_test() {
     println!("Coalsece multi - language 3");
     let stack = vec![
         PhrasematchResults {
+            id: 0,
             scorefactor: 0,
             prefix: 0,
             nmask: 1,
@@ -1164,6 +1193,7 @@ fn coalesce_multi_languages_test() {
             mask: 1 << 1,
         },
         PhrasematchResults {
+            id: 0,
             scorefactor: 0,
             prefix: 0,
             nmask: 2,
@@ -1228,6 +1258,7 @@ fn coalesce_multi_scoredist() {
 
     let stack = vec![
         PhrasematchResults {
+            id: 0,
             scorefactor: 0,
             prefix: 0,
             nmask: 1,
@@ -1245,6 +1276,7 @@ fn coalesce_multi_scoredist() {
             mask: 1 << 1,
         },
         PhrasematchResults {
+            id: 0,
             scorefactor: 0,
             prefix: 0,
             nmask: 2,
@@ -1329,6 +1361,7 @@ fn coalesce_multi_test_bbox() {
 
     let stack = vec![
         PhrasematchResults {
+            id: 0,
             scorefactor: 0,
             prefix: 0,
             nmask: 1,
@@ -1346,6 +1379,7 @@ fn coalesce_multi_test_bbox() {
             mask: 1 << 1,
         },
         PhrasematchResults {
+            id: 0,
             scorefactor: 0,
             prefix: 0,
             nmask: 2,
@@ -1423,6 +1457,7 @@ fn coalesce_multi_test_bbox() {
     println!("Coalesce multi - bbox at lower zoom than either of the expected results");
     let stack = vec![
         PhrasematchResults {
+            id: 0,
             scorefactor: 0,
             prefix: 0,
             nmask: 1,
@@ -1440,6 +1475,7 @@ fn coalesce_multi_test_bbox() {
             mask: 1 << 1,
         },
         PhrasematchResults {
+            id: 0,
             scorefactor: 0,
             prefix: 0,
             nmask: 2,
