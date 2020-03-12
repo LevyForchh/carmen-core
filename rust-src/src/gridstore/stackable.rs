@@ -193,11 +193,26 @@ mod test {
         let phrasematch_results = vec![vec![a1, b1, b2]];
 
         let tree = stackable(&phrasematch_results, None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0, 0);
-        let a1_children_ids: Vec<u32> = tree.clone().children[0].clone().children.iter().map(|node| node.phrasematch_id).collect();
+        let a1_children_ids: Vec<u32> = tree.clone().children[0]
+            .clone()
+            .children
+            .iter()
+            .map(|node| node.phrasematch_id)
+            .collect();
         assert_eq!(vec![1, 2], a1_children_ids, "a1 can stack with b1 and b2");
-        let b1_children_ids: Vec<u32> = tree.clone().children[1].clone().children.iter().map(|node| node.phrasematch_id).collect();
+        let b1_children_ids: Vec<u32> = tree.clone().children[1]
+            .clone()
+            .children
+            .iter()
+            .map(|node| node.phrasematch_id)
+            .collect();
         assert_eq!(0, b1_children_ids.len(), "b1 cannot stack with b2, same nmask");
-        let b2_children_ids: Vec<u32> = tree.clone().children[2].clone().children.iter().map(|node| node.phrasematch_id).collect();
+        let b2_children_ids: Vec<u32> = tree.clone().children[2]
+            .clone()
+            .children
+            .iter()
+            .map(|node| node.phrasematch_id)
+            .collect();
         assert_eq!(0, b2_children_ids.len(), "b2 cannot stack with b1, same nmask");
     }
 
