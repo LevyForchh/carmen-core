@@ -7,7 +7,7 @@ mod stackable;
 mod store;
 
 pub use builder::*;
-pub use coalesce::coalesce;
+pub use coalesce::{coalesce, stack_and_coalesce, tree_coalesce};
 pub use common::*;
 pub use stackable::stackable;
 pub use store::*;

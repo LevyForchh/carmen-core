@@ -1,5 +1,4 @@
-use carmen_core::gridstore::coalesce;
-use carmen_core::gridstore::stackable;
+use carmen_core::gridstore::{coalesce, stackable, stack_and_coalesce};
 use carmen_core::gridstore::PhrasematchSubquery;
 use carmen_core::gridstore::{
     CoalesceContext, GridEntry, GridKey, GridStore, GridStoreBuilder, MatchOpts, MatchKey, PhrasematchResults
@@ -27,6 +26,36 @@ impl Task for CoalesceTask {
 
     fn perform(&self) -> Result<Vec<CoalesceContext>, String> {
         coalesce(self.argument.0.clone(), &self.argument.1).map_err(|err| err.to_string())
+    }
+
+    fn complete<'a>(
+        self,
+        mut cx: TaskContext<'a>,
+        result: Result<Vec<CoalesceContext>, String>,
+    ) -> JsResult<JsArray> {
+        let converted_result = {
+            match &result {
+                Ok(r) => r,
+                Err(s) => return cx.throw_error(s),
+            }
+        };
+        Ok(neon_serde::to_value(&mut cx, converted_result)?
+            .downcast::<JsArray>()
+            .or_throw(&mut cx)?)
+    }
+}
+
+struct StackAndCoalesceTask {
+    argument: (Vec<Vec<PhrasematchResults<ArcGridStore>>>, MatchOpts),
+}
+
+impl Task for StackAndCoalesceTask {
+    type Output = Vec<CoalesceContext>;
+    type Error = String;
+    type JsEvent = JsArray;
+
+    fn perform(&self) -> Result<Vec<CoalesceContext>, String> {
+        stack_and_coalesce(&self.argument.0, &self.argument.1).map_err(|err| err.to_string())
     }
 
     fn complete<'a>(
@@ -399,6 +428,20 @@ pub fn js_coalesce(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     Ok(cx.undefined())
 }
 
+pub fn js_stack_and_coalesce(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let js_phrase_subq = { cx.argument::<JsArray>(0)? };
+    let js_match_ops = { cx.argument::<JsValue>(1)? };
+    let phrase_subq: Vec<Vec<PhrasematchResults<ArcGridStore>>> =
+        deserialize_phrasematch_results(&mut cx, js_phrase_subq)?;
+    let match_opts: MatchOpts = neon_serde::from_value(&mut cx, js_match_ops)?;
+    let cb = cx.argument::<JsFunction>(2)?;
+
+    let task = StackAndCoalesceTask { argument: (phrase_subq, match_opts) };
+    task.schedule(cb);
+
+    Ok(cx.undefined())
+}
+
 fn deserialize_phrasesubq<'j, C>(
     cx: &mut C,
     js_phrase_subq_array: Handle<'j, JsArray>,
@@ -488,8 +531,9 @@ fn deserialize_phrasematch_results<'j, C: Context<'j>>(
         let lang_set: u128 = langarray_to_langset(cx, js_lang_set)?;
         let scorefactor = js_phrasematch_obj.get(cx, "scorefactor")?;
         let prefix = js_phrasematch_obj.get(cx, "prefix")?;
-        let edit_multiplier = js_phrasematch_obj.get(cx, "edit_multiplier")?;
+        let edit_multiplier = js_phrasematch_obj.get(cx, "editMultiplier")?;
         let subquery_edit_distance = js_phrasematch_obj.get(cx, "subquery_edit_distance")?;
+        let id = js_phrasematch_obj.get(cx, "id")?;
 
         let phrasematch_result = PhrasematchResults
             {
@@ -505,6 +549,7 @@ fn deserialize_phrasematch_results<'j, C: Context<'j>>(
                 bmask: neon_serde::from_value(cx, bmask)?,
                 edit_multiplier: neon_serde::from_value(cx, edit_multiplier)?,
                 subquery_edit_distance: neon_serde::from_value(cx, subquery_edit_distance)?,
+                id: neon_serde::from_value(cx, id)?,
             };
             phrasematches.push(phrasematch_result);
         }
@@ -538,5 +583,6 @@ register_module!(mut m, {
     m.export_class::<JsGridKeyStoreKeyIterator>("GridStoreKeyIterator")?;
     m.export_function("coalesce", js_coalesce)?;
     m.export_function("stackable", js_stackable)?;
+    m.export_function("stackAndCoalesce", js_stack_and_coalesce)?;
     Ok(())
 });

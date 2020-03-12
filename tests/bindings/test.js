@@ -252,7 +252,8 @@ tape('Coalesce single valid stack - Valid inputs', (t) => {
                     tmp_id: 33554433,
                     mask: 1,
                     distance: 0,
-                    scoredist: 1
+                    scoredist: 1,
+                    phrasematch_id: 0,
                 }
             ], 'Ok, finds the right grid entry');
         t.equal(res.length, 3, 'Result set has 3 grid entries');
@@ -470,7 +471,7 @@ tape('Deserialize phrasematch results', (t) => {
     let phrasematchResults = [
         {
             'phrasematches': [
-                new Phrasematch(store, ['main', 'street'], 'main street', 1, [0, 2], 1, 0, 14, 6, 1, false, false, false, 0, ['main', 'street'], 0, 14, [0])
+                new Phrasematch(store, ['main', 'street'], 'main street', 1, [0, 2], 1, 0, 14, 6, 1, false, false, false, 0, ['main', 'street'], 0, 14, [0], 1)
             ],
             idx: 0,
             nmask: 14,
@@ -483,7 +484,7 @@ tape('Deserialize phrasematch results', (t) => {
 
 
 
-function Phrasematch(store, subquery, phrase, weight, phrase_id_range, scorefactor, prefix, mask, zoom, edit_multiplier, prox_match, cat_match, partial_number, subquery_edit_distance, original_phrase, original_phrase_ender, original_phrase_mask, languages) {
+function Phrasematch(store, subquery, phrase, weight, phrase_id_range, scorefactor, prefix, mask, zoom, editMultiplier, prox_match, cat_match, partial_number, subquery_edit_distance, original_phrase, original_phrase_ender, original_phrase_mask, languages, id) {
     this.store = store;
     this.subquery = subquery;
     this.phrase = phrase;
@@ -493,7 +494,7 @@ function Phrasematch(store, subquery, phrase, weight, phrase_id_range, scorefact
     this.scorefactor = scorefactor;
     this.prefix = prefix;
     this.zoom = zoom;
-    this.edit_multiplier = edit_multiplier || 1;
+    this.editMultiplier = editMultiplier || 1;
     this.prox_match = prox_match || false;
     this.cat_match = cat_match || false;
     this.partial_number = partial_number || false;
@@ -501,6 +502,7 @@ function Phrasematch(store, subquery, phrase, weight, phrase_id_range, scorefact
     this.original_phrase = original_phrase;
     this.original_phrase_ender = original_phrase_ender;
     this.original_phrase_mask = original_phrase_mask;
+    this.id = id;
 
     if (languages) {
         // carmen-cache gives special treatment to the "languages" property
@@ -521,7 +523,7 @@ function Phrasematch(store, subquery, phrase, weight, phrase_id_range, scorefact
 }
 
 Phrasematch.prototype.clone = function() {
-    return new Phrasematch(this.store, this.subquery.slice(), this.phrase, this.weight, this.phrase_id_range, this.scorefactor, this.prefix, this.mask, this.zoom, this.edit_multiplier, this.prox_match, this.cat_match, this.partial_number, this.subquery_edit_distance, this.original_phrase, this.original_phrase_ender, this.original_phrase_mask, this.languages);
+    return new Phrasematch(this.store, this.subquery.slice(), this.phrase, this.weight, this.phrase_id_range, this.scorefactor, this.prefix, this.mask, this.zoom, this.editMultiplier, this.prox_match, this.cat_match, this.partial_number, this.subquery_edit_distance, this.original_phrase, this.original_phrase_ender, this.original_phrase_mask, this.languages, this.id);
 };
 
 module.exports.Phrasematch = Phrasematch;
