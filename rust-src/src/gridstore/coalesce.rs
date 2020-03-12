@@ -9,6 +9,7 @@ use itertools::Itertools;
 use ordered_float::OrderedFloat;
 
 use crate::gridstore::common::*;
+use crate::gridstore::stackable::{stackable, StackableNode};
 use crate::gridstore::store::GridStore;
 
 /// Takes a vector of phrasematch subqueries (stack) and match options, gets matching grids, sorts the grids,
@@ -48,6 +49,7 @@ fn grid_to_coalesce_entry<T: Borrow<GridStore> + Clone>(
     grid: &MatchEntry,
     subquery: &PhrasematchSubquery<T>,
     match_opts: &MatchOpts,
+    phrasematch_id: u32,
 ) -> CoalesceEntry {
     // Zoom has been adjusted in coalesce_multi, or correct zoom has been passed in for coalesce_single
     debug_assert!(match_opts.zoom == subquery.zoom);
@@ -61,6 +63,7 @@ fn grid_to_coalesce_entry<T: Borrow<GridStore> + Clone>(
         mask: subquery.mask,
         distance: grid.distance,
         scoredist: grid.scoredist,
+        phrasematch_id,
     }
 }
 
@@ -85,7 +88,7 @@ fn coalesce_single<T: Borrow<GridStore> + Clone>(
     let mut coalesced: HashMap<u32, CoalesceEntry> = HashMap::new();
 
     for grid in grids {
-        let coalesce_entry = grid_to_coalesce_entry(&grid, subquery, match_opts);
+        let coalesce_entry = grid_to_coalesce_entry(&grid, subquery, match_opts, 0);
 
         // If it's the same feature as the last one, but a lower scoredist don't add it
         if previous_id == coalesce_entry.grid_entry.id
@@ -207,7 +210,7 @@ fn coalesce_multi<T: Borrow<GridStore> + Clone>(
 
         for grid in grids.take(MAX_GRIDS_PER_PHRASE) {
             let coalesce_entry =
-                grid_to_coalesce_entry(&grid, subquery, &zoom_adjusted_match_options);
+                grid_to_coalesce_entry(&grid, subquery, &zoom_adjusted_match_options, 0);
 
             let zxy = (subquery.zoom, grid.grid_entry.x, grid.grid_entry.y);
 
@@ -324,4 +327,270 @@ fn coalesce_multi<T: Borrow<GridStore> + Clone>(
     });
 
     Ok(contexts)
+}
+
+type TreeCoalesceState = HashMap<(u16, u16), Vec<CoalesceContext>>;
+
+pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug>(
+    stack_tree: &StackableNode<T>,
+    match_opts: &MatchOpts,
+) -> Result<Vec<CoalesceContext>, Error> {
+    // the "tree" is just a node with no phrasematch; assure that this is the case
+    debug_assert!(stack_tree.phrasematch.is_none(), "no phrasematch on root node");
+
+    let mut contexts: Vec<CoalesceContext> = Vec::new();
+
+    for node in &stack_tree.children {
+        let subq_results =
+            node.phrasematch.as_ref().expect("phrasematch must be set on non-root tree nodes");
+        let subquery: PhrasematchSubquery<T> = subq_results.clone().into();
+
+        let mut zoom_adjusted_match_options = match_opts.clone();
+        if zoom_adjusted_match_options.zoom != subquery.zoom {
+            zoom_adjusted_match_options = match_opts.adjust_to_zoom(subquery.zoom);
+        }
+
+        if node.children.len() == 0 {
+            // we're not stacking this on top of anything, and we're not stacking anything else
+            // on top of this, so we can grab a minimal set of elements here
+            let bigger_max = 2 * MAX_CONTEXTS;
+
+            let grids = subquery.store.borrow().streaming_get_matching(
+                &subquery.match_key,
+                &zoom_adjusted_match_options,
+                // double to give us some sorting wiggle room
+                bigger_max,
+            )?;
+
+            let coalesced =
+                tree_coalesce_single(&subq_results, &zoom_adjusted_match_options, grids)?;
+
+            contexts.extend(coalesced);
+        } else {
+            // we need lots of grids because we don't know where the things we're stacking on top
+            // will be
+            let mut prev_state: TreeCoalesceState = TreeCoalesceState::new();
+            let grids = subquery.store.borrow().streaming_get_matching(
+                &subquery.match_key,
+                &zoom_adjusted_match_options,
+                MAX_GRIDS_PER_PHRASE,
+            )?;
+
+            for grid in grids.take(MAX_GRIDS_PER_PHRASE) {
+                let entry = grid_to_coalesce_entry(
+                    &grid,
+                    &subquery,
+                    &zoom_adjusted_match_options,
+                    subq_results.id,
+                );
+                let context = CoalesceContext {
+                    mask: subquery.mask,
+                    relev: entry.grid_entry.relev,
+                    entries: vec![entry],
+                };
+
+                contexts.push(context.clone());
+
+                let state_vec = prev_state
+                    .entry((grid.grid_entry.x, grid.grid_entry.y))
+                    .or_insert_with(|| vec![]);
+                state_vec.push(context);
+            }
+
+            let mut multi_contexts = Vec::new();
+            tree_recurse(&node, match_opts, &prev_state, subquery.zoom, &mut multi_contexts)?;
+
+            // penalize singnle-entry stacks and ascending stacks for... some reason?
+            for mut context in multi_contexts {
+                if context.entries.len() == 1 || context.entries[0].mask > context.entries[1].mask {
+                    context.relev -= 0.01
+                }
+                contexts.push(context);
+            }
+        }
+    }
+
+    contexts.sort_by_key(|context| {
+        (
+            Reverse(OrderedFloat(context.relev)),
+            Reverse(OrderedFloat(context.entries[0].scoredist)),
+            context.entries[0].idx,
+            Reverse(context.entries[0].grid_entry.x),
+            Reverse(context.entries[0].grid_entry.y),
+            Reverse(context.entries[0].grid_entry.id),
+        )
+    });
+
+    // other stuff that ought to happen here:
+    // - deduplication? if we have the same mask, same stack, better relevance, we should prefer it
+    // - the thing where we don't allow jumps down in relevance that are bigger than 0.25
+    // - way smarter stopping earlier, sorting, cutting off, etc.
+    // - there's a relevance penalty for ascending vs. descending stuff for some reason... maybe
+    //   we just shouldn't do that anymore though?
+    contexts.truncate(MAX_CONTEXTS * 40);
+
+    Ok(contexts)
+}
+
+fn tree_coalesce_single<T: Borrow<GridStore> + Clone, U: Iterator<Item = MatchEntry>>(
+    subquery: &PhrasematchResults<T>,
+    match_opts: &MatchOpts,
+    grids: U,
+) -> Result<impl Iterator<Item = CoalesceContext>, Error> {
+    let bigger_max = 2 * MAX_CONTEXTS;
+
+    let mut max_relevance: f64 = 0.;
+    let mut previous_id: u32 = 0;
+    let mut previous_relevance: f64 = 0.;
+    let mut previous_scoredist: f64 = 0.;
+    let mut min_scoredist = std::f64::MAX;
+    let mut feature_count: usize = 0;
+
+    let mut coalesced: HashMap<u32, CoalesceEntry> = HashMap::new();
+
+    let phrasematch_id = subquery.id;
+    let subquery: PhrasematchSubquery<T> = subquery.clone().into();
+
+    for grid in grids {
+        let coalesce_entry = grid_to_coalesce_entry(&grid, &subquery, match_opts, phrasematch_id);
+
+        // If it's the same feature as the last one, but a lower scoredist don't add it
+        if previous_id == coalesce_entry.grid_entry.id
+            && coalesce_entry.scoredist <= previous_scoredist
+        {
+            continue;
+        }
+
+        if feature_count > bigger_max {
+            if coalesce_entry.scoredist < min_scoredist {
+                continue;
+            } else if coalesce_entry.grid_entry.relev < previous_relevance {
+                // Grids should be sorted by relevance coming out of get_matching,
+                // so if it's lower than the last relevance, stop
+                break;
+            }
+        }
+
+        if max_relevance - coalesce_entry.grid_entry.relev >= 0.25 {
+            break;
+        }
+        if coalesce_entry.grid_entry.relev > max_relevance {
+            max_relevance = coalesce_entry.grid_entry.relev;
+        }
+
+        // Save current values before mocing into coalesced
+        let current_id = coalesce_entry.grid_entry.id;
+        let current_relev = coalesce_entry.grid_entry.relev;
+        let current_scoredist = coalesce_entry.scoredist;
+
+        // If it's the same feature as one that's been added before, but a higher scoredist, update the entry
+        match coalesced.entry(current_id) {
+            Entry::Occupied(mut already_coalesced) => {
+                if current_scoredist > already_coalesced.get().scoredist
+                    && current_relev >= already_coalesced.get().grid_entry.relev
+                {
+                    already_coalesced.insert(coalesce_entry);
+                }
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(coalesce_entry);
+            }
+        }
+
+        if previous_id != current_id {
+            feature_count += 1;
+        }
+        if match_opts.proximity.is_none() && feature_count > bigger_max {
+            break;
+        }
+        if current_scoredist < min_scoredist {
+            min_scoredist = current_scoredist;
+        }
+        previous_id = current_id;
+        previous_relevance = current_relev;
+        previous_scoredist = current_scoredist;
+    }
+
+    let contexts = coalesced.into_iter().map(|(_, entry)| CoalesceContext {
+        entries: vec![entry.clone()],
+        mask: entry.mask,
+        relev: entry.grid_entry.relev,
+    });
+
+    Ok(contexts)
+}
+
+fn tree_recurse<T: Borrow<GridStore> + Clone + Debug>(
+    node: &StackableNode<T>,
+    match_opts: &MatchOpts,
+    prev_state: &TreeCoalesceState,
+    prev_zoom: u16,
+    mut contexts: &mut Vec<CoalesceContext>,
+) -> Result<(), Error> {
+    for child in &node.children {
+        // we need lots of grids because we don't know where the things we're stacking on top
+        // will be
+        let subq_results =
+            child.phrasematch.as_ref().expect("phrasematch must be set on non-root tree nodes");
+        let subquery: PhrasematchSubquery<T> = subq_results.clone().into();
+
+        let mut zoom_adjusted_match_options = match_opts.clone();
+        if zoom_adjusted_match_options.zoom != subquery.zoom {
+            zoom_adjusted_match_options = match_opts.adjust_to_zoom(subquery.zoom);
+        }
+
+        let scale_factor: u16 = 1 << (subquery.zoom - prev_zoom);
+
+        let mut state: TreeCoalesceState = TreeCoalesceState::new();
+        let grids = subquery.store.borrow().streaming_get_matching(
+            &subquery.match_key,
+            &zoom_adjusted_match_options,
+            MAX_GRIDS_PER_PHRASE,
+        )?;
+
+        for grid in grids.take(MAX_GRIDS_PER_PHRASE) {
+            let prev_zoom_xy = (grid.grid_entry.x / scale_factor, grid.grid_entry.y / scale_factor);
+
+            if let Some(already_coalesced) = prev_state.get(&prev_zoom_xy) {
+                let entry = grid_to_coalesce_entry(
+                    &grid,
+                    &subquery,
+                    &zoom_adjusted_match_options,
+                    subq_results.id,
+                );
+                for parent_context in already_coalesced {
+                    let mut new_context = parent_context.clone();
+                    new_context.entries.insert(0, entry.clone());
+
+                    new_context.mask = new_context.mask | subquery.mask;
+                    new_context.relev += entry.grid_entry.relev;
+
+                    contexts.push(new_context.clone());
+
+                    if child.children.len() > 0 {
+                        // only bother with getting ready to recurse if we have any children to
+                        // operate on
+                        let state_vec = state
+                            .entry((grid.grid_entry.x, grid.grid_entry.y))
+                            .or_insert_with(|| vec![]);
+                        state_vec.push(new_context);
+                    }
+                }
+            }
+        }
+        if state.len() > 0 {
+            tree_recurse(&child, match_opts, &state, subquery.zoom, &mut contexts)?;
+        }
+    }
+    Ok(())
+}
+
+pub fn stack_and_coalesce<T: Borrow<GridStore> + Clone + Debug>(
+    phrasematches: &Vec<Vec<PhrasematchResults<T>>>,
+    match_opts: &MatchOpts,
+) -> Result<Vec<CoalesceContext>, Error> {
+    // currently stackable requires double-wrapping the phrasematches vector, which requires an
+    // extra clone; ideally we wouldn't do that
+    let tree = stackable(&phrasematches, None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0);
+    tree_coalesce(&tree, &match_opts)
 }
