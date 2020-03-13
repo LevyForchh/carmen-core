@@ -11,7 +11,7 @@ use rusoto_core::Region;
 use rusoto_s3::{GetObjectRequest, S3Client, S3};
 use serde::{Deserialize, Serialize};
 
-use std::collections::HashMap;
+use std::collections::{ HashMap, HashSet };
 use std::env;
 use std::fs::{self, File};
 use std::io::{self, BufRead, BufWriter, Read, Write};
@@ -52,14 +52,21 @@ struct PrefixBoundary {
 /// Utility to create stores
 /// Takes an vector, with each item mapping to a store to create
 /// Each item is a vector with maps of grid keys to the entries to insert into the store for that grid key
-pub fn create_store(store_entries: Vec<StoreEntryBuildingBlock>) -> GridStore {
+pub fn create_store(
+    store_entries: Vec<StoreEntryBuildingBlock>,
+    idx: u16,
+    zoom: u16,
+    type_id: u16,
+    non_overlapping_indexes: HashSet<u16>,
+    coalesce_radius: f64,
+) -> GridStore {
     let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
     let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
     for build_block in store_entries {
         builder.insert(&build_block.grid_key, build_block.entries).expect("Unable to insert");
     }
     builder.finish().unwrap();
-    GridStore::new(directory.path()).unwrap()
+    GridStore::new_with_options(directory.path(), idx, zoom, type_id, non_overlapping_indexes, coalesce_radius).unwrap()
 }
 
 // Gets the absolute path for a path relative to the carmen-core dir
@@ -219,9 +226,8 @@ pub fn prepare_coalesce_stacks(
                             store: store.clone(),
                             weight: placeholder.weight,
                             match_key: placeholder.match_key.clone(),
-                            idx: placeholder.idx,
-                            zoom: placeholder.zoom,
                             mask: placeholder.mask,
+                            id: 0,
                         }
                     })
                     .collect();

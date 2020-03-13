@@ -20,6 +20,12 @@ pub struct GridStore {
     db: DB,
     bin_boundaries: HashSet<u32>,
     pub path: PathBuf,
+    // options:
+    pub idx: u16,
+    pub zoom: u16,
+    pub type_id: u16,
+    pub non_overlapping_indexes: HashSet<u16>, // the field formerly known as bmask
+    pub coalesce_radius: f64,
 }
 
 #[inline]
@@ -245,6 +251,17 @@ impl<T: Iterator<Item = MatchEntry>> Eq for QueueElement<T> {}
 
 impl GridStore {
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
+        GridStore::new_with_options(path, 0, 6, 0, HashSet::new(), 0.0)
+    }
+
+    pub fn new_with_options<P: AsRef<Path>>(
+        path: P,
+        idx: u16,
+        zoom: u16,
+        type_id: u16,
+        non_overlapping_indexes: HashSet<u16>,
+        coalesce_radius: f64,
+    ) -> Result<Self, Error> {
         let path = path.as_ref().to_owned();
         let mut opts = Options::default();
         opts.set_read_only(true);
@@ -268,7 +285,16 @@ impl GridStore {
             None => HashSet::new(),
         };
 
-        Ok(GridStore { db, path, bin_boundaries })
+        Ok(GridStore {
+            db,
+            path,
+            bin_boundaries,
+            idx,
+            zoom,
+            type_id,
+            non_overlapping_indexes,
+            coalesce_radius,
+        })
     }
 
     #[inline(never)]

@@ -404,40 +404,8 @@ pub struct PhrasematchSubquery<T: Borrow<GridStore> + Clone> {
     pub store: T,
     pub weight: f64,
     pub match_key: MatchKey,
-    pub idx: u16,
-    pub zoom: u16,
     pub mask: u32,
-}
-
-#[derive(Serialize, Debug, Clone)]
-pub struct PhrasematchResults<T: Borrow<GridStore> + Clone> {
-    #[serde(serialize_with = "serialize_path")]
-    pub store: T,
-    pub scorefactor: u32,
-    pub prefix: u8,
-    pub weight: f64,
-    pub match_key: MatchKey,
-    pub idx: u16,
-    pub zoom: u16,
-    pub nmask: u32,
-    pub mask: u32,
-    pub bmask: HashSet<u16>,
-    pub edit_multiplier: f64,
-    pub subquery_edit_distance: u8,
     pub id: u32,
-}
-
-impl<T: Borrow<GridStore> + Clone> From<PhrasematchResults<T>> for PhrasematchSubquery<T> {
-    fn from(phrasematch_results: PhrasematchResults<T>) -> Self {
-        PhrasematchSubquery {
-            store: phrasematch_results.store,
-            weight: phrasematch_results.weight,
-            match_key: phrasematch_results.match_key,
-            idx: phrasematch_results.idx,
-            zoom: phrasematch_results.zoom,
-            mask: phrasematch_results.mask,
-        }
-    }
 }
 
 #[inline]

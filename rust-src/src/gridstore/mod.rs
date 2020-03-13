@@ -16,7 +16,7 @@ pub use store::*;
 mod tests {
     use super::*;
     use once_cell::sync::Lazy;
-    use std::collections::BTreeMap;
+    use std::collections::{ BTreeMap, HashSet };
 
     #[test]
     fn combined_test() {
@@ -510,9 +510,9 @@ mod tests {
         builder_with_boundaries.finish().unwrap();
         builder_without_boundaries.finish().unwrap();
 
-        let reader_with_boundaries = GridStore::new(directory_with_boundaries.path()).unwrap();
+        let reader_with_boundaries = GridStore::new_with_options(directory_with_boundaries.path(), 0, 14, 0, HashSet::new(), 200.).unwrap();
         let reader_without_boundaries =
-            GridStore::new(directory_without_boundaries.path()).unwrap();
+            GridStore::new_with_options(directory_without_boundaries.path(), 0, 14, 0, HashSet::new(), 200.).unwrap();
 
         (
             reader_with_boundaries,
@@ -645,14 +645,13 @@ mod tests {
         .into_iter()
         .map(|(reader, range)| {
             let subquery = PhrasematchSubquery {
+                id: 0,
                 store: reader,
                 weight: 1.,
                 match_key: MatchKey {
                     match_phrase: MatchPhrase::Range { start: range.0, end: range.1 },
                     lang_set: 1,
                 },
-                idx: 1,
-                zoom: 14,
                 mask: 1 << 0,
             };
             let stack = vec![subquery];
