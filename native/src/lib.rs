@@ -462,8 +462,6 @@ where
             gridstore_clone
         };
         let weight = js_phrasematch.get(cx, "weight")?;
-        let idx = js_phrasematch.get(cx, "idx")?;
-        let zoom = js_phrasematch.get(cx, "zoom")?;
         let mask = js_phrasematch.get(cx, "mask")?;
 
         let match_key = js_phrasematch.get(cx, "match_key")?.downcast::<JsObject>().or_throw(cx)?;
@@ -504,9 +502,6 @@ fn deserialize_phrasematch_results<'j, C: Context<'j>>(
     for i in 0..js_phrasematch_per_index.len() {
         let js_phrasematch = js_phrasematch_per_index.get(cx, i)?.downcast::<JsObject>().or_throw(cx)?;
         let phrasematch_array = js_phrasematch.get(cx, "phrasematches")?.downcast::<JsArray>().or_throw(cx)?;
-        let nmask = js_phrasematch.get(cx, "nmask")?;
-        let idx = js_phrasematch.get(cx, "idx")?;
-        let bmask = js_phrasematch.get(cx, "bmask")?;
 
         let phrasematch_array_length = phrasematch_array.len();
         let mut phrasematches: Vec<PhrasematchSubquery<ArcGridStore>> = Vec::with_capacity(phrasematch_array_length as usize);

@@ -1,5 +1,4 @@
 use std::borrow::Borrow;
-use std::collections::HashSet;
 
 use crate::gridstore::store::GridStore;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};

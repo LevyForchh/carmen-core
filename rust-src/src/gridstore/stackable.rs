@@ -5,8 +5,6 @@ use std::cmp::Reverse;
 use std::collections::HashSet;
 use std::fmt::Debug;
 
-use crate::gridstore::builder::*;
-use crate::gridstore::common::MatchPhrase::Range;
 use crate::gridstore::common::*;
 use crate::gridstore::store::*;
 
