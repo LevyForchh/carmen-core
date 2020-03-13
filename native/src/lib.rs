@@ -6,6 +6,7 @@ use carmen_core::gridstore::{
 use neon::prelude::*;
 use neon::{class_definition, declare_types, impl_managed, register_module};
 use neon_serde::errors::Result as LibResult;
+use serde::Deserialize;
 use std::collections::HashSet;
 use owning_ref::OwningHandle;
 use failure::Error;
@@ -75,6 +76,15 @@ impl Task for StackAndCoalesceTask {
 }
 
 type KeyIterator = OwningHandle<ArcGridStore, Box<dyn Iterator<Item=Result<GridKey, Error>>>>;
+
+#[derive(Deserialize, Debug, PartialEq, Clone)]
+struct GridStoreOpts {
+    pub idx: u16,
+    pub zoom: u16,
+    pub type_id: u16,
+    pub non_overlapping_indexes: HashSet<u16>, // the field formerly known as bmask
+    pub coalesce_radius: f64,
+}
 
 declare_types! {
     pub class JsGridStoreBuilder as JsGridStoreBuilder for Option<GridStoreBuilder> {
@@ -271,7 +281,22 @@ declare_types! {
     pub class JsGridStore as JsGridStore for ArcGridStore {
         init(mut cx) {
             let filename = cx.argument::<JsString>(0)?.value();
-            match GridStore::new(filename) {
+            let store = match cx.argument_opt(1) {
+                Some(arg) => {
+                    let opts: GridStoreOpts = neon_serde::from_value(&mut cx, arg)?;
+
+                    GridStore::new_with_options(
+                        filename,
+                        opts.idx,
+                        opts.zoom,
+                        opts.type_id,
+                        opts.non_overlapping_indexes,
+                        opts.coalesce_radius
+                    )
+                },
+                None => GridStore::new(filename)
+            };
+            match store {
                 Ok(s) => Ok(Arc::new(s)),
                 Err(e) => cx.throw_type_error(e.to_string())
             }
