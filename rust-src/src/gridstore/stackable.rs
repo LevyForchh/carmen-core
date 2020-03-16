@@ -20,6 +20,29 @@ pub struct StackableNode<T: Borrow<GridStore> + Clone + Debug> {
     pub zoom: u16,
 }
 
+impl<T: Borrow<GridStore> + Clone + Debug> StackableNode<T> {
+    fn is_leaf(&self) -> bool {
+        self.children.len() == 0
+    }
+}
+
+//tree traversal used only for tests
+pub fn bfs<T: Borrow<GridStore> + Clone + Debug>(root: StackableNode<T>) -> Vec<StackableNode<T>> {
+    let mut node_vec: Vec<StackableNode<T>> = vec![];
+    let mut stack: Vec<_> = vec![];
+
+    stack.push(root);
+
+    while stack.len() > 0 {
+        let node = stack.pop().unwrap();
+        node_vec.push(node.clone());
+        for child in node.children {
+            stack.push(child);
+        }
+    }
+    return node_vec;
+}
+
 pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
     phrasematch_results: &Vec<PhrasematchSubquery<T>>,
     phrasematch_result: Option<PhrasematchSubquery<T>>,
@@ -38,7 +61,7 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
         nmask: nmask,
         idx: idx,
         max_relev: max_relev,
-        zoom: zoom,
+        zoom: zoom
     };
 
     for phrasematches in phrasematch_results.iter() {
@@ -53,28 +76,28 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
         }
 
         if (node.nmask & (1u32 << phrasematches.store.borrow().type_id)) == 0
-            && (node.mask & phrasematches.mask) == 0
-            && phrasematches.store.borrow().non_overlapping_indexes.contains(&node.idx) == false
-        {
-            let target_nmask = &(1u32 << phrasematches.store.borrow().type_id) | node.nmask;
-            let target_mask = &phrasematches.mask | node.mask;
-            let mut target_bmask: HashSet<u16> = node.bmask.iter().cloned().collect();
-            let phrasematch_bmask: HashSet<u16> =
-                phrasematches.store.borrow().non_overlapping_indexes.iter().cloned().collect();
-            target_bmask.extend(&phrasematch_bmask);
-            let target_relev = 0.0 + &phrasematches.weight;
+                && (node.mask & phrasematches.mask) == 0
+                && phrasematches.store.borrow().non_overlapping_indexes.contains(&node.idx) == false
+            {
+                let target_nmask = &(1u32 << phrasematches.store.borrow().type_id) | node.nmask;
+                let target_mask = &phrasematches.mask | node.mask;
+                let mut target_bmask: HashSet<u16> = node.bmask.iter().cloned().collect();
+                let phrasematch_bmask: HashSet<u16> =
+                    phrasematches.store.borrow().non_overlapping_indexes.iter().cloned().collect();
+                target_bmask.extend(&phrasematch_bmask);
+                let target_relev = 0.0 + &phrasematches.weight;
 
-            node.children.push(stackable(
-                phrasematch_results,
-                Some(phrasematches.clone()),
-                target_nmask,
-                target_bmask,
-                target_mask,
-                phrasematches.store.borrow().idx,
-                target_relev,
-                phrasematches.store.borrow().zoom,
-            ));
-        }
+                node.children.push(stackable(
+                    &phrasematch_results,
+                    Some(phrasematches.clone()),
+                    target_nmask,
+                    target_bmask,
+                    target_mask,
+                    phrasematches.store.borrow().idx,
+                    target_relev,
+                    phrasematches.store.borrow().zoom,
+                ));
+            }
     }
 
     node.children.sort_by_key(|node| Reverse(OrderedFloat(node.max_relev)));
@@ -93,7 +116,74 @@ mod test {
     use crate::gridstore::common::MatchPhrase::Range;
 
     #[test]
-    fn stackable_test() {
+    fn simple_stackable_test() {
+        let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
+        let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
+
+        let key = GridKey { phrase_id: 1, lang_set: 1 };
+
+        let entries = vec![
+            GridEntry { id: 2, x: 2, y: 2, relev: 0.8, score: 3, source_phrase_hash: 0 },
+            GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 1, source_phrase_hash: 1 },
+            GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 7, source_phrase_hash: 2 },
+        ];
+        builder.insert(&key, entries).expect("Unable to insert record");
+        builder.finish().unwrap();
+        let store1 = GridStore::new_with_options(directory.path(), 1, 14, 1, HashSet::new(), 200.).unwrap();
+        let store2 = GridStore::new_with_options(directory.path(), 2, 14, 2, HashSet::new(), 200.).unwrap();
+
+        let a1 = PhrasematchSubquery {
+            id: 0,
+            store: &store1,
+            weight: 0.5,
+            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+            mask: 2,
+        };
+
+        let b1 = PhrasematchSubquery {
+            id: 1,
+            store: &store2,
+            weight: 0.5,
+            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+            mask: 1,
+        };
+
+        let b2 = PhrasematchSubquery {
+            id: 2,
+            store: &store2,
+            weight: 0.5,
+            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+            mask: 1,
+        };
+
+        let phrasematch_results = vec![a1, b1, b2];
+
+        let tree = stackable(&phrasematch_results, None, 0, HashSet::new(), 0, 129, 0.0, 0);
+        let a1_children_ids: Vec<u32> = tree.clone().children[0]
+            .clone()
+            .children
+            .iter()
+            .map(|node| node.phrasematch.as_ref().map(|p| p.id).unwrap())
+            .collect();
+        assert_eq!(vec![1, 2], a1_children_ids, "a1 can stack with b1 and b2");
+        let b1_children_ids: Vec<u32> = tree.clone().children[1]
+            .clone()
+            .children
+            .iter()
+            .map(|node| node.phrasematch.as_ref().map(|p| p.id).unwrap())
+            .collect();
+        assert_eq!(0, b1_children_ids.len(), "b1 cannot stack with b2, same nmask");
+        let b2_children_ids: Vec<u32> = tree.clone().children[2]
+            .clone()
+            .children
+            .iter()
+            .map(|node| node.phrasematch.as_ref().map(|p| p.id).unwrap())
+            .collect();
+        assert_eq!(0, b2_children_ids.len(), "b2 cannot stack with b1, same nmask");
+    }
+
+    #[test]
+    fn nmask_stackable_test() {
         let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
         let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
 
@@ -113,10 +203,46 @@ mod test {
             store: &store,
             weight: 0.5,
             match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
-            mask: 2,
+            mask: 1,
         };
 
         let b1 = PhrasematchSubquery {
+            id: 1,
+            store: &store,
+            weight: 0.5,
+            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+            mask: 1,
+        };
+        let phrasematch_results = vec![a1, b1];
+        let tree = stackable(&phrasematch_results, None, 0, HashSet::new(), 0, 129, 0.0, 0);
+        let nmask_stacks: Vec<bool> = bfs(tree).iter().map(|node| node.is_leaf()).collect();
+        assert_eq!(nmask_stacks[1], true, "a1 and b1 cannot stack since they have the same nmask - so they don't have any children");
+        assert_eq!(nmask_stacks[2], true, "a1 and b1 cannot stack since they have the same nmask - so they don't have any children");
+    }
+
+    #[test]
+    fn bmask_stackable_test() {
+        let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
+        let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
+
+        let key = GridKey { phrase_id: 1, lang_set: 1 };
+
+        let entries = vec![
+            GridEntry { id: 2, x: 2, y: 2, relev: 0.8, score: 3, source_phrase_hash: 0 },
+            GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 1, source_phrase_hash: 1 },
+            GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 7, source_phrase_hash: 2 },
+        ];
+        builder.insert(&key, entries).expect("Unable to insert record");
+        builder.finish().unwrap();
+        let store = GridStore::new(directory.path()).unwrap();
+        let mut a1_bmask: HashSet<u16> = HashSet::new();
+        a1_bmask.insert(0);
+        a1_bmask.insert(1);
+        let mut b1_bmask: HashSet<u16> = HashSet::new();
+        b1_bmask.insert(1);
+        b1_bmask.insert(0);
+
+        let a1 = PhrasematchSubquery {
             id: 0,
             store: &store,
             weight: 0.5,
@@ -124,7 +250,37 @@ mod test {
             mask: 1,
         };
 
-        let b2 = PhrasematchSubquery {
+        let b1 = PhrasematchSubquery {
+            id: 1,
+            store: &store,
+            weight: 0.5,
+            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+            mask: 1,
+        };
+        let phrasematch_results = vec![a1, b1];
+        let tree = stackable(&phrasematch_results, None, 0, HashSet::new(), 0, 129, 0.0, 0);
+        let bmask_stacks: Vec<bool> = bfs(tree).iter().map(|node| node.is_leaf()).collect();
+        assert_eq!(bmask_stacks[1], true, "a1 cannot stack with b1 since a1's bmask contains the idx of b1 - so they don't have any children");
+        assert_eq!(bmask_stacks[2], true, "b1 cannot stack with a1 since b1's bmask contains the idx of a1 - so they don't have any children");
+    }
+
+    #[test]
+    fn mask_stackable_test() {
+        let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
+        let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
+
+        let key = GridKey { phrase_id: 1, lang_set: 1 };
+
+        let entries = vec![
+            GridEntry { id: 2, x: 2, y: 2, relev: 0.8, score: 3, source_phrase_hash: 0 },
+            GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 1, source_phrase_hash: 1 },
+            GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 7, source_phrase_hash: 2 },
+        ];
+        builder.insert(&key, entries).expect("Unable to insert record");
+        builder.finish().unwrap();
+        let store = GridStore::new(directory.path()).unwrap();
+
+        let a1 = PhrasematchSubquery {
             id: 0,
             store: &store,
             weight: 0.5,
@@ -132,7 +288,17 @@ mod test {
             mask: 1,
         };
 
-        let phrasematch_results = vec![a1, b1, b2];
-        stackable(&phrasematch_results, None, 0, HashSet::new(), 0, 129, 0.0, 0);
+        let b1 = PhrasematchSubquery {
+            id: 1,
+            store: &store,
+            weight: 0.5,
+            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+            mask: 1,
+        };
+        let phrasematch_results = vec![a1, b1];
+        let tree = stackable(&phrasematch_results, None, 0, HashSet::new(), 0, 129, 0.0, 0);
+        let mask_stacks: Vec<bool> = bfs(tree).iter().map(|node| node.is_leaf()).collect();
+        assert_eq!(mask_stacks[1], true, "a1 and b1 cannot stack since they have the same mask - so they don't have any children");
+        assert_eq!(mask_stacks[2], true, "a1 and b1 cannot stack since they have the same mask - so they don't have any children");
     }
 }
