@@ -61,7 +61,7 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
         nmask: nmask,
         idx: idx,
         max_relev: max_relev,
-        zoom: zoom
+        zoom: zoom,
     };
 
     for phrasematches in phrasematch_results.iter() {
@@ -76,28 +76,28 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
         }
 
         if (node.nmask & (1u32 << phrasematches.store.borrow().type_id)) == 0
-                && (node.mask & phrasematches.mask) == 0
-                && phrasematches.store.borrow().non_overlapping_indexes.contains(&node.idx) == false
-            {
-                let target_nmask = &(1u32 << phrasematches.store.borrow().type_id) | node.nmask;
-                let target_mask = &phrasematches.mask | node.mask;
-                let mut target_bmask: HashSet<u16> = node.bmask.iter().cloned().collect();
-                let phrasematch_bmask: HashSet<u16> =
-                    phrasematches.store.borrow().non_overlapping_indexes.iter().cloned().collect();
-                target_bmask.extend(&phrasematch_bmask);
-                let target_relev = 0.0 + &phrasematches.weight;
+            && (node.mask & phrasematches.mask) == 0
+            && phrasematches.store.borrow().non_overlapping_indexes.contains(&node.idx) == false
+        {
+            let target_nmask = &(1u32 << phrasematches.store.borrow().type_id) | node.nmask;
+            let target_mask = &phrasematches.mask | node.mask;
+            let mut target_bmask: HashSet<u16> = node.bmask.iter().cloned().collect();
+            let phrasematch_bmask: HashSet<u16> =
+                phrasematches.store.borrow().non_overlapping_indexes.iter().cloned().collect();
+            target_bmask.extend(&phrasematch_bmask);
+            let target_relev = 0.0 + &phrasematches.weight;
 
-                node.children.push(stackable(
-                    &phrasematch_results,
-                    Some(phrasematches.clone()),
-                    target_nmask,
-                    target_bmask,
-                    target_mask,
-                    phrasematches.store.borrow().idx,
-                    target_relev,
-                    phrasematches.store.borrow().zoom,
-                ));
-            }
+            node.children.push(stackable(
+                &phrasematch_results,
+                Some(phrasematches.clone()),
+                target_nmask,
+                target_bmask,
+                target_mask,
+                phrasematches.store.borrow().idx,
+                target_relev,
+                phrasematches.store.borrow().zoom,
+            ));
+        }
     }
 
     node.children.sort_by_key(|node| Reverse(OrderedFloat(node.max_relev)));
@@ -129,8 +129,10 @@ mod test {
         ];
         builder.insert(&key, entries).expect("Unable to insert record");
         builder.finish().unwrap();
-        let store1 = GridStore::new_with_options(directory.path(), 1, 14, 1, HashSet::new(), 200.).unwrap();
-        let store2 = GridStore::new_with_options(directory.path(), 2, 14, 2, HashSet::new(), 200.).unwrap();
+        let store1 =
+            GridStore::new_with_options(directory.path(), 1, 14, 1, HashSet::new(), 200.).unwrap();
+        let store2 =
+            GridStore::new_with_options(directory.path(), 2, 14, 2, HashSet::new(), 200.).unwrap();
 
         let a1 = PhrasematchSubquery {
             id: 0,
