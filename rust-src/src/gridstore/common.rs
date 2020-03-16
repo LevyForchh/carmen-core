@@ -179,9 +179,9 @@ mod tests {
     use super::*;
     use once_cell::sync::Lazy;
 
-    fn matchopts_proximity_generator(point: [u16; 2], radius: f64, zoom: u16) -> MatchOpts {
+    fn matchopts_proximity_generator(point: [u16; 2], zoom: u16) -> MatchOpts {
         MatchOpts {
-            proximity: Some(Proximity { point: point, radius: radius }),
+            proximity: Some(point),
             zoom: zoom,
             ..MatchOpts::default()
         }
@@ -190,9 +190,9 @@ mod tests {
     #[test]
     fn adjust_to_zoom_test_proximity() {
         static MATCH_OPTS_PROXIMITY: Lazy<(MatchOpts, MatchOpts, MatchOpts)> = Lazy::new(|| {
-            let match_opts1 = matchopts_proximity_generator([2, 28], 400., 14);
-            let match_opts2 = matchopts_proximity_generator([11, 25], 400., 6);
-            let match_opts3 = matchopts_proximity_generator([6, 6], 400., 4);
+            let match_opts1 = matchopts_proximity_generator([2, 28], 14);
+            let match_opts2 = matchopts_proximity_generator([11, 25], 6);
+            let match_opts3 = matchopts_proximity_generator([6, 6], 4);
             (match_opts1, match_opts2, match_opts3)
         });
 
@@ -201,42 +201,38 @@ mod tests {
             adjusted_match_opts1.zoom, 6,
             "Adjusted MatchOpts should have target zoom as zoom"
         );
-        assert_eq!(adjusted_match_opts1.proximity.unwrap().point, [0, 0], "should be 0,0");
+        assert_eq!(adjusted_match_opts1.proximity.unwrap(), [0, 0], "should be 0,0");
 
         let adjusted_match_opts2 = MATCH_OPTS_PROXIMITY.1.adjust_to_zoom(8);
         assert_eq!(
             adjusted_match_opts2.zoom, 8,
             "Adjusted MatchOpts should have target zoom as zoom"
         );
-        assert_eq!(adjusted_match_opts2.proximity.unwrap().point, [45, 101], "Should be 45, 101");
+        assert_eq!(adjusted_match_opts2.proximity.unwrap(), [45, 101], "Should be 45, 101");
 
         let same_zoom = MATCH_OPTS_PROXIMITY.2.adjust_to_zoom(4);
         assert_eq!(same_zoom, MATCH_OPTS_PROXIMITY.2, "If the zoom is the same as the original, adjusted MatchOpts should be a clone of the original");
         let zoomed_out_1z = MATCH_OPTS_PROXIMITY.2.adjust_to_zoom(3);
         let proximity_out_1z = zoomed_out_1z.proximity.unwrap();
-        assert_eq!(proximity_out_1z.point, [3, 3], "4/6/6 zoomed out to zoom 3 should be 3/3/3");
-        assert_eq!(
-            proximity_out_1z.radius, 400.,
-            "The adjusted radius should be the original radius"
-        );
+        assert_eq!(proximity_out_1z, [3, 3], "4/6/6 zoomed out to zoom 3 should be 3/3/3");
         assert_eq!(zoomed_out_1z.zoom, 3, "The adjusted zoom should be the target zoom");
 
         let zoomed_out_2z = MATCH_OPTS_PROXIMITY.2.adjust_to_zoom(2);
         let proximity_out_2z = zoomed_out_2z.proximity.unwrap();
-        assert_eq!(proximity_out_2z.point, [1, 1], "4/6/6 zoomed out to zoom 2 should be 2/1/1");
+        assert_eq!(proximity_out_2z, [1, 1], "4/6/6 zoomed out to zoom 2 should be 2/1/1");
 
         let zoomed_in_1z = MATCH_OPTS_PROXIMITY.2.adjust_to_zoom(5);
         let proximity_in_1z = zoomed_in_1z.proximity.unwrap();
-        assert_eq!(proximity_in_1z.point, [12, 12], "4/6/6 zoomed in to zoom 5 should be 5/12/12");
+        assert_eq!(proximity_in_1z, [12, 12], "4/6/6 zoomed in to zoom 5 should be 5/12/12");
         assert_eq!(zoomed_in_1z.zoom, 5, "The adjusted zoom should be the target zoom");
 
         let zoomed_in_2z = MATCH_OPTS_PROXIMITY.2.adjust_to_zoom(6);
         let proximity_in_2z = zoomed_in_2z.proximity.unwrap();
-        assert_eq!(proximity_in_2z.point, [25, 25], "4/6/6 zoomed in to zoom 6 should be 6/25/25");
+        assert_eq!(proximity_in_2z, [25, 25], "4/6/6 zoomed in to zoom 6 should be 6/25/25");
 
         let zoomed_in_3z = MATCH_OPTS_PROXIMITY.2.adjust_to_zoom(7);
         let proximity_in_3z = zoomed_in_3z.proximity.unwrap();
-        assert_eq!(proximity_in_3z.point, [51, 51], "4/6/6 zoomed in to zoom 7 should be 7/51/51");
+        assert_eq!(proximity_in_3z, [51, 51], "4/6/6 zoomed in to zoom 7 should be 7/51/51");
     }
 
     fn matchopts_bbox_generator(bbox: [u16; 4], zoom: u16) -> MatchOpts {

@@ -193,7 +193,7 @@ mod tests {
 
         builder.finish().unwrap();
 
-        let reader = GridStore::new(directory.path()).unwrap();
+        let reader = GridStore::new_with_options(directory.path(), 0, 14, 0, HashSet::new(), 1000.).unwrap();
 
         let search_key =
             MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 2 }, lang_set: 1 };
@@ -391,7 +391,7 @@ mod tests {
                 &search_key,
                 &MatchOpts {
                     bbox: None,
-                    proximity: Some(Proximity { point: [26, 1], radius: 1000. }),
+                    proximity: Some([26, 1]),
                     ..MatchOpts::default()
                 },
                 MAX_CONTEXTS,
@@ -424,7 +424,7 @@ mod tests {
                 &search_key,
                 &MatchOpts {
                     bbox: Some([10, 0, 41, 2]),
-                    proximity: Some(Proximity { point: [26, 1], radius: 1000. }),
+                    proximity: Some([26, 1]),
                     ..MatchOpts::default()
                 },
                 MAX_CONTEXTS,

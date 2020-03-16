@@ -35,7 +35,7 @@ fn coalesce_single_test_proximity_quadrants() {
     println!("Coalesce single - NE proximity");
     let match_opts = MatchOpts {
         zoom: 14,
-        proximity: Some(Proximity { point: [110, 115], radius: 200. }), // NE proximity point
+        proximity: Some([110, 115]), // NE proximity point
         ..MatchOpts::default()
     };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
@@ -52,7 +52,7 @@ fn coalesce_single_test_proximity_quadrants() {
     println!("Coalesce single - SE proximity");
     let match_opts = MatchOpts {
         zoom: 14,
-        proximity: Some(Proximity { point: [110, 85], radius: 200. }), // SE proximity point
+        proximity: Some([110, 85]), // SE proximity point
         ..MatchOpts::default()
     };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
@@ -69,7 +69,7 @@ fn coalesce_single_test_proximity_quadrants() {
     println!("Coalesce single - SW proximity");
     let match_opts = MatchOpts {
         zoom: 14,
-        proximity: Some(Proximity { point: [90, 85], radius: 200. }), // SW proximity point
+        proximity: Some([90, 85]), // SW proximity point
         ..MatchOpts::default()
     };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
@@ -86,7 +86,7 @@ fn coalesce_single_test_proximity_quadrants() {
     println!("Coalesce single - NW proximity");
     let match_opts = MatchOpts {
         zoom: 14,
-        proximity: Some(Proximity { point: [90, 115], radius: 200. }), // NW proximity point
+        proximity: Some([90, 115]), // NW proximity point
         ..MatchOpts::default()
     };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
@@ -129,7 +129,7 @@ fn coalesce_single_test_proximity_basic() {
     let stack = vec![subquery];
     let match_opts = MatchOpts {
         zoom: 14,
-        proximity: Some(Proximity { point: [2, 2], radius: 400. }),
+        proximity: Some([2, 2]),
         ..MatchOpts::default()
     };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
@@ -169,7 +169,7 @@ fn coalesce_single_test_language_penalty() {
     builder.insert(&key, entries).expect("Unable to insert record");
     builder.finish().unwrap();
 
-    let store = GridStore::new_with_options(directory.path(), 1, 14, 1, HashSet::new(), 200.).unwrap();
+    let store = GridStore::new_with_options(directory.path(), 1, 14, 1, HashSet::new(), 1.).unwrap();
     let subquery = PhrasematchSubquery {
         id: 0,
         store: &store,
@@ -180,7 +180,7 @@ fn coalesce_single_test_language_penalty() {
     let stack = vec![subquery.clone()];
     let match_opts = MatchOpts {
         zoom: 14,
-        proximity: Some(Proximity { point: [2, 2], radius: 1. }),
+        proximity: Some([2, 2]),
         ..MatchOpts::default()
     };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
@@ -257,7 +257,7 @@ fn coalesce_multi_test_language_penalty() {
 
     let match_opts = MatchOpts {
         zoom: 14,
-        proximity: Some(Proximity { point: [2, 2], radius: 1. }),
+        proximity: Some([2, 2]),
         ..MatchOpts::default()
     };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
@@ -298,7 +298,7 @@ fn coalesce_single_test() {
             GridEntry { id: 2, x: 2, y: 2, relev: 0.8, score: 3, source_phrase_hash: 0 },
             GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 1, source_phrase_hash: 0 },
         ],
-    }], 1, 6, 0, HashSet::new(), 200.);
+    }], 1, 6, 0, HashSet::new(), 40.);
     let subquery = PhrasematchSubquery {
         id: 0,
         store: &store,
@@ -368,7 +368,7 @@ fn coalesce_single_test() {
     println!("Coalsece single - with proximity");
     let match_opts = MatchOpts {
         zoom: 6,
-        proximity: Some(Proximity { point: [3, 3], radius: 40. }),
+        proximity: Some([3, 3]),
         ..MatchOpts::default()
     };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
@@ -498,7 +498,7 @@ fn coalesce_single_test() {
     let match_opts = MatchOpts {
         zoom: 6,
         bbox: Some([1, 1, 1, 1]),
-        proximity: Some(Proximity { point: [1, 1], radius: 40. }),
+        proximity: Some([1, 1]),
     };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
     let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0);
@@ -680,7 +680,7 @@ fn coalesce_multi_test() {
             // TODO: this isn't a real tile at zoom 1. Maybe pick more realistic test case?
             GridEntry { id: 2, x: 2, y: 2, relev: 1., score: 1, source_phrase_hash: 0 },
         ],
-    }], 0, 1, 0, HashSet::new(), 200.);
+    }], 0, 1, 0, HashSet::new(), 40.);
 
     let store2 = create_store(vec![StoreEntryBuildingBlock {
         grid_key: GridKey { phrase_id: 2, lang_set: 1 },
@@ -689,7 +689,7 @@ fn coalesce_multi_test() {
             GridEntry { id: 2, x: 2, y: 2, relev: 1., score: 3, source_phrase_hash: 0 },
             GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 1, source_phrase_hash: 0 },
         ],
-    }], 1, 2, 1, HashSet::new(), 200.);
+    }], 1, 2, 1, HashSet::new(), 40.);
 
     let stack = vec![
         PhrasematchSubquery {
@@ -816,7 +816,7 @@ fn coalesce_multi_test() {
     println!("Coalesce multi - with proximity");
     let match_opts = MatchOpts {
         zoom: 2,
-        proximity: Some(Proximity { point: [3, 3], radius: 40. }),
+        proximity: Some([3, 3]),
         ..MatchOpts::default()
     };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
@@ -1143,7 +1143,7 @@ fn coalesce_multi_scoredist() {
     println!("Coalesce multi - proximity very close to one grid");
     let match_opts = MatchOpts {
         zoom: 14,
-        proximity: Some(Proximity { point: [4601, 6200], radius: 40. }),
+        proximity: Some([4601, 6200]),
         ..MatchOpts::default()
     };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
@@ -1162,7 +1162,7 @@ fn coalesce_multi_scoredist() {
     println!("Coalesce multi - proximity less close to one grid");
     let match_opts = MatchOpts {
         zoom: 14,
-        proximity: Some(Proximity { point: [4610, 6200], radius: 40. }),
+        proximity: Some([4610, 6200]),
         ..MatchOpts::default()
     };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();

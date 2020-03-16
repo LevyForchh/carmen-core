@@ -91,6 +91,9 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::gridstore::common::MatchPhrase::Range;
+    use crate::gridstore::builder::*;
+
     #[test]
     fn stackable_test() {
         let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
