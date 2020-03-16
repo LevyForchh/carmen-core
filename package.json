@@ -1,6 +1,6 @@
 {
   "name": "@mapbox/carmen-core",
-  "version": "0.1.1-stack-and-coalesce-2",
+  "version": "0.1.1-stack-and-coalesce-3",
   "description": "node bindings for carmen-core",
   "main": "index.js",
   "engines": {
