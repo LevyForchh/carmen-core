@@ -117,10 +117,7 @@ impl MatchOpts {
                         // If this is a zoom out, divide by 2 for every level of zooming out.
                         let zoom_levels = self.zoom - target_z;
                         // Shifting to the right by a number is the same as dividing by 2 that number of times.
-                        Some([
-                            x >> zoom_levels,
-                            y >> zoom_levels,
-                        ])
+                        Some([x >> zoom_levels, y >> zoom_levels])
                     } else {
                         // If this is a zoom in, choose the closest to the middle of the possible tiles at the higher zoom level.
                         // The scale of the coordinates for zooming in is 2^(difference in zs).
@@ -180,11 +177,7 @@ mod tests {
     use once_cell::sync::Lazy;
 
     fn matchopts_proximity_generator(point: [u16; 2], zoom: u16) -> MatchOpts {
-        MatchOpts {
-            proximity: Some(point),
-            zoom: zoom,
-            ..MatchOpts::default()
-        }
+        MatchOpts { proximity: Some(point), zoom: zoom, ..MatchOpts::default() }
     }
 
     #[test]

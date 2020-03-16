@@ -22,7 +22,8 @@ fn coalesce_single_test_proximity_quadrants() {
 
     builder.finish().unwrap();
 
-    let store = GridStore::new_with_options(directory.path(), 1, 14, 1, HashSet::new(), 200.).unwrap();
+    let store =
+        GridStore::new_with_options(directory.path(), 1, 14, 1, HashSet::new(), 200.).unwrap();
     let subquery = PhrasematchSubquery {
         id: 0,
         store: &store,
@@ -118,7 +119,8 @@ fn coalesce_single_test_proximity_basic() {
 
     builder.finish().unwrap();
 
-    let store = GridStore::new_with_options(directory.path(), 1, 14, 1, HashSet::new(), 200.).unwrap();
+    let store =
+        GridStore::new_with_options(directory.path(), 1, 14, 1, HashSet::new(), 200.).unwrap();
     let subquery = PhrasematchSubquery {
         id: 0,
         store: &store,
@@ -127,11 +129,7 @@ fn coalesce_single_test_proximity_basic() {
         mask: 1 << 0,
     };
     let stack = vec![subquery];
-    let match_opts = MatchOpts {
-        zoom: 14,
-        proximity: Some([2, 2]),
-        ..MatchOpts::default()
-    };
+    let match_opts = MatchOpts { zoom: 14, proximity: Some([2, 2]), ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
     let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
@@ -169,7 +167,8 @@ fn coalesce_single_test_language_penalty() {
     builder.insert(&key, entries).expect("Unable to insert record");
     builder.finish().unwrap();
 
-    let store = GridStore::new_with_options(directory.path(), 1, 14, 1, HashSet::new(), 1.).unwrap();
+    let store =
+        GridStore::new_with_options(directory.path(), 1, 14, 1, HashSet::new(), 1.).unwrap();
     let subquery = PhrasematchSubquery {
         id: 0,
         store: &store,
@@ -178,11 +177,7 @@ fn coalesce_single_test_language_penalty() {
         mask: 1 << 0,
     };
     let stack = vec![subquery.clone()];
-    let match_opts = MatchOpts {
-        zoom: 14,
-        proximity: Some([2, 2]),
-        ..MatchOpts::default()
-    };
+    let match_opts = MatchOpts { zoom: 14, proximity: Some([2, 2]), ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
     let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
@@ -213,22 +208,36 @@ fn coalesce_single_test_language_penalty() {
 #[test]
 fn coalesce_multi_test_language_penalty() {
     // Add more specific layer into a store
-    let store1 = create_store(vec![StoreEntryBuildingBlock {
-        grid_key: GridKey { phrase_id: 1, lang_set: 1 },
-        entries: vec![
-            GridEntry { id: 1, x: 2, y: 2, relev: 1., score: 1, source_phrase_hash: 0 },
-            GridEntry { id: 2, x: 12800, y: 12800, relev: 1., score: 1, source_phrase_hash: 0 },
-        ],
-    }], 1, 14, 0, HashSet::new(), 200.);
+    let store1 = create_store(
+        vec![StoreEntryBuildingBlock {
+            grid_key: GridKey { phrase_id: 1, lang_set: 1 },
+            entries: vec![
+                GridEntry { id: 1, x: 2, y: 2, relev: 1., score: 1, source_phrase_hash: 0 },
+                GridEntry { id: 2, x: 12800, y: 12800, relev: 1., score: 1, source_phrase_hash: 0 },
+            ],
+        }],
+        1,
+        14,
+        0,
+        HashSet::new(),
+        200.,
+    );
 
     // Add less specific layer into a store
-    let store2 = create_store(vec![StoreEntryBuildingBlock {
-        grid_key: GridKey { phrase_id: 2, lang_set: 1 },
-        entries: vec![
-            GridEntry { id: 3, x: 0, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },
-            GridEntry { id: 4, x: 50, y: 50, relev: 1., score: 1, source_phrase_hash: 0 },
-        ],
-    }], 2, 6, 1, HashSet::new(), 200.);
+    let store2 = create_store(
+        vec![StoreEntryBuildingBlock {
+            grid_key: GridKey { phrase_id: 2, lang_set: 1 },
+            entries: vec![
+                GridEntry { id: 3, x: 0, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },
+                GridEntry { id: 4, x: 50, y: 50, relev: 1., score: 1, source_phrase_hash: 0 },
+            ],
+        }],
+        2,
+        6,
+        1,
+        HashSet::new(),
+        200.,
+    );
 
     // Subqueries with a different language set
     println!("Coalesce multi - Subqueries with different language set from grids, with proximity");
@@ -255,11 +264,7 @@ fn coalesce_multi_test_language_penalty() {
         },
     ];
 
-    let match_opts = MatchOpts {
-        zoom: 14,
-        proximity: Some([2, 2]),
-        ..MatchOpts::default()
-    };
+    let match_opts = MatchOpts { zoom: 14, proximity: Some([2, 2]), ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
     let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
@@ -291,14 +296,21 @@ fn coalesce_multi_test_language_penalty() {
 
 #[test]
 fn coalesce_single_test() {
-    let store = create_store(vec![StoreEntryBuildingBlock {
-        grid_key: GridKey { phrase_id: 1, lang_set: 1 },
-        entries: vec![
-            GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 3, source_phrase_hash: 0 },
-            GridEntry { id: 2, x: 2, y: 2, relev: 0.8, score: 3, source_phrase_hash: 0 },
-            GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 1, source_phrase_hash: 0 },
-        ],
-    }], 1, 6, 0, HashSet::new(), 40.);
+    let store = create_store(
+        vec![StoreEntryBuildingBlock {
+            grid_key: GridKey { phrase_id: 1, lang_set: 1 },
+            entries: vec![
+                GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 3, source_phrase_hash: 0 },
+                GridEntry { id: 2, x: 2, y: 2, relev: 0.8, score: 3, source_phrase_hash: 0 },
+                GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 1, source_phrase_hash: 0 },
+            ],
+        }],
+        1,
+        6,
+        0,
+        HashSet::new(),
+        40.,
+    );
     let subquery = PhrasematchSubquery {
         id: 0,
         store: &store,
@@ -366,11 +378,7 @@ fn coalesce_single_test() {
     }
     // Test opts with proximity
     println!("Coalsece single - with proximity");
-    let match_opts = MatchOpts {
-        zoom: 6,
-        proximity: Some([3, 3]),
-        ..MatchOpts::default()
-    };
+    let match_opts = MatchOpts { zoom: 6, proximity: Some([3, 3]), ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
     let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
@@ -495,11 +503,7 @@ fn coalesce_single_test() {
 
     // Test with bbox and proximity
     println!("Coalesce single - with bbox and proximity");
-    let match_opts = MatchOpts {
-        zoom: 6,
-        bbox: Some([1, 1, 1, 1]),
-        proximity: Some([1, 1]),
-    };
+    let match_opts = MatchOpts { zoom: 6, bbox: Some([1, 1, 1, 1]), proximity: Some([1, 1]) };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
     let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
@@ -548,7 +552,8 @@ fn coalesce_single_languages_test() {
     }
     builder.finish().unwrap();
 
-    let store = GridStore::new_with_options(directory.path(), 1, 6, 1, HashSet::new(), 200.).unwrap();
+    let store =
+        GridStore::new_with_options(directory.path(), 1, 6, 1, HashSet::new(), 200.).unwrap();
     // Test query with all languages
     println!("Coalesce single - all languages");
     let subquery = PhrasematchSubquery {
@@ -673,23 +678,37 @@ fn coalesce_single_languages_test() {
 #[test]
 fn coalesce_multi_test() {
     // Add more specific layer into a store
-    let store1 = create_store(vec![StoreEntryBuildingBlock {
-        grid_key: GridKey { phrase_id: 1, lang_set: 1 },
-        entries: vec![
-            GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 1, source_phrase_hash: 0 },
-            // TODO: this isn't a real tile at zoom 1. Maybe pick more realistic test case?
-            GridEntry { id: 2, x: 2, y: 2, relev: 1., score: 1, source_phrase_hash: 0 },
-        ],
-    }], 0, 1, 0, HashSet::new(), 40.);
+    let store1 = create_store(
+        vec![StoreEntryBuildingBlock {
+            grid_key: GridKey { phrase_id: 1, lang_set: 1 },
+            entries: vec![
+                GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 1, source_phrase_hash: 0 },
+                // TODO: this isn't a real tile at zoom 1. Maybe pick more realistic test case?
+                GridEntry { id: 2, x: 2, y: 2, relev: 1., score: 1, source_phrase_hash: 0 },
+            ],
+        }],
+        0,
+        1,
+        0,
+        HashSet::new(),
+        40.,
+    );
 
-    let store2 = create_store(vec![StoreEntryBuildingBlock {
-        grid_key: GridKey { phrase_id: 2, lang_set: 1 },
-        entries: vec![
-            GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 3, source_phrase_hash: 0 },
-            GridEntry { id: 2, x: 2, y: 2, relev: 1., score: 3, source_phrase_hash: 0 },
-            GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 1, source_phrase_hash: 0 },
-        ],
-    }], 1, 2, 1, HashSet::new(), 40.);
+    let store2 = create_store(
+        vec![StoreEntryBuildingBlock {
+            grid_key: GridKey { phrase_id: 2, lang_set: 1 },
+            entries: vec![
+                GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 3, source_phrase_hash: 0 },
+                GridEntry { id: 2, x: 2, y: 2, relev: 1., score: 3, source_phrase_hash: 0 },
+                GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 1, source_phrase_hash: 0 },
+            ],
+        }],
+        1,
+        2,
+        1,
+        HashSet::new(),
+        40.,
+    );
 
     let stack = vec![
         PhrasematchSubquery {
@@ -814,11 +833,7 @@ fn coalesce_multi_test() {
 
     // Test coalesce multi with proximity
     println!("Coalesce multi - with proximity");
-    let match_opts = MatchOpts {
-        zoom: 2,
-        proximity: Some([3, 3]),
-        ..MatchOpts::default()
-    };
+    let match_opts = MatchOpts { zoom: 2, proximity: Some([3, 3]), ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
     let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
@@ -916,38 +931,59 @@ fn coalesce_multi_test() {
 #[test]
 fn coalesce_multi_languages_test() {
     // Store 1 with grids in all languages
-    let store1 = create_store(vec![StoreEntryBuildingBlock {
-        grid_key: GridKey { phrase_id: 1, lang_set: ALL_LANGUAGES },
-        entries: vec![GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 1, source_phrase_hash: 0 }],
-    }], 0, 1, 0, HashSet::new(), 200.);
+    let store1 = create_store(
+        vec![StoreEntryBuildingBlock {
+            grid_key: GridKey { phrase_id: 1, lang_set: ALL_LANGUAGES },
+            entries: vec![GridEntry {
+                id: 1,
+                x: 1,
+                y: 1,
+                relev: 1.,
+                score: 1,
+                source_phrase_hash: 0,
+            }],
+        }],
+        0,
+        1,
+        0,
+        HashSet::new(),
+        200.,
+    );
 
     // Store 2 with grids in multiple language sets
-    let store2 = create_store(vec![
-        // Insert grid with lang_set 1
-        StoreEntryBuildingBlock {
-            grid_key: GridKey { phrase_id: 2, lang_set: langarray_to_langfield(&[1]) },
-            entries: vec![GridEntry {
-                id: 2,
-                x: 1,
-                y: 1,
-                relev: 1.,
-                score: 1,
-                source_phrase_hash: 0,
-            }],
-        },
-        // Insert grid with lang_set 0
-        StoreEntryBuildingBlock {
-            grid_key: GridKey { phrase_id: 2, lang_set: langarray_to_langfield(&[0]) },
-            entries: vec![GridEntry {
-                id: 3,
-                x: 1,
-                y: 1,
-                relev: 1.,
-                score: 1,
-                source_phrase_hash: 0,
-            }],
-        },
-    ], 1, 1, 1, HashSet::new(), 200.);
+    let store2 = create_store(
+        vec![
+            // Insert grid with lang_set 1
+            StoreEntryBuildingBlock {
+                grid_key: GridKey { phrase_id: 2, lang_set: langarray_to_langfield(&[1]) },
+                entries: vec![GridEntry {
+                    id: 2,
+                    x: 1,
+                    y: 1,
+                    relev: 1.,
+                    score: 1,
+                    source_phrase_hash: 0,
+                }],
+            },
+            // Insert grid with lang_set 0
+            StoreEntryBuildingBlock {
+                grid_key: GridKey { phrase_id: 2, lang_set: langarray_to_langfield(&[0]) },
+                entries: vec![GridEntry {
+                    id: 3,
+                    x: 1,
+                    y: 1,
+                    relev: 1.,
+                    score: 1,
+                    source_phrase_hash: 0,
+                }],
+            },
+        ],
+        1,
+        1,
+        1,
+        HashSet::new(),
+        200.,
+    );
 
     // Test ALL LANGUAGES
     println!("Coalesce multi - all languages");
@@ -1103,19 +1139,40 @@ fn coalesce_multi_languages_test() {
 #[test]
 fn coalesce_multi_scoredist() {
     // Add more specific layer into a store
-    let store1 = create_store(vec![StoreEntryBuildingBlock {
-        grid_key: GridKey { phrase_id: 1, lang_set: 0 },
-        entries: vec![GridEntry { id: 1, x: 0, y: 0, relev: 1., score: 1, source_phrase_hash: 0 }],
-    }], 0, 0, 0, HashSet::new(), 200.);
+    let store1 = create_store(
+        vec![StoreEntryBuildingBlock {
+            grid_key: GridKey { phrase_id: 1, lang_set: 0 },
+            entries: vec![GridEntry {
+                id: 1,
+                x: 0,
+                y: 0,
+                relev: 1.,
+                score: 1,
+                source_phrase_hash: 0,
+            }],
+        }],
+        0,
+        0,
+        0,
+        HashSet::new(),
+        200.,
+    );
 
     // Add less specific layer into a store
-    let store2 = create_store(vec![StoreEntryBuildingBlock {
-        grid_key: GridKey { phrase_id: 2, lang_set: 0 },
-        entries: vec![
-            GridEntry { id: 2, x: 4800, y: 6200, relev: 1., score: 7, source_phrase_hash: 0 },
-            GridEntry { id: 3, x: 4600, y: 6200, relev: 1., score: 1, source_phrase_hash: 0 },
-        ],
-    }], 1, 14, 1, HashSet::new(), 200.);
+    let store2 = create_store(
+        vec![StoreEntryBuildingBlock {
+            grid_key: GridKey { phrase_id: 2, lang_set: 0 },
+            entries: vec![
+                GridEntry { id: 2, x: 4800, y: 6200, relev: 1., score: 7, source_phrase_hash: 0 },
+                GridEntry { id: 3, x: 4600, y: 6200, relev: 1., score: 1, source_phrase_hash: 0 },
+            ],
+        }],
+        1,
+        14,
+        1,
+        HashSet::new(),
+        200.,
+    );
 
     let stack = vec![
         PhrasematchSubquery {
@@ -1141,11 +1198,7 @@ fn coalesce_multi_scoredist() {
     ];
     // Closer proximity to one grid
     println!("Coalesce multi - proximity very close to one grid");
-    let match_opts = MatchOpts {
-        zoom: 14,
-        proximity: Some([4601, 6200]),
-        ..MatchOpts::default()
-    };
+    let match_opts = MatchOpts { zoom: 14, proximity: Some([4601, 6200]), ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
     let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
@@ -1160,11 +1213,7 @@ fn coalesce_multi_scoredist() {
 
     // Proximity is still close to same grid, but less close
     println!("Coalesce multi - proximity less close to one grid");
-    let match_opts = MatchOpts {
-        zoom: 14,
-        proximity: Some([4610, 6200]),
-        ..MatchOpts::default()
-    };
+    let match_opts = MatchOpts { zoom: 14, proximity: Some([4610, 6200]), ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
     let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
@@ -1181,28 +1230,49 @@ fn coalesce_multi_scoredist() {
 // TODO: language tests
 #[test]
 fn coalesce_multi_test_bbox() {
-    let store1 = create_store(vec![StoreEntryBuildingBlock {
-        grid_key: GridKey { phrase_id: 1, lang_set: ALL_LANGUAGES },
-        entries: vec![
-            GridEntry { id: 1, x: 0, y: 0, relev: 0.8, score: 1, source_phrase_hash: 0 },
-            GridEntry { id: 2, x: 1, y: 1, relev: 1., score: 1, source_phrase_hash: 0 },
-        ],
-    }], 0, 1, 0, HashSet::new(), 200.);
-    let store2 = create_store(vec![StoreEntryBuildingBlock {
-        grid_key: GridKey { phrase_id: 2, lang_set: ALL_LANGUAGES },
-        entries: vec![
-            GridEntry { id: 3, x: 3, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },
-            GridEntry { id: 4, x: 0, y: 3, relev: 1., score: 1, source_phrase_hash: 0 },
-        ],
-    }], 1, 2, 1, HashSet::new(), 200.);
+    let store1 = create_store(
+        vec![StoreEntryBuildingBlock {
+            grid_key: GridKey { phrase_id: 1, lang_set: ALL_LANGUAGES },
+            entries: vec![
+                GridEntry { id: 1, x: 0, y: 0, relev: 0.8, score: 1, source_phrase_hash: 0 },
+                GridEntry { id: 2, x: 1, y: 1, relev: 1., score: 1, source_phrase_hash: 0 },
+            ],
+        }],
+        0,
+        1,
+        0,
+        HashSet::new(),
+        200.,
+    );
+    let store2 = create_store(
+        vec![StoreEntryBuildingBlock {
+            grid_key: GridKey { phrase_id: 2, lang_set: ALL_LANGUAGES },
+            entries: vec![
+                GridEntry { id: 3, x: 3, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },
+                GridEntry { id: 4, x: 0, y: 3, relev: 1., score: 1, source_phrase_hash: 0 },
+            ],
+        }],
+        1,
+        2,
+        1,
+        HashSet::new(),
+        200.,
+    );
 
-    let store3 = create_store(vec![StoreEntryBuildingBlock {
-        grid_key: GridKey { phrase_id: 3, lang_set: ALL_LANGUAGES },
-        entries: vec![
-            GridEntry { id: 5, x: 21, y: 7, relev: 1., score: 1, source_phrase_hash: 0 },
-            GridEntry { id: 6, x: 21, y: 18, relev: 1., score: 1, source_phrase_hash: 0 },
-        ],
-    }], 2, 5, 2, HashSet::new(), 200.);
+    let store3 = create_store(
+        vec![StoreEntryBuildingBlock {
+            grid_key: GridKey { phrase_id: 3, lang_set: ALL_LANGUAGES },
+            entries: vec![
+                GridEntry { id: 5, x: 21, y: 7, relev: 1., score: 1, source_phrase_hash: 0 },
+                GridEntry { id: 6, x: 21, y: 18, relev: 1., score: 1, source_phrase_hash: 0 },
+            ],
+        }],
+        2,
+        5,
+        2,
+        HashSet::new(),
+        200.,
+    );
 
     let stack = vec![
         PhrasematchSubquery {

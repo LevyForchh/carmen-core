@@ -155,8 +155,7 @@ fn decode_matching_value<T: AsRef<[u8]>>(
 
                     let (distance, within_radius, scoredist) = match &match_opts {
                         MatchOpts { proximity: Some(prox_pt), zoom, .. } => {
-                            let distance =
-                                spatial::tile_dist(prox_pt[0], prox_pt[1], x, y);
+                            let distance = spatial::tile_dist(prox_pt[0], prox_pt[1], x, y);
                             (
                                 distance,
                                 // The proximity radius calculation is also done in scoredist
@@ -342,7 +341,8 @@ impl GridStore {
 
         for (key, value) in db_iter {
             let matches_language = match_key.matches_language(&key).unwrap();
-            let mut entry_iter = decode_matching_value(value, &match_opts, matches_language, self.coalesce_radius);
+            let mut entry_iter =
+                decode_matching_value(value, &match_opts, matches_language, self.coalesce_radius);
             if let Some(next_entry) = entry_iter.next() {
                 let queue_element = QueueElement { next_entry, entry_iter };
                 if pri_queue.len() >= max_values {
