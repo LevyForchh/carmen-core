@@ -474,14 +474,7 @@ tape('Deserialize phrasematch results', (t) => {
     builder.finish();
     const store = new addon.GridStore(tmpDir.name, { idx: 0, zoom: 14, non_overlapping_indexes: [], type_id: 0, coalesce_radius: 200 });
     let phrasematchResults = [
-        {
-            'phrasematches': [
-                new Phrasematch(store, ['main', 'street'], 'main street', 1, [0, 2], 1, 0, 14, 6, 1, false, false, false, 0, ['main', 'street'], 0, 14, [0], 1)
-            ],
-            idx: 0,
-            nmask: 14,
-            bmask: [0]
-        }
+        new Phrasematch(store, ['main', 'street'], 'main street', 1, [0, 2], 1, 0, 14, 6, 1, false, false, false, 0, ['main', 'street'], 0, 14, [0], 1)
     ];
     addon.stackable(phrasematchResults);
     t.end();

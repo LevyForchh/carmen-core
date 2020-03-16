@@ -21,7 +21,7 @@ pub struct StackableNode<T: Borrow<GridStore> + Clone + Debug> {
 }
 
 pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
-    phrasematch_results: &Vec<Vec<PhrasematchSubquery<T>>>,
+    phrasematch_results: &Vec<PhrasematchSubquery<T>>,
     phrasematch_result: Option<PhrasematchSubquery<T>>,
     nmask: u32,
     bmask: HashSet<u16>,
@@ -41,41 +41,39 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
         zoom: zoom,
     };
 
-    for phrasematch_per_index in phrasematch_results.iter() {
-        for phrasematches in phrasematch_per_index.iter() {
-            if node.phrasematch.is_some() {
-                if node.zoom > phrasematches.store.borrow().zoom {
+    for phrasematches in phrasematch_results.iter() {
+        if node.phrasematch.is_some() {
+            if node.zoom > phrasematches.store.borrow().zoom {
+                continue;
+            } else if node.zoom == phrasematches.store.borrow().zoom {
+                if node.idx > phrasematches.store.borrow().idx {
                     continue;
-                } else if node.zoom == phrasematches.store.borrow().zoom {
-                    if node.idx > phrasematches.store.borrow().idx {
-                        continue;
-                    }
                 }
             }
+        }
 
-            if (node.nmask & (1u32 << phrasematches.store.borrow().type_id)) == 0
-                && (node.mask & phrasematches.mask) == 0
-                && phrasematches.store.borrow().non_overlapping_indexes.contains(&node.idx) == false
-            {
-                let target_nmask = &(1u32 << phrasematches.store.borrow().type_id) | node.nmask;
-                let target_mask = &phrasematches.mask | node.mask;
-                let mut target_bmask: HashSet<u16> = node.bmask.iter().cloned().collect();
-                let phrasematch_bmask: HashSet<u16> =
-                    phrasematches.store.borrow().non_overlapping_indexes.iter().cloned().collect();
-                target_bmask.extend(&phrasematch_bmask);
-                let target_relev = 0.0 + &phrasematches.weight;
+        if (node.nmask & (1u32 << phrasematches.store.borrow().type_id)) == 0
+            && (node.mask & phrasematches.mask) == 0
+            && phrasematches.store.borrow().non_overlapping_indexes.contains(&node.idx) == false
+        {
+            let target_nmask = &(1u32 << phrasematches.store.borrow().type_id) | node.nmask;
+            let target_mask = &phrasematches.mask | node.mask;
+            let mut target_bmask: HashSet<u16> = node.bmask.iter().cloned().collect();
+            let phrasematch_bmask: HashSet<u16> =
+                phrasematches.store.borrow().non_overlapping_indexes.iter().cloned().collect();
+            target_bmask.extend(&phrasematch_bmask);
+            let target_relev = 0.0 + &phrasematches.weight;
 
-                node.children.push(stackable(
-                    &phrasematch_results,
-                    Some(phrasematches.clone()),
-                    target_nmask,
-                    target_bmask,
-                    target_mask,
-                    phrasematches.store.borrow().idx,
-                    target_relev,
-                    phrasematches.store.borrow().zoom,
-                ));
-            }
+            node.children.push(stackable(
+                phrasematch_results,
+                Some(phrasematches.clone()),
+                target_nmask,
+                target_bmask,
+                target_mask,
+                phrasematches.store.borrow().idx,
+                target_relev,
+                phrasematches.store.borrow().zoom,
+            ));
         }
     }
 
@@ -134,7 +132,7 @@ mod test {
             mask: 1,
         };
 
-        let phrasematch_results = vec![vec![a1, b1, b2]];
+        let phrasematch_results = vec![a1, b1, b2];
         stackable(&phrasematch_results, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     }
 }

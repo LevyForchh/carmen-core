@@ -46,7 +46,7 @@ impl Task for CoalesceTask {
 }
 
 struct StackAndCoalesceTask {
-    argument: (Vec<Vec<PhrasematchSubquery<ArcGridStore>>>, MatchOpts),
+    argument: (Vec<PhrasematchSubquery<ArcGridStore>>, MatchOpts),
 }
 
 impl Task for StackAndCoalesceTask {
@@ -455,8 +455,8 @@ pub fn js_coalesce(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 pub fn js_stack_and_coalesce(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let js_phrase_subq = { cx.argument::<JsArray>(0)? };
     let js_match_ops = { cx.argument::<JsValue>(1)? };
-    let phrase_subq: Vec<Vec<PhrasematchSubquery<ArcGridStore>>> =
-        deserialize_phrasematch_results(&mut cx, js_phrase_subq)?;
+    let phrase_subq: Vec<PhrasematchSubquery<ArcGridStore>> =
+        deserialize_phrasesubq(&mut cx, js_phrase_subq)?;
     let match_opts: MatchOpts = neon_serde::from_value(&mut cx, js_match_ops)?;
     let cb = cx.argument::<JsFunction>(2)?;
 
@@ -511,57 +511,11 @@ where
 
 pub fn js_stackable(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let js_phrasematch_result = { cx.argument::<JsArray>(0)? };
-    let phrasematch_results: Vec<Vec<PhrasematchSubquery<ArcGridStore>>> =
-        deserialize_phrasematch_results(&mut cx, js_phrasematch_result)?;
+    let phrasematch_results: Vec<PhrasematchSubquery<ArcGridStore>> =
+        deserialize_phrasesubq(&mut cx, js_phrasematch_result)?;
     stackable(&phrasematch_results, None, 0, HashSet::new(), 0, 129, 0.0, 0);
 
     Ok(cx.undefined())
-}
-
-
-fn deserialize_phrasematch_results<'j, C: Context<'j>>(
-    cx: &mut C,
-    js_phrasematch_per_index: Handle<'j, JsArray>,
-) -> LibResult<Vec<Vec<PhrasematchSubquery<ArcGridStore>>>> {
-    let mut phrasematch_results_by_index: Vec<Vec<PhrasematchSubquery<ArcGridStore>>> = Vec::new();
-    for i in 0..js_phrasematch_per_index.len() {
-        let js_phrasematch = js_phrasematch_per_index.get(cx, i)?.downcast::<JsObject>().or_throw(cx)?;
-        let phrasematch_array = js_phrasematch.get(cx, "phrasematches")?.downcast::<JsArray>().or_throw(cx)?;
-
-        let phrasematch_array_length = phrasematch_array.len();
-        let mut phrasematches: Vec<PhrasematchSubquery<ArcGridStore>> = Vec::with_capacity(phrasematch_array_length as usize);
-
-        for j in 0..phrasematch_array_length {
-        let js_phrasematch_obj =
-            phrasematch_array.get(cx, j)?.downcast::<JsObject>().or_throw(cx)?;
-        let js_gridstore = js_phrasematch_obj.get(cx, "store")?.downcast::<JsGridStore>().or_throw(cx)?;
-            let gridstore = {
-                let guard = cx.lock();
-                // shallow clone of the Arc
-                let gridstore_clone = js_gridstore.borrow(&guard).clone();
-                gridstore_clone
-            };
-
-        let weight = js_phrasematch_obj.get(cx, "weight")?;
-        let mask = js_phrasematch_obj.get(cx, "mask")?;
-        let match_key = js_phrasematch_obj.get(cx, "match_key")?.downcast::<JsObject>().or_throw(cx)?;
-        let match_phrase = match_key.get(cx, "match_phrase")?;
-        let js_lang_set = match_key.get(cx, "lang_set")?;
-        let lang_set: u128 = langarray_to_langset(cx, js_lang_set)?;
-        let id = js_phrasematch_obj.get(cx, "id")?;
-
-        let subq = PhrasematchSubquery {
-            store: gridstore,
-            weight: neon_serde::from_value(cx, weight)?,
-            match_key: MatchKey { match_phrase: neon_serde::from_value(cx, match_phrase)?, lang_set },
-            mask: neon_serde::from_value(cx, mask)?,
-            id: neon_serde::from_value(cx, id)?,
-        };
-            phrasematches.push(subq);
-        }
-        phrasematch_results_by_index.push(phrasematches);
-    }
-    Ok(phrasematch_results_by_index)
 }
 
 #[inline(always)]

@@ -590,11 +590,11 @@ fn tree_recurse<T: Borrow<GridStore> + Clone + Debug>(
 }
 
 pub fn stack_and_coalesce<T: Borrow<GridStore> + Clone + Debug>(
-    phrasematches: &Vec<Vec<PhrasematchSubquery<T>>>,
+    phrasematches: &Vec<PhrasematchSubquery<T>>,
     match_opts: &MatchOpts,
 ) -> Result<Vec<CoalesceContext>, Error> {
     // currently stackable requires double-wrapping the phrasematches vector, which requires an
     // extra clone; ideally we wouldn't do that
-    let tree = stackable(&phrasematches, None, 0, HashSet::new(), 0, 129, 0.0, 0);
+    let tree = stackable(phrasematches, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     tree_coalesce(&tree, &match_opts)
 }

@@ -11,7 +11,7 @@ use rusoto_core::Region;
 use rusoto_s3::{GetObjectRequest, S3Client, S3};
 use serde::{Deserialize, Serialize};
 
-use std::collections::{ HashMap, HashSet };
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs::{self, File};
 use std::io::{self, BufRead, BufWriter, Read, Write};
@@ -66,7 +66,15 @@ pub fn create_store(
         builder.insert(&build_block.grid_key, build_block.entries).expect("Unable to insert");
     }
     builder.finish().unwrap();
-    GridStore::new_with_options(directory.path(), idx, zoom, type_id, non_overlapping_indexes, coalesce_radius).unwrap()
+    GridStore::new_with_options(
+        directory.path(),
+        idx,
+        zoom,
+        type_id,
+        non_overlapping_indexes,
+        coalesce_radius,
+    )
+    .unwrap()
 }
 
 // Gets the absolute path for a path relative to the carmen-core dir
