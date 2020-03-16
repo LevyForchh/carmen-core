@@ -94,15 +94,9 @@ impl MatchKey {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct Proximity {
-    pub point: [u16; 2],
-    pub radius: f64,
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct MatchOpts {
     pub bbox: Option<[u16; 4]>,
-    pub proximity: Option<Proximity>,
+    pub proximity: Option<[u16; 2]>,
     pub zoom: u16,
 }
 
@@ -118,18 +112,15 @@ impl MatchOpts {
             self.clone()
         } else {
             let adjusted_proximity = match &self.proximity {
-                Some(orig_proximity) => {
+                Some([x, y]) => {
                     if target_z < self.zoom {
                         // If this is a zoom out, divide by 2 for every level of zooming out.
                         let zoom_levels = self.zoom - target_z;
-                        Some(Proximity {
-                            // Shifting to the right by a number is the same as dividing by 2 that number of times.
-                            point: [
-                                orig_proximity.point[0] >> zoom_levels,
-                                orig_proximity.point[1] >> zoom_levels,
-                            ],
-                            radius: orig_proximity.radius,
-                        })
+                        // Shifting to the right by a number is the same as dividing by 2 that number of times.
+                        Some([
+                            x >> zoom_levels,
+                            y >> zoom_levels,
+                        ])
                     } else {
                         // If this is a zoom in, choose the closest to the middle of the possible tiles at the higher zoom level.
                         // The scale of the coordinates for zooming in is 2^(difference in zs).
@@ -137,15 +128,10 @@ impl MatchOpts {
                         // Pick a coordinate halfway between the possible higher zoom tiles,
                         // subtracting one to pick the one on the top left of the four middle tiles for consistency.
                         let mid_coord_adjuster = scale_multiplier / 2 - 1;
-                        let adjusted_x =
-                            orig_proximity.point[0] * scale_multiplier + mid_coord_adjuster;
-                        let adjusted_y =
-                            orig_proximity.point[1] * scale_multiplier + mid_coord_adjuster;
+                        let adjusted_x = x * scale_multiplier + mid_coord_adjuster;
+                        let adjusted_y = y * scale_multiplier + mid_coord_adjuster;
 
-                        Some(Proximity {
-                            point: [adjusted_x, adjusted_y],
-                            radius: orig_proximity.radius,
-                        })
+                        Some([adjusted_x, adjusted_y])
                     }
                 }
                 None => None,
