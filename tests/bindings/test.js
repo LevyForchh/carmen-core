@@ -223,7 +223,7 @@ tape('Coalesce single valid stack - Valid inputs', (t) => {
         ]
     );
     builder.finish();
-    const reader = new addon.GridStore(tmpDir.name, { idx: 1, zoom: 14, non_overlapping_indexes: [], type_id: 0, coalesce_radius: 200 });
+    const reader = new addon.GridStore(tmpDir.name, { idx: 1, zoom: 14, non_overlapping_indexes: Array.from(new Set()), type_id: 0, coalesce_radius: 200 });
 
     const valid_stack = [{
         store: reader,
@@ -271,7 +271,7 @@ tape('Coalesce multi valid stack - Valid inputs', (t) => {
         ]
     );
     builder1.finish();
-    const reader1 = new addon.GridStore(tmpDir1.name, { idx: 0, zoom: 1, non_overlapping_indexes: [], type_id: 0, coalesce_radius: 200 });
+    const reader1 = new addon.GridStore(tmpDir1.name, { idx: 0, zoom: 1, non_overlapping_indexes: Array.from(new Set()), type_id: 0, coalesce_radius: 200 });
 
     const tmpDir2 = tmp.dirSync();
     const builder2 = new addon.GridStoreBuilder(tmpDir2.name);
@@ -282,7 +282,7 @@ tape('Coalesce multi valid stack - Valid inputs', (t) => {
         ]
     );
     builder2.finish();
-    const reader2 = new addon.GridStore(tmpDir2.name, { idx: 1, zoom: 2, non_overlapping_indexes: [], type_id: 1, coalesce_radius: 200 });
+    const reader2 = new addon.GridStore(tmpDir2.name, { idx: 1, zoom: 2, non_overlapping_indexes: Array.from(new Set()), type_id: 1, coalesce_radius: 200 });
 
     const valid_coalesce_multi = [{
         store: reader1,
@@ -413,8 +413,8 @@ tape('Bin boundaries', (t) => {
     builderWithBoundaries.finish();
     builderWithoutBoundaries.finish();
 
-    const readerWithBoundaries = new addon.GridStore(directoryWithBoundaries.name, { idx: 1, zoom: 14, non_overlapping_indexes: [], type_id: 0, coalesce_radius: 200 });
-    const readerWithoutBoundaries = new addon.GridStore(directoryWithoutBoundaries.name, { idx: 1, zoom: 14, non_overlapping_indexes: [], type_id: 0, coalesce_radius: 200 });
+    const readerWithBoundaries = new addon.GridStore(directoryWithBoundaries.name, { idx: 1, zoom: 14, non_overlapping_indexes: Array.from(new Set()), type_id: 0, coalesce_radius: 200 });
+    const readerWithoutBoundaries = new addon.GridStore(directoryWithoutBoundaries.name, { idx: 1, zoom: 14, non_overlapping_indexes: Array.from(new Set()), type_id: 0, coalesce_radius: 200 });
 
     const findRange = (prefix) => {
         let start = null,
@@ -472,7 +472,7 @@ tape('Deserialize phrasematch results', (t) => {
         ]
     );
     builder.finish();
-    const store = new addon.GridStore(tmpDir.name, { idx: 0, zoom: 14, non_overlapping_indexes: [], type_id: 0, coalesce_radius: 200 });
+    const store = new addon.GridStore(tmpDir.name, { idx: 0, zoom: 14, non_overlapping_indexes: Array.from(new Set()), type_id: 0, coalesce_radius: 200 });
     let phrasematchResults = [
         new Phrasematch(store, ['main', 'street'], 'main street', 1, [0, 2], 1, 0, 14, 6, 1, false, false, false, 0, ['main', 'street'], 0, 14, [0], 1)
     ];
