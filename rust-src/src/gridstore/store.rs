@@ -20,6 +20,12 @@ pub struct GridStore {
     db: DB,
     bin_boundaries: HashSet<u32>,
     pub path: PathBuf,
+    // options:
+    pub idx: u16,
+    pub zoom: u16,
+    pub type_id: u16,
+    pub non_overlapping_indexes: HashSet<u16>, // the field formerly known as bmask
+    pub coalesce_radius: f64,
 }
 
 #[inline]
@@ -72,6 +78,7 @@ fn decode_matching_value<T: AsRef<[u8]>>(
     value: T,
     match_opts: &MatchOpts,
     matches_language: bool,
+    coalesce_radius: f64,
 ) -> impl Iterator<Item = MatchEntry> {
     let match_opts = match_opts.clone();
 
@@ -123,14 +130,14 @@ fn decode_matching_value<T: AsRef<[u8]>>(
                             }
                         }
                         MatchOpts { bbox: None, proximity: Some(prox_pt), .. } => {
-                            match spatial::proximity(coords_vec, prox_pt.point) {
+                            match spatial::proximity(coords_vec, *prox_pt) {
                                 Some(v) => Some(Box::new(v)
                                     as Box<dyn Iterator<Item = gridstore_format::Coord>>),
                                 None => None,
                             }
                         }
                         MatchOpts { bbox: Some(bbox), proximity: Some(prox_pt), .. } => {
-                            match spatial::bbox_proximity_filter(coords_vec, *bbox, prox_pt.point) {
+                            match spatial::bbox_proximity_filter(coords_vec, *bbox, *prox_pt) {
                                 Some(v) => Some(Box::new(v)
                                     as Box<dyn Iterator<Item = gridstore_format::Coord>>),
                                 None => None,
@@ -148,14 +155,13 @@ fn decode_matching_value<T: AsRef<[u8]>>(
 
                     let (distance, within_radius, scoredist) = match &match_opts {
                         MatchOpts { proximity: Some(prox_pt), zoom, .. } => {
-                            let distance =
-                                spatial::tile_dist(prox_pt.point[0], prox_pt.point[1], x, y);
+                            let distance = spatial::tile_dist(prox_pt[0], prox_pt[1], x, y);
                             (
                                 distance,
                                 // The proximity radius calculation is also done in scoredist
                                 // There could be an opportunity to optimize by doing it once
-                                distance <= spatial::proximity_radius(*zoom, prox_pt.radius),
-                                spatial::scoredist(*zoom, distance, score, prox_pt.radius),
+                                distance <= spatial::proximity_radius(*zoom, coalesce_radius),
+                                spatial::scoredist(*zoom, distance, score, coalesce_radius),
                             )
                         }
                         _ => (0f64, false, score as f64),
@@ -245,6 +251,17 @@ impl<T: Iterator<Item = MatchEntry>> Eq for QueueElement<T> {}
 
 impl GridStore {
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
+        GridStore::new_with_options(path, 0, 6, 0, HashSet::new(), 0.0)
+    }
+
+    pub fn new_with_options<P: AsRef<Path>>(
+        path: P,
+        idx: u16,
+        zoom: u16,
+        type_id: u16,
+        non_overlapping_indexes: HashSet<u16>,
+        coalesce_radius: f64,
+    ) -> Result<Self, Error> {
         let path = path.as_ref().to_owned();
         let mut opts = Options::default();
         opts.set_read_only(true);
@@ -268,7 +285,16 @@ impl GridStore {
             None => HashSet::new(),
         };
 
-        Ok(GridStore { db, path, bin_boundaries })
+        Ok(GridStore {
+            db,
+            path,
+            bin_boundaries,
+            idx,
+            zoom,
+            type_id,
+            non_overlapping_indexes,
+            coalesce_radius,
+        })
     }
 
     #[inline(never)]
@@ -315,7 +341,8 @@ impl GridStore {
 
         for (key, value) in db_iter {
             let matches_language = match_key.matches_language(&key).unwrap();
-            let mut entry_iter = decode_matching_value(value, &match_opts, matches_language);
+            let mut entry_iter =
+                decode_matching_value(value, &match_opts, matches_language, self.coalesce_radius);
             if let Some(next_entry) = entry_iter.next() {
                 let queue_element = QueueElement { next_entry, entry_iter };
                 if pri_queue.len() >= max_values {

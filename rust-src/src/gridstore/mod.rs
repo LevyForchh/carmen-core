@@ -16,7 +16,7 @@ pub use store::*;
 mod tests {
     use super::*;
     use once_cell::sync::Lazy;
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, HashSet};
 
     #[test]
     fn combined_test() {
@@ -193,7 +193,8 @@ mod tests {
 
         builder.finish().unwrap();
 
-        let reader = GridStore::new(directory.path()).unwrap();
+        let reader =
+            GridStore::new_with_options(directory.path(), 0, 14, 0, HashSet::new(), 1000.).unwrap();
 
         let search_key =
             MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 2 }, lang_set: 1 };
@@ -389,11 +390,7 @@ mod tests {
         let records: Vec<_> = reader
             .streaming_get_matching(
                 &search_key,
-                &MatchOpts {
-                    bbox: None,
-                    proximity: Some(Proximity { point: [26, 1], radius: 1000. }),
-                    ..MatchOpts::default()
-                },
+                &MatchOpts { bbox: None, proximity: Some([26, 1]), ..MatchOpts::default() },
                 MAX_CONTEXTS,
             )
             .unwrap()
@@ -424,7 +421,7 @@ mod tests {
                 &search_key,
                 &MatchOpts {
                     bbox: Some([10, 0, 41, 2]),
-                    proximity: Some(Proximity { point: [26, 1], radius: 1000. }),
+                    proximity: Some([26, 1]),
                     ..MatchOpts::default()
                 },
                 MAX_CONTEXTS,
@@ -510,9 +507,24 @@ mod tests {
         builder_with_boundaries.finish().unwrap();
         builder_without_boundaries.finish().unwrap();
 
-        let reader_with_boundaries = GridStore::new(directory_with_boundaries.path()).unwrap();
-        let reader_without_boundaries =
-            GridStore::new(directory_without_boundaries.path()).unwrap();
+        let reader_with_boundaries = GridStore::new_with_options(
+            directory_with_boundaries.path(),
+            0,
+            14,
+            0,
+            HashSet::new(),
+            200.,
+        )
+        .unwrap();
+        let reader_without_boundaries = GridStore::new_with_options(
+            directory_without_boundaries.path(),
+            0,
+            14,
+            0,
+            HashSet::new(),
+            200.,
+        )
+        .unwrap();
 
         (
             reader_with_boundaries,
@@ -645,14 +657,13 @@ mod tests {
         .into_iter()
         .map(|(reader, range)| {
             let subquery = PhrasematchSubquery {
+                id: 0,
                 store: reader,
                 weight: 1.,
                 match_key: MatchKey {
                     match_phrase: MatchPhrase::Range { start: range.0, end: range.1 },
                     lang_set: 1,
                 },
-                idx: 1,
-                zoom: 14,
                 mask: 1 << 0,
             };
             let stack = vec![subquery];

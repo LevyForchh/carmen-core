@@ -22,20 +22,13 @@ fn coalesce_single_test_proximity_quadrants() {
 
     builder.finish().unwrap();
 
-    let store = GridStore::new(directory.path()).unwrap();
-    let subquery = PhrasematchResults {
+    let store =
+        GridStore::new_with_options(directory.path(), 1, 14, 1, HashSet::new(), 200.).unwrap();
+    let subquery = PhrasematchSubquery {
         id: 0,
-        scorefactor: 0,
-        prefix: 0,
-        nmask: 1,
-        bmask: HashSet::new(),
-        edit_multiplier: 1.0,
-        subquery_edit_distance: 0,
         store: &store,
         weight: 1.,
         match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 },
-        idx: 1,
-        zoom: 14,
         mask: 1 << 0,
     };
     let stack = vec![subquery];
@@ -43,11 +36,11 @@ fn coalesce_single_test_proximity_quadrants() {
     println!("Coalesce single - NE proximity");
     let match_opts = MatchOpts {
         zoom: 14,
-        proximity: Some(Proximity { point: [110, 115], radius: 200. }), // NE proximity point
+        proximity: Some([110, 115]), // NE proximity point
         ..MatchOpts::default()
     };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0, 0);
+    let tree = stackable(&stack, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
     assert_eq!(result, tree_result);
     let result_ids: Vec<u32> =
@@ -60,11 +53,11 @@ fn coalesce_single_test_proximity_quadrants() {
     println!("Coalesce single - SE proximity");
     let match_opts = MatchOpts {
         zoom: 14,
-        proximity: Some(Proximity { point: [110, 85], radius: 200. }), // SE proximity point
+        proximity: Some([110, 85]), // SE proximity point
         ..MatchOpts::default()
     };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0, 0);
+    let tree = stackable(&stack, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
     assert_eq!(result, tree_result);
     let result_ids: Vec<u32> =
@@ -77,11 +70,11 @@ fn coalesce_single_test_proximity_quadrants() {
     println!("Coalesce single - SW proximity");
     let match_opts = MatchOpts {
         zoom: 14,
-        proximity: Some(Proximity { point: [90, 85], radius: 200. }), // SW proximity point
+        proximity: Some([90, 85]), // SW proximity point
         ..MatchOpts::default()
     };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0, 0);
+    let tree = stackable(&stack, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
     assert_eq!(result, tree_result);
     let result_ids: Vec<u32> =
@@ -94,11 +87,11 @@ fn coalesce_single_test_proximity_quadrants() {
     println!("Coalesce single - NW proximity");
     let match_opts = MatchOpts {
         zoom: 14,
-        proximity: Some(Proximity { point: [90, 115], radius: 200. }), // NW proximity point
+        proximity: Some([90, 115]), // NW proximity point
         ..MatchOpts::default()
     };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0, 0);
+    let tree = stackable(&stack, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
     assert_eq!(result, tree_result);
     let result_ids: Vec<u32> =
@@ -126,30 +119,19 @@ fn coalesce_single_test_proximity_basic() {
 
     builder.finish().unwrap();
 
-    let store = GridStore::new(directory.path()).unwrap();
-    let subquery = PhrasematchResults {
+    let store =
+        GridStore::new_with_options(directory.path(), 1, 14, 1, HashSet::new(), 200.).unwrap();
+    let subquery = PhrasematchSubquery {
         id: 0,
-        scorefactor: 0,
-        prefix: 0,
-        nmask: 1,
-        bmask: HashSet::new(),
-        edit_multiplier: 1.0,
-        subquery_edit_distance: 0,
         store: &store,
         weight: 1.,
         match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 },
-        idx: 1,
-        zoom: 14,
         mask: 1 << 0,
     };
     let stack = vec![subquery];
-    let match_opts = MatchOpts {
-        zoom: 14,
-        proximity: Some(Proximity { point: [2, 2], radius: 400. }),
-        ..MatchOpts::default()
-    };
+    let match_opts = MatchOpts { zoom: 14, proximity: Some([2, 2]), ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0, 0);
+    let tree = stackable(&stack, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
     assert_eq!(result, tree_result);
     let result_ids: Vec<u32> =
@@ -185,30 +167,19 @@ fn coalesce_single_test_language_penalty() {
     builder.insert(&key, entries).expect("Unable to insert record");
     builder.finish().unwrap();
 
-    let store = GridStore::new(directory.path()).unwrap();
-    let subquery = PhrasematchResults {
+    let store =
+        GridStore::new_with_options(directory.path(), 1, 14, 1, HashSet::new(), 1.).unwrap();
+    let subquery = PhrasematchSubquery {
         id: 0,
-        scorefactor: 0,
-        prefix: 0,
-        nmask: 1,
-        bmask: HashSet::new(),
-        edit_multiplier: 1.0,
-        subquery_edit_distance: 0,
         store: &store,
         weight: 1.,
         match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 2 },
-        idx: 1,
-        zoom: 14,
         mask: 1 << 0,
     };
     let stack = vec![subquery.clone()];
-    let match_opts = MatchOpts {
-        zoom: 14,
-        proximity: Some(Proximity { point: [2, 2], radius: 1. }),
-        ..MatchOpts::default()
-    };
+    let match_opts = MatchOpts { zoom: 14, proximity: Some([2, 2]), ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0, 0);
+    let tree = stackable(&stack, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
     assert_eq!(result, tree_result);
     #[cfg_attr(rustfmt, rustfmt::skip)]
@@ -223,7 +194,7 @@ fn coalesce_single_test_language_penalty() {
     let match_opts = MatchOpts { zoom: 14, ..MatchOpts::default() };
     let stack = vec![subquery.clone()];
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0, 0);
+    let tree = stackable(&stack, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
     assert_eq!(result, tree_result);
     #[cfg_attr(rustfmt, rustfmt::skip)]
@@ -237,71 +208,65 @@ fn coalesce_single_test_language_penalty() {
 #[test]
 fn coalesce_multi_test_language_penalty() {
     // Add more specific layer into a store
-    let store1 = create_store(vec![StoreEntryBuildingBlock {
-        grid_key: GridKey { phrase_id: 1, lang_set: 1 },
-        entries: vec![
-            GridEntry { id: 1, x: 2, y: 2, relev: 1., score: 1, source_phrase_hash: 0 },
-            GridEntry { id: 2, x: 12800, y: 12800, relev: 1., score: 1, source_phrase_hash: 0 },
-        ],
-    }]);
+    let store1 = create_store(
+        vec![StoreEntryBuildingBlock {
+            grid_key: GridKey { phrase_id: 1, lang_set: 1 },
+            entries: vec![
+                GridEntry { id: 1, x: 2, y: 2, relev: 1., score: 1, source_phrase_hash: 0 },
+                GridEntry { id: 2, x: 12800, y: 12800, relev: 1., score: 1, source_phrase_hash: 0 },
+            ],
+        }],
+        1,
+        14,
+        0,
+        HashSet::new(),
+        200.,
+    );
 
     // Add less specific layer into a store
-    let store2 = create_store(vec![StoreEntryBuildingBlock {
-        grid_key: GridKey { phrase_id: 2, lang_set: 1 },
-        entries: vec![
-            GridEntry { id: 3, x: 0, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },
-            GridEntry { id: 4, x: 50, y: 50, relev: 1., score: 1, source_phrase_hash: 0 },
-        ],
-    }]);
+    let store2 = create_store(
+        vec![StoreEntryBuildingBlock {
+            grid_key: GridKey { phrase_id: 2, lang_set: 1 },
+            entries: vec![
+                GridEntry { id: 3, x: 0, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },
+                GridEntry { id: 4, x: 50, y: 50, relev: 1., score: 1, source_phrase_hash: 0 },
+            ],
+        }],
+        2,
+        6,
+        1,
+        HashSet::new(),
+        200.,
+    );
 
     // Subqueries with a different language set
     println!("Coalesce multi - Subqueries with different language set from grids, with proximity");
     let stack = vec![
-        PhrasematchResults {
+        PhrasematchSubquery {
             id: 0,
-            scorefactor: 0,
-            prefix: 0,
-            nmask: 1,
-            bmask: HashSet::new(),
-            edit_multiplier: 1.0,
-            subquery_edit_distance: 0,
             store: &store1,
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                 lang_set: 2,
             },
-            idx: 1,
-            zoom: 14,
             mask: 1 << 0,
         },
-        PhrasematchResults {
+        PhrasematchSubquery {
             id: 0,
-            scorefactor: 0,
-            prefix: 0,
-            nmask: 2,
-            bmask: HashSet::new(),
-            edit_multiplier: 1.0,
-            subquery_edit_distance: 0,
             store: &store2,
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                 lang_set: 2,
             },
-            idx: 2,
-            zoom: 6,
             mask: 1 << 1,
         },
     ];
 
-    let match_opts = MatchOpts {
-        zoom: 14,
-        proximity: Some(Proximity { point: [2, 2], radius: 1. }),
-        ..MatchOpts::default()
-    };
+    let match_opts = MatchOpts { zoom: 14, proximity: Some([2, 2]), ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0, 0);
+    let tree = stackable(&stack, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
     assert_eq!(result, tree_result);
     #[cfg_attr(rustfmt, rustfmt::skip)]
@@ -318,7 +283,7 @@ fn coalesce_multi_test_language_penalty() {
     println!("Coalesce multi - Subqueires with different lang set from grids, no proximity");
     let match_opts = MatchOpts { zoom: 14, ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0, 0);
+    let tree = stackable(&stack, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
     assert_eq!(result, tree_result);
     #[cfg_attr(rustfmt, rustfmt::skip)]
@@ -331,27 +296,26 @@ fn coalesce_multi_test_language_penalty() {
 
 #[test]
 fn coalesce_single_test() {
-    let store = create_store(vec![StoreEntryBuildingBlock {
-        grid_key: GridKey { phrase_id: 1, lang_set: 1 },
-        entries: vec![
-            GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 3, source_phrase_hash: 0 },
-            GridEntry { id: 2, x: 2, y: 2, relev: 0.8, score: 3, source_phrase_hash: 0 },
-            GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 1, source_phrase_hash: 0 },
-        ],
-    }]);
-    let subquery = PhrasematchResults {
+    let store = create_store(
+        vec![StoreEntryBuildingBlock {
+            grid_key: GridKey { phrase_id: 1, lang_set: 1 },
+            entries: vec![
+                GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 3, source_phrase_hash: 0 },
+                GridEntry { id: 2, x: 2, y: 2, relev: 0.8, score: 3, source_phrase_hash: 0 },
+                GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 1, source_phrase_hash: 0 },
+            ],
+        }],
+        1,
+        6,
+        0,
+        HashSet::new(),
+        40.,
+    );
+    let subquery = PhrasematchSubquery {
         id: 0,
-        scorefactor: 0,
-        prefix: 0,
-        nmask: 1,
-        bmask: HashSet::new(),
-        edit_multiplier: 1.0,
-        subquery_edit_distance: 0,
         store: &store,
         weight: 1.,
         match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 },
-        idx: 1,
-        zoom: 6,
         mask: 1 << 0,
     };
     let stack = vec![subquery];
@@ -360,7 +324,7 @@ fn coalesce_single_test() {
     println!("Coalsece single - no proximity, no bbox");
     let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0, 0);
+    let tree = stackable(&stack, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
     assert_eq!(result, tree_result);
 
@@ -414,13 +378,9 @@ fn coalesce_single_test() {
     }
     // Test opts with proximity
     println!("Coalsece single - with proximity");
-    let match_opts = MatchOpts {
-        zoom: 6,
-        proximity: Some(Proximity { point: [3, 3], radius: 40. }),
-        ..MatchOpts::default()
-    };
+    let match_opts = MatchOpts { zoom: 6, proximity: Some([3, 3]), ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0, 0);
+    let tree = stackable(&stack, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
     assert_eq!(result, tree_result);
     #[cfg_attr(rustfmt, rustfmt::skip)]
@@ -510,7 +470,7 @@ fn coalesce_single_test() {
     println!("Coalsece single - with bbox");
     let match_opts = MatchOpts { zoom: 6, bbox: Some([1, 1, 1, 1]), ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0, 0);
+    let tree = stackable(&stack, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
     assert_eq!(result, tree_result);
     assert_eq!(result[0].entries.len(), 1, "Only one result is within the bbox");
@@ -543,13 +503,9 @@ fn coalesce_single_test() {
 
     // Test with bbox and proximity
     println!("Coalesce single - with bbox and proximity");
-    let match_opts = MatchOpts {
-        zoom: 6,
-        bbox: Some([1, 1, 1, 1]),
-        proximity: Some(Proximity { point: [1, 1], radius: 40. }),
-    };
+    let match_opts = MatchOpts { zoom: 6, bbox: Some([1, 1, 1, 1]), proximity: Some([1, 1]) };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0, 0);
+    let tree = stackable(&stack, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
     assert_eq!(result, tree_result);
     assert_eq!(result[0].entries.len(), 1, "Only one result is within the bbox");
@@ -596,31 +552,24 @@ fn coalesce_single_languages_test() {
     }
     builder.finish().unwrap();
 
-    let store = GridStore::new(directory.path()).unwrap();
+    let store =
+        GridStore::new_with_options(directory.path(), 1, 6, 1, HashSet::new(), 200.).unwrap();
     // Test query with all languages
     println!("Coalesce single - all languages");
-    let subquery = PhrasematchResults {
+    let subquery = PhrasematchSubquery {
         id: 0,
-        scorefactor: 0,
-        prefix: 0,
-        nmask: 1,
-        bmask: HashSet::new(),
-        edit_multiplier: 1.0,
-        subquery_edit_distance: 0,
         store: &store,
         weight: 1.,
         match_key: MatchKey {
             match_phrase: MatchPhrase::Range { start: 1, end: 3 },
             lang_set: ALL_LANGUAGES,
         },
-        idx: 0,
-        zoom: 6,
         mask: 1 << 0,
     };
     let stack = vec![subquery];
     let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0, 0);
+    let tree = stackable(&stack, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
     assert_eq!(result, tree_result);
 
@@ -647,28 +596,20 @@ fn coalesce_single_languages_test() {
 
     // Test lanuage 0
     println!("Coalesce single - language 0, language matching 2 grids");
-    let subquery = PhrasematchResults {
+    let subquery = PhrasematchSubquery {
         id: 0,
-        scorefactor: 0,
-        prefix: 0,
-        nmask: 1,
-        bmask: HashSet::new(),
-        edit_multiplier: 1.0,
-        subquery_edit_distance: 0,
         store: &store,
         weight: 1.,
         match_key: MatchKey {
             match_phrase: MatchPhrase::Range { start: 1, end: 3 },
             lang_set: langarray_to_langfield(&[0]),
         },
-        idx: 0,
-        zoom: 6,
         mask: 1 << 0,
     };
     let stack = vec![subquery];
     let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0, 0);
+    let tree = stackable(&stack, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
     assert_eq!(result, tree_result);
 
@@ -695,28 +636,20 @@ fn coalesce_single_languages_test() {
 
     println!("Coalesce single - language 3, language matching no grids");
 
-    let subquery = PhrasematchResults {
+    let subquery = PhrasematchSubquery {
         id: 0,
-        scorefactor: 0,
-        prefix: 0,
-        nmask: 1,
-        bmask: HashSet::new(),
-        edit_multiplier: 1.0,
-        subquery_edit_distance: 0,
         store: &store,
         weight: 1.,
         match_key: MatchKey {
             match_phrase: MatchPhrase::Range { start: 1, end: 3 },
             lang_set: langarray_to_langfield(&[3]),
         },
-        idx: 0,
-        zoom: 6,
         mask: 1 << 0,
     };
     let stack = vec![subquery];
     let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0, 0);
+    let tree = stackable(&stack, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
     assert_eq!(result, tree_result);
 
@@ -745,59 +678,57 @@ fn coalesce_single_languages_test() {
 #[test]
 fn coalesce_multi_test() {
     // Add more specific layer into a store
-    let store1 = create_store(vec![StoreEntryBuildingBlock {
-        grid_key: GridKey { phrase_id: 1, lang_set: 1 },
-        entries: vec![
-            GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 1, source_phrase_hash: 0 },
-            // TODO: this isn't a real tile at zoom 1. Maybe pick more realistic test case?
-            GridEntry { id: 2, x: 2, y: 2, relev: 1., score: 1, source_phrase_hash: 0 },
-        ],
-    }]);
+    let store1 = create_store(
+        vec![StoreEntryBuildingBlock {
+            grid_key: GridKey { phrase_id: 1, lang_set: 1 },
+            entries: vec![
+                GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 1, source_phrase_hash: 0 },
+                // TODO: this isn't a real tile at zoom 1. Maybe pick more realistic test case?
+                GridEntry { id: 2, x: 2, y: 2, relev: 1., score: 1, source_phrase_hash: 0 },
+            ],
+        }],
+        0,
+        1,
+        0,
+        HashSet::new(),
+        40.,
+    );
 
-    let store2 = create_store(vec![StoreEntryBuildingBlock {
-        grid_key: GridKey { phrase_id: 2, lang_set: 1 },
-        entries: vec![
-            GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 3, source_phrase_hash: 0 },
-            GridEntry { id: 2, x: 2, y: 2, relev: 1., score: 3, source_phrase_hash: 0 },
-            GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 1, source_phrase_hash: 0 },
-        ],
-    }]);
+    let store2 = create_store(
+        vec![StoreEntryBuildingBlock {
+            grid_key: GridKey { phrase_id: 2, lang_set: 1 },
+            entries: vec![
+                GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 3, source_phrase_hash: 0 },
+                GridEntry { id: 2, x: 2, y: 2, relev: 1., score: 3, source_phrase_hash: 0 },
+                GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 1, source_phrase_hash: 0 },
+            ],
+        }],
+        1,
+        2,
+        1,
+        HashSet::new(),
+        40.,
+    );
 
     let stack = vec![
-        PhrasematchResults {
+        PhrasematchSubquery {
             id: 0,
-            scorefactor: 0,
-            prefix: 0,
-            nmask: 1,
-            bmask: HashSet::new(),
-            edit_multiplier: 1.0,
-            subquery_edit_distance: 0,
             store: &store1,
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                 lang_set: 1,
             },
-            idx: 0,
-            zoom: 1,
             mask: 1 << 1,
         },
-        PhrasematchResults {
+        PhrasematchSubquery {
             id: 0,
-            scorefactor: 0,
-            prefix: 0,
-            nmask: 2,
-            bmask: HashSet::new(),
-            edit_multiplier: 1.0,
-            subquery_edit_distance: 0,
             store: &store2,
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                 lang_set: 1,
             },
-            idx: 1,
-            zoom: 2,
             mask: 1 << 0,
         },
     ];
@@ -806,7 +737,7 @@ fn coalesce_multi_test() {
     println!("Coalsece multi - no proximity no bbox");
     let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0, 0);
+    let tree = stackable(&stack, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
     assert_eq!(result, tree_result);
     assert_eq!(result[0].relev, 1., "1st result has relevance 1");
@@ -902,13 +833,9 @@ fn coalesce_multi_test() {
 
     // Test coalesce multi with proximity
     println!("Coalesce multi - with proximity");
-    let match_opts = MatchOpts {
-        zoom: 2,
-        proximity: Some(Proximity { point: [3, 3], radius: 40. }),
-        ..MatchOpts::default()
-    };
+    let match_opts = MatchOpts { zoom: 2, proximity: Some([3, 3]), ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0, 0);
+    let tree = stackable(&stack, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
     assert_eq!(result, tree_result);
     assert_eq!(result[0].relev, 1., "1st result context has relevance 1");
@@ -1004,83 +931,87 @@ fn coalesce_multi_test() {
 #[test]
 fn coalesce_multi_languages_test() {
     // Store 1 with grids in all languages
-    let store1 = create_store(vec![StoreEntryBuildingBlock {
-        grid_key: GridKey { phrase_id: 1, lang_set: ALL_LANGUAGES },
-        entries: vec![GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 1, source_phrase_hash: 0 }],
-    }]);
+    let store1 = create_store(
+        vec![StoreEntryBuildingBlock {
+            grid_key: GridKey { phrase_id: 1, lang_set: ALL_LANGUAGES },
+            entries: vec![GridEntry {
+                id: 1,
+                x: 1,
+                y: 1,
+                relev: 1.,
+                score: 1,
+                source_phrase_hash: 0,
+            }],
+        }],
+        0,
+        1,
+        0,
+        HashSet::new(),
+        200.,
+    );
 
     // Store 2 with grids in multiple language sets
-    let store2 = create_store(vec![
-        // Insert grid with lang_set 1
-        StoreEntryBuildingBlock {
-            grid_key: GridKey { phrase_id: 2, lang_set: langarray_to_langfield(&[1]) },
-            entries: vec![GridEntry {
-                id: 2,
-                x: 1,
-                y: 1,
-                relev: 1.,
-                score: 1,
-                source_phrase_hash: 0,
-            }],
-        },
-        // Insert grid with lang_set 0
-        StoreEntryBuildingBlock {
-            grid_key: GridKey { phrase_id: 2, lang_set: langarray_to_langfield(&[0]) },
-            entries: vec![GridEntry {
-                id: 3,
-                x: 1,
-                y: 1,
-                relev: 1.,
-                score: 1,
-                source_phrase_hash: 0,
-            }],
-        },
-    ]);
+    let store2 = create_store(
+        vec![
+            // Insert grid with lang_set 1
+            StoreEntryBuildingBlock {
+                grid_key: GridKey { phrase_id: 2, lang_set: langarray_to_langfield(&[1]) },
+                entries: vec![GridEntry {
+                    id: 2,
+                    x: 1,
+                    y: 1,
+                    relev: 1.,
+                    score: 1,
+                    source_phrase_hash: 0,
+                }],
+            },
+            // Insert grid with lang_set 0
+            StoreEntryBuildingBlock {
+                grid_key: GridKey { phrase_id: 2, lang_set: langarray_to_langfield(&[0]) },
+                entries: vec![GridEntry {
+                    id: 3,
+                    x: 1,
+                    y: 1,
+                    relev: 1.,
+                    score: 1,
+                    source_phrase_hash: 0,
+                }],
+            },
+        ],
+        1,
+        1,
+        1,
+        HashSet::new(),
+        200.,
+    );
 
     // Test ALL LANGUAGES
     println!("Coalesce multi - all languages");
     let stack = vec![
-        PhrasematchResults {
+        PhrasematchSubquery {
             id: 0,
-            scorefactor: 0,
-            prefix: 0,
-            nmask: 1,
-            bmask: HashSet::new(),
-            edit_multiplier: 1.0,
-            subquery_edit_distance: 0,
             store: &store1,
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                 lang_set: ALL_LANGUAGES,
             },
-            idx: 0,
-            zoom: 1,
             mask: 1 << 1,
         },
-        PhrasematchResults {
+        PhrasematchSubquery {
             id: 0,
-            scorefactor: 0,
-            prefix: 0,
-            nmask: 2,
-            bmask: HashSet::new(),
-            edit_multiplier: 1.0,
-            subquery_edit_distance: 0,
             store: &store2,
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                 lang_set: ALL_LANGUAGES,
             },
-            idx: 1,
-            // TODO: when would these have the same zoom?
-            zoom: 1,
             mask: 1 << 0,
         },
     ];
     let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0, 0);
+    let tree = stackable(&stack, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
     assert_eq!(result, tree_result);
     #[cfg_attr(rustfmt, rustfmt::skip)]
@@ -1107,47 +1038,30 @@ fn coalesce_multi_languages_test() {
     // Test language 0
     println!("Coalesce multi - language 0");
     let stack = vec![
-        PhrasematchResults {
+        PhrasematchSubquery {
             id: 0,
-            scorefactor: 0,
-            prefix: 0,
-            nmask: 1,
-            bmask: HashSet::new(),
-            edit_multiplier: 1.0,
-            subquery_edit_distance: 0,
             store: &store1,
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                 lang_set: ALL_LANGUAGES,
             },
-            idx: 0,
-            zoom: 1,
             mask: 1 << 1,
         },
-        PhrasematchResults {
+        PhrasematchSubquery {
             id: 0,
-            scorefactor: 0,
-            prefix: 0,
-            nmask: 2,
-            bmask: HashSet::new(),
-            edit_multiplier: 1.0,
-            subquery_edit_distance: 0,
             store: &store2,
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                 lang_set: langarray_to_langfield(&[0]),
             },
-            idx: 1,
-            // TODO: when would these have the same zoom?
-            zoom: 1,
             mask: 1 << 0,
         },
     ];
     let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0, 0);
+    let tree = stackable(&stack, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
     assert_eq!(result, tree_result);
     #[cfg_attr(rustfmt, rustfmt::skip)]
@@ -1174,47 +1088,30 @@ fn coalesce_multi_languages_test() {
     // Test language 3
     println!("Coalsece multi - language 3");
     let stack = vec![
-        PhrasematchResults {
+        PhrasematchSubquery {
             id: 0,
-            scorefactor: 0,
-            prefix: 0,
-            nmask: 1,
-            bmask: HashSet::new(),
-            edit_multiplier: 1.0,
-            subquery_edit_distance: 0,
             store: &store1,
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                 lang_set: ALL_LANGUAGES,
             },
-            idx: 0,
-            zoom: 1,
             mask: 1 << 1,
         },
-        PhrasematchResults {
+        PhrasematchSubquery {
             id: 0,
-            scorefactor: 0,
-            prefix: 0,
-            nmask: 2,
-            bmask: HashSet::new(),
-            edit_multiplier: 1.0,
-            subquery_edit_distance: 0,
             store: &store2,
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                 lang_set: langarray_to_langfield(&[3]),
             },
-            idx: 1,
-            // TODO: when would these have the same zoom?
-            zoom: 1,
             mask: 1 << 0,
         },
     ];
     let match_opts = MatchOpts { zoom: 6, ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0, 0);
+    let tree = stackable(&stack, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
     assert_eq!(result, tree_result);
     #[cfg_attr(rustfmt, rustfmt::skip)]
@@ -1242,67 +1139,68 @@ fn coalesce_multi_languages_test() {
 #[test]
 fn coalesce_multi_scoredist() {
     // Add more specific layer into a store
-    let store1 = create_store(vec![StoreEntryBuildingBlock {
-        grid_key: GridKey { phrase_id: 1, lang_set: 0 },
-        entries: vec![GridEntry { id: 1, x: 0, y: 0, relev: 1., score: 1, source_phrase_hash: 0 }],
-    }]);
+    let store1 = create_store(
+        vec![StoreEntryBuildingBlock {
+            grid_key: GridKey { phrase_id: 1, lang_set: 0 },
+            entries: vec![GridEntry {
+                id: 1,
+                x: 0,
+                y: 0,
+                relev: 1.,
+                score: 1,
+                source_phrase_hash: 0,
+            }],
+        }],
+        0,
+        0,
+        0,
+        HashSet::new(),
+        200.,
+    );
 
     // Add less specific layer into a store
-    let store2 = create_store(vec![StoreEntryBuildingBlock {
-        grid_key: GridKey { phrase_id: 2, lang_set: 0 },
-        entries: vec![
-            GridEntry { id: 2, x: 4800, y: 6200, relev: 1., score: 7, source_phrase_hash: 0 },
-            GridEntry { id: 3, x: 4600, y: 6200, relev: 1., score: 1, source_phrase_hash: 0 },
-        ],
-    }]);
+    let store2 = create_store(
+        vec![StoreEntryBuildingBlock {
+            grid_key: GridKey { phrase_id: 2, lang_set: 0 },
+            entries: vec![
+                GridEntry { id: 2, x: 4800, y: 6200, relev: 1., score: 7, source_phrase_hash: 0 },
+                GridEntry { id: 3, x: 4600, y: 6200, relev: 1., score: 1, source_phrase_hash: 0 },
+            ],
+        }],
+        1,
+        14,
+        1,
+        HashSet::new(),
+        200.,
+    );
 
     let stack = vec![
-        PhrasematchResults {
+        PhrasematchSubquery {
             id: 0,
-            scorefactor: 0,
-            prefix: 0,
-            nmask: 1,
-            bmask: HashSet::new(),
-            edit_multiplier: 1.0,
-            subquery_edit_distance: 0,
             store: &store1,
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                 lang_set: 0,
             },
-            idx: 0,
-            zoom: 0,
             mask: 1 << 1,
         },
-        PhrasematchResults {
+        PhrasematchSubquery {
             id: 0,
-            scorefactor: 0,
-            prefix: 0,
-            nmask: 2,
-            bmask: HashSet::new(),
-            edit_multiplier: 1.0,
-            subquery_edit_distance: 0,
             store: &store2,
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                 lang_set: 0,
             },
-            idx: 1,
-            zoom: 14,
             mask: 1 << 0,
         },
     ];
     // Closer proximity to one grid
     println!("Coalesce multi - proximity very close to one grid");
-    let match_opts = MatchOpts {
-        zoom: 14,
-        proximity: Some(Proximity { point: [4601, 6200], radius: 40. }),
-        ..MatchOpts::default()
-    };
+    let match_opts = MatchOpts { zoom: 14, proximity: Some([4601, 6200]), ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0, 0);
+    let tree = stackable(&stack, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
     assert_eq!(result, tree_result);
     assert_eq!(result[0].entries[0].grid_entry.id, 3, "Closer feature is 1st");
@@ -1315,13 +1213,9 @@ fn coalesce_multi_scoredist() {
 
     // Proximity is still close to same grid, but less close
     println!("Coalesce multi - proximity less close to one grid");
-    let match_opts = MatchOpts {
-        zoom: 14,
-        proximity: Some(Proximity { point: [4610, 6200], radius: 40. }),
-        ..MatchOpts::default()
-    };
+    let match_opts = MatchOpts { zoom: 14, proximity: Some([4610, 6200]), ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0, 0);
+    let tree = stackable(&stack, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
     assert_eq!(result, tree_result);
     assert_eq!(result[0].entries[0].grid_entry.id, 3, "Farther feature with higher score is 1st");
@@ -1336,64 +1230,69 @@ fn coalesce_multi_scoredist() {
 // TODO: language tests
 #[test]
 fn coalesce_multi_test_bbox() {
-    let store1 = create_store(vec![StoreEntryBuildingBlock {
-        grid_key: GridKey { phrase_id: 1, lang_set: ALL_LANGUAGES },
-        entries: vec![
-            GridEntry { id: 1, x: 0, y: 0, relev: 0.8, score: 1, source_phrase_hash: 0 },
-            GridEntry { id: 2, x: 1, y: 1, relev: 1., score: 1, source_phrase_hash: 0 },
-        ],
-    }]);
-    let store2 = create_store(vec![StoreEntryBuildingBlock {
-        grid_key: GridKey { phrase_id: 2, lang_set: ALL_LANGUAGES },
-        entries: vec![
-            GridEntry { id: 3, x: 3, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },
-            GridEntry { id: 4, x: 0, y: 3, relev: 1., score: 1, source_phrase_hash: 0 },
-        ],
-    }]);
+    let store1 = create_store(
+        vec![StoreEntryBuildingBlock {
+            grid_key: GridKey { phrase_id: 1, lang_set: ALL_LANGUAGES },
+            entries: vec![
+                GridEntry { id: 1, x: 0, y: 0, relev: 0.8, score: 1, source_phrase_hash: 0 },
+                GridEntry { id: 2, x: 1, y: 1, relev: 1., score: 1, source_phrase_hash: 0 },
+            ],
+        }],
+        0,
+        1,
+        0,
+        HashSet::new(),
+        200.,
+    );
+    let store2 = create_store(
+        vec![StoreEntryBuildingBlock {
+            grid_key: GridKey { phrase_id: 2, lang_set: ALL_LANGUAGES },
+            entries: vec![
+                GridEntry { id: 3, x: 3, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },
+                GridEntry { id: 4, x: 0, y: 3, relev: 1., score: 1, source_phrase_hash: 0 },
+            ],
+        }],
+        1,
+        2,
+        1,
+        HashSet::new(),
+        200.,
+    );
 
-    let store3 = create_store(vec![StoreEntryBuildingBlock {
-        grid_key: GridKey { phrase_id: 3, lang_set: ALL_LANGUAGES },
-        entries: vec![
-            GridEntry { id: 5, x: 21, y: 7, relev: 1., score: 1, source_phrase_hash: 0 },
-            GridEntry { id: 6, x: 21, y: 18, relev: 1., score: 1, source_phrase_hash: 0 },
-        ],
-    }]);
+    let store3 = create_store(
+        vec![StoreEntryBuildingBlock {
+            grid_key: GridKey { phrase_id: 3, lang_set: ALL_LANGUAGES },
+            entries: vec![
+                GridEntry { id: 5, x: 21, y: 7, relev: 1., score: 1, source_phrase_hash: 0 },
+                GridEntry { id: 6, x: 21, y: 18, relev: 1., score: 1, source_phrase_hash: 0 },
+            ],
+        }],
+        2,
+        5,
+        2,
+        HashSet::new(),
+        200.,
+    );
 
     let stack = vec![
-        PhrasematchResults {
+        PhrasematchSubquery {
             id: 0,
-            scorefactor: 0,
-            prefix: 0,
-            nmask: 1,
-            bmask: HashSet::new(),
-            edit_multiplier: 1.0,
-            subquery_edit_distance: 0,
             store: &store1,
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                 lang_set: ALL_LANGUAGES,
             },
-            idx: 0,
-            zoom: 1,
             mask: 1 << 1,
         },
-        PhrasematchResults {
+        PhrasematchSubquery {
             id: 0,
-            scorefactor: 0,
-            prefix: 0,
-            nmask: 2,
-            bmask: HashSet::new(),
-            edit_multiplier: 1.0,
-            subquery_edit_distance: 0,
             store: &store2,
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                 lang_set: ALL_LANGUAGES,
             },
-            idx: 1,
-            zoom: 2,
             mask: 1 << 0,
         },
     ];
@@ -1401,7 +1300,7 @@ fn coalesce_multi_test_bbox() {
     println!("Coalesce multi - bbox at lower zoom of subquery");
     let match_opts = MatchOpts { zoom: 1, bbox: Some([0, 0, 1, 0]), ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0, 0);
+    let tree = stackable(&stack, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let _tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
     // assert_eq!(result, tree_result);
     assert_eq!(result.len(), 2, "Bbox [1,0,0,1,0] - 2 results are within the bbox");
@@ -1419,7 +1318,7 @@ fn coalesce_multi_test_bbox() {
     println!("Coalesce multi - bbox at higher zoom of subquery");
     let match_opts = MatchOpts { zoom: 2, bbox: Some([0, 0, 1, 3]), ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0, 0);
+    let tree = stackable(&stack, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let _tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
     // assert_eq!(result, tree_result);
     assert_eq!(result.len(), 2, "Bbox [2,0,0,1,3] - 2 results are within the bbox");
@@ -1438,7 +1337,7 @@ fn coalesce_multi_test_bbox() {
     println!("Coalesce multi - bbox at zoom 6");
     let match_opts = MatchOpts { zoom: 6, bbox: Some([14, 30, 15, 64]), ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0, 0);
+    let tree = stackable(&stack, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let _tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
     // assert_eq!(result, tree_result);
     assert_eq!(result.len(), 2, "Bbox [6,14,30,15,64] - 2 results are within the bbox");
@@ -1456,46 +1355,30 @@ fn coalesce_multi_test_bbox() {
     // Test bbox at lower zoom than either of the expected results
     println!("Coalesce multi - bbox at lower zoom than either of the expected results");
     let stack = vec![
-        PhrasematchResults {
+        PhrasematchSubquery {
             id: 0,
-            scorefactor: 0,
-            prefix: 0,
-            nmask: 1,
-            bmask: HashSet::new(),
-            edit_multiplier: 1.0,
-            subquery_edit_distance: 0,
             store: &store2,
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 4 },
                 lang_set: ALL_LANGUAGES,
             },
-            idx: 1,
-            zoom: 2,
             mask: 1 << 1,
         },
-        PhrasematchResults {
+        PhrasematchSubquery {
             id: 0,
-            scorefactor: 0,
-            prefix: 0,
-            nmask: 2,
-            bmask: HashSet::new(),
-            edit_multiplier: 1.0,
-            subquery_edit_distance: 0,
             store: &store3,
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 4 },
                 lang_set: ALL_LANGUAGES,
             },
-            idx: 2,
-            zoom: 5,
             mask: 1 << 0,
         },
     ];
     let match_opts = MatchOpts { zoom: 1, bbox: Some([0, 0, 1, 0]), ..MatchOpts::default() };
     let result = coalesce(stack.iter().map(|s| s.clone().into()).collect(), &match_opts).unwrap();
-    let tree = stackable(&vec![stack.clone()], None, 0, HashSet::new(), 0, 129, 0.0, 0.0, 0, 0);
+    let tree = stackable(&stack, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     let _tree_result = truncate_coalesce_results(tree_coalesce(&tree, &match_opts).unwrap());
     // assert_eq!(result, tree_result);
     assert_eq!(result.len(), 2, "Bbox [1,0,0,1,0] - 2 results are within the bbox");

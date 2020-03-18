@@ -1,5 +1,4 @@
 use std::borrow::Borrow;
-use std::collections::HashSet;
 
 use crate::gridstore::store::GridStore;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
@@ -95,15 +94,9 @@ impl MatchKey {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct Proximity {
-    pub point: [u16; 2],
-    pub radius: f64,
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct MatchOpts {
     pub bbox: Option<[u16; 4]>,
-    pub proximity: Option<Proximity>,
+    pub proximity: Option<[u16; 2]>,
     pub zoom: u16,
 }
 
@@ -119,18 +112,12 @@ impl MatchOpts {
             self.clone()
         } else {
             let adjusted_proximity = match &self.proximity {
-                Some(orig_proximity) => {
+                Some([x, y]) => {
                     if target_z < self.zoom {
                         // If this is a zoom out, divide by 2 for every level of zooming out.
                         let zoom_levels = self.zoom - target_z;
-                        Some(Proximity {
-                            // Shifting to the right by a number is the same as dividing by 2 that number of times.
-                            point: [
-                                orig_proximity.point[0] >> zoom_levels,
-                                orig_proximity.point[1] >> zoom_levels,
-                            ],
-                            radius: orig_proximity.radius,
-                        })
+                        // Shifting to the right by a number is the same as dividing by 2 that number of times.
+                        Some([x >> zoom_levels, y >> zoom_levels])
                     } else {
                         // If this is a zoom in, choose the closest to the middle of the possible tiles at the higher zoom level.
                         // The scale of the coordinates for zooming in is 2^(difference in zs).
@@ -138,15 +125,10 @@ impl MatchOpts {
                         // Pick a coordinate halfway between the possible higher zoom tiles,
                         // subtracting one to pick the one on the top left of the four middle tiles for consistency.
                         let mid_coord_adjuster = scale_multiplier / 2 - 1;
-                        let adjusted_x =
-                            orig_proximity.point[0] * scale_multiplier + mid_coord_adjuster;
-                        let adjusted_y =
-                            orig_proximity.point[1] * scale_multiplier + mid_coord_adjuster;
+                        let adjusted_x = x * scale_multiplier + mid_coord_adjuster;
+                        let adjusted_y = y * scale_multiplier + mid_coord_adjuster;
 
-                        Some(Proximity {
-                            point: [adjusted_x, adjusted_y],
-                            radius: orig_proximity.radius,
-                        })
+                        Some([adjusted_x, adjusted_y])
                     }
                 }
                 None => None,
@@ -194,20 +176,16 @@ mod tests {
     use super::*;
     use once_cell::sync::Lazy;
 
-    fn matchopts_proximity_generator(point: [u16; 2], radius: f64, zoom: u16) -> MatchOpts {
-        MatchOpts {
-            proximity: Some(Proximity { point: point, radius: radius }),
-            zoom: zoom,
-            ..MatchOpts::default()
-        }
+    fn matchopts_proximity_generator(point: [u16; 2], zoom: u16) -> MatchOpts {
+        MatchOpts { proximity: Some(point), zoom: zoom, ..MatchOpts::default() }
     }
 
     #[test]
     fn adjust_to_zoom_test_proximity() {
         static MATCH_OPTS_PROXIMITY: Lazy<(MatchOpts, MatchOpts, MatchOpts)> = Lazy::new(|| {
-            let match_opts1 = matchopts_proximity_generator([2, 28], 400., 14);
-            let match_opts2 = matchopts_proximity_generator([11, 25], 400., 6);
-            let match_opts3 = matchopts_proximity_generator([6, 6], 400., 4);
+            let match_opts1 = matchopts_proximity_generator([2, 28], 14);
+            let match_opts2 = matchopts_proximity_generator([11, 25], 6);
+            let match_opts3 = matchopts_proximity_generator([6, 6], 4);
             (match_opts1, match_opts2, match_opts3)
         });
 
@@ -216,42 +194,38 @@ mod tests {
             adjusted_match_opts1.zoom, 6,
             "Adjusted MatchOpts should have target zoom as zoom"
         );
-        assert_eq!(adjusted_match_opts1.proximity.unwrap().point, [0, 0], "should be 0,0");
+        assert_eq!(adjusted_match_opts1.proximity.unwrap(), [0, 0], "should be 0,0");
 
         let adjusted_match_opts2 = MATCH_OPTS_PROXIMITY.1.adjust_to_zoom(8);
         assert_eq!(
             adjusted_match_opts2.zoom, 8,
             "Adjusted MatchOpts should have target zoom as zoom"
         );
-        assert_eq!(adjusted_match_opts2.proximity.unwrap().point, [45, 101], "Should be 45, 101");
+        assert_eq!(adjusted_match_opts2.proximity.unwrap(), [45, 101], "Should be 45, 101");
 
         let same_zoom = MATCH_OPTS_PROXIMITY.2.adjust_to_zoom(4);
         assert_eq!(same_zoom, MATCH_OPTS_PROXIMITY.2, "If the zoom is the same as the original, adjusted MatchOpts should be a clone of the original");
         let zoomed_out_1z = MATCH_OPTS_PROXIMITY.2.adjust_to_zoom(3);
         let proximity_out_1z = zoomed_out_1z.proximity.unwrap();
-        assert_eq!(proximity_out_1z.point, [3, 3], "4/6/6 zoomed out to zoom 3 should be 3/3/3");
-        assert_eq!(
-            proximity_out_1z.radius, 400.,
-            "The adjusted radius should be the original radius"
-        );
+        assert_eq!(proximity_out_1z, [3, 3], "4/6/6 zoomed out to zoom 3 should be 3/3/3");
         assert_eq!(zoomed_out_1z.zoom, 3, "The adjusted zoom should be the target zoom");
 
         let zoomed_out_2z = MATCH_OPTS_PROXIMITY.2.adjust_to_zoom(2);
         let proximity_out_2z = zoomed_out_2z.proximity.unwrap();
-        assert_eq!(proximity_out_2z.point, [1, 1], "4/6/6 zoomed out to zoom 2 should be 2/1/1");
+        assert_eq!(proximity_out_2z, [1, 1], "4/6/6 zoomed out to zoom 2 should be 2/1/1");
 
         let zoomed_in_1z = MATCH_OPTS_PROXIMITY.2.adjust_to_zoom(5);
         let proximity_in_1z = zoomed_in_1z.proximity.unwrap();
-        assert_eq!(proximity_in_1z.point, [12, 12], "4/6/6 zoomed in to zoom 5 should be 5/12/12");
+        assert_eq!(proximity_in_1z, [12, 12], "4/6/6 zoomed in to zoom 5 should be 5/12/12");
         assert_eq!(zoomed_in_1z.zoom, 5, "The adjusted zoom should be the target zoom");
 
         let zoomed_in_2z = MATCH_OPTS_PROXIMITY.2.adjust_to_zoom(6);
         let proximity_in_2z = zoomed_in_2z.proximity.unwrap();
-        assert_eq!(proximity_in_2z.point, [25, 25], "4/6/6 zoomed in to zoom 6 should be 6/25/25");
+        assert_eq!(proximity_in_2z, [25, 25], "4/6/6 zoomed in to zoom 6 should be 6/25/25");
 
         let zoomed_in_3z = MATCH_OPTS_PROXIMITY.2.adjust_to_zoom(7);
         let proximity_in_3z = zoomed_in_3z.proximity.unwrap();
-        assert_eq!(proximity_in_3z.point, [51, 51], "4/6/6 zoomed in to zoom 7 should be 7/51/51");
+        assert_eq!(proximity_in_3z, [51, 51], "4/6/6 zoomed in to zoom 7 should be 7/51/51");
     }
 
     fn matchopts_bbox_generator(bbox: [u16; 4], zoom: u16) -> MatchOpts {
@@ -404,40 +378,8 @@ pub struct PhrasematchSubquery<T: Borrow<GridStore> + Clone> {
     pub store: T,
     pub weight: f64,
     pub match_key: MatchKey,
-    pub idx: u16,
-    pub zoom: u16,
     pub mask: u32,
-}
-
-#[derive(Serialize, Debug, Clone)]
-pub struct PhrasematchResults<T: Borrow<GridStore> + Clone> {
-    #[serde(serialize_with = "serialize_path")]
-    pub store: T,
-    pub scorefactor: u32,
-    pub prefix: u8,
-    pub weight: f64,
-    pub match_key: MatchKey,
-    pub idx: u16,
-    pub zoom: u16,
-    pub nmask: u32,
-    pub mask: u32,
-    pub bmask: HashSet<u16>,
-    pub edit_multiplier: f64,
-    pub subquery_edit_distance: u8,
     pub id: u32,
-}
-
-impl<T: Borrow<GridStore> + Clone> From<PhrasematchResults<T>> for PhrasematchSubquery<T> {
-    fn from(phrasematch_results: PhrasematchResults<T>) -> Self {
-        PhrasematchSubquery {
-            store: phrasematch_results.store,
-            weight: phrasematch_results.weight,
-            match_key: phrasematch_results.match_key,
-            idx: phrasematch_results.idx,
-            zoom: phrasematch_results.zoom,
-            mask: phrasematch_results.mask,
-        }
-    }
 }
 
 #[inline]

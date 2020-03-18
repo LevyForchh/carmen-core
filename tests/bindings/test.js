@@ -223,7 +223,7 @@ tape('Coalesce single valid stack - Valid inputs', (t) => {
         ]
     );
     builder.finish();
-    const reader = new addon.GridStore(tmpDir.name);
+    const reader = new addon.GridStore(tmpDir.name, { idx: 1, zoom: 14, non_overlapping_indexes: Array.from(new Set()), type_id: 0, coalesce_radius: 200 });
 
     const valid_stack = [{
         store: reader,
@@ -240,6 +240,7 @@ tape('Coalesce single valid stack - Valid inputs', (t) => {
         idx: 1,
         zoom: 14,
         mask: 1 << 0,
+        id: 0
     }];
 
     addon.coalesce(valid_stack, { zoom: 14 }, (err, res) => {
@@ -270,7 +271,7 @@ tape('Coalesce multi valid stack - Valid inputs', (t) => {
         ]
     );
     builder1.finish();
-    const reader1 = new addon.GridStore(tmpDir1.name);
+    const reader1 = new addon.GridStore(tmpDir1.name, { idx: 0, zoom: 1, non_overlapping_indexes: Array.from(new Set()), type_id: 0, coalesce_radius: 200 });
 
     const tmpDir2 = tmp.dirSync();
     const builder2 = new addon.GridStoreBuilder(tmpDir2.name);
@@ -281,7 +282,7 @@ tape('Coalesce multi valid stack - Valid inputs', (t) => {
         ]
     );
     builder2.finish();
-    const reader2 = new addon.GridStore(tmpDir2.name);
+    const reader2 = new addon.GridStore(tmpDir2.name, { idx: 1, zoom: 2, non_overlapping_indexes: Array.from(new Set()), type_id: 1, coalesce_radius: 200 });
 
     const valid_coalesce_multi = [{
         store: reader1,
@@ -298,6 +299,7 @@ tape('Coalesce multi valid stack - Valid inputs', (t) => {
         idx: 0,
         zoom: 1,
         mask: 1 << 1,
+        id: 0
     },{
         store: reader2,
         weight: 0.5,
@@ -313,6 +315,7 @@ tape('Coalesce multi valid stack - Valid inputs', (t) => {
         idx: 1,
         zoom: 2,
         mask: 1 << 0,
+        id: 1
     }];
     addon.coalesce(valid_coalesce_multi, { zoom: 2 }, (err, res) => {
         t.deepEqual(res[0].entries[0].grid_entry, { relev: 0.5, score: 3, x: 2, y: 2, id: 2, source_phrase_hash: 0 }, '1st result highest score from the higher zoom index');
@@ -347,6 +350,7 @@ tape('lang_set >= 128', (t) => {
         idx: 1,
         zoom: 14,
         mask: 1 << 0,
+        id: 0
     }];
 
     addon.coalesce(lang_set_stack, { zoom: 14 }, (err, res) => {
@@ -409,8 +413,8 @@ tape('Bin boundaries', (t) => {
     builderWithBoundaries.finish();
     builderWithoutBoundaries.finish();
 
-    const readerWithBoundaries = new addon.GridStore(directoryWithBoundaries.name);
-    const readerWithoutBoundaries = new addon.GridStore(directoryWithoutBoundaries.name);
+    const readerWithBoundaries = new addon.GridStore(directoryWithBoundaries.name, { idx: 1, zoom: 14, non_overlapping_indexes: Array.from(new Set()), type_id: 0, coalesce_radius: 200 });
+    const readerWithoutBoundaries = new addon.GridStore(directoryWithoutBoundaries.name, { idx: 1, zoom: 14, non_overlapping_indexes: Array.from(new Set()), type_id: 0, coalesce_radius: 200 });
 
     const findRange = (prefix) => {
         let start = null,
@@ -442,6 +446,7 @@ tape('Bin boundaries', (t) => {
             idx: 1,
             zoom: 14,
             mask: 1,
+            id: 0
         };
         let stack = [subquery];
         let match_opts = {
@@ -467,16 +472,9 @@ tape('Deserialize phrasematch results', (t) => {
         ]
     );
     builder.finish();
-    const store = new addon.GridStore(tmpDir.name);
+    const store = new addon.GridStore(tmpDir.name, { idx: 0, zoom: 14, non_overlapping_indexes: Array.from(new Set()), type_id: 0, coalesce_radius: 200 });
     let phrasematchResults = [
-        {
-            'phrasematches': [
-                new Phrasematch(store, ['main', 'street'], 'main street', 1, [0, 2], 1, 0, 14, 6, 1, false, false, false, 0, ['main', 'street'], 0, 14, [0], 1)
-            ],
-            idx: 0,
-            nmask: 14,
-            bmask: [0]
-        }
+        new Phrasematch(store, ['main', 'street'], 'main street', 1, [0, 2], 1, 0, 14, 6, 1, false, false, false, 0, ['main', 'street'], 0, 14, [0], 1)
     ];
     addon.stackable(phrasematchResults);
     t.end();
