@@ -86,7 +86,9 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
                 phrasematches.store.borrow().non_overlapping_indexes.iter().cloned().collect();
             target_bmask.extend(&phrasematch_bmask);
             let target_relev = 0.0 + &phrasematches.weight;
-
+            if target_relev < 0.5 {
+                continue;
+            }
             node.children.push(stackable(
                 &phrasematch_results,
                 Some(phrasematches.clone()),
