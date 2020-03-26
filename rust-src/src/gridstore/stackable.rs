@@ -18,6 +18,7 @@ pub struct StackableNode<T: Borrow<GridStore> + Clone + Debug> {
     pub idx: u16,
     pub max_relev: f64,
     pub zoom: u16,
+    pub depth: u16,
 }
 
 impl<T: Borrow<GridStore> + Clone + Debug> StackableNode<T> {
@@ -52,6 +53,7 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
     idx: u16,
     max_relev: f64,
     zoom: u16,
+    depth: u16,
 ) -> StackableNode<T> {
     let mut node = StackableNode {
         phrasematch: phrasematch_result,
@@ -62,6 +64,7 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
         idx: idx,
         max_relev: max_relev,
         zoom: zoom,
+        depth: depth,
     };
 
     for phrasematches in phrasematch_results.iter() {
@@ -78,6 +81,7 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
         if (node.nmask & (1u32 << phrasematches.store.borrow().type_id)) == 0
             && (node.mask & phrasematches.mask) == 0
             && phrasematches.store.borrow().non_overlapping_indexes.contains(&node.idx) == false
+            && phrasematches.weight >= 0.5
         {
             let target_nmask = &(1u32 << phrasematches.store.borrow().type_id) | node.nmask;
             let target_mask = &phrasematches.mask | node.mask;
@@ -86,6 +90,7 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
                 phrasematches.store.borrow().non_overlapping_indexes.iter().cloned().collect();
             target_bmask.extend(&phrasematch_bmask);
             let target_relev = 0.0 + &phrasematches.weight;
+            let target_depth = depth + 1;
 
             node.children.push(stackable(
                 &phrasematch_results,
@@ -96,6 +101,7 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
                 phrasematches.store.borrow().idx,
                 target_relev,
                 phrasematches.store.borrow().zoom,
+                target_depth,
             ));
         }
     }
@@ -160,7 +166,7 @@ mod test {
 
         let phrasematch_results = vec![a1, b1, b2];
 
-        let tree = stackable(&phrasematch_results, None, 0, HashSet::new(), 0, 129, 0.0, 0);
+        let tree = stackable(&phrasematch_results, None, 0, HashSet::new(), 0, 129, 0.0, 0, 0);
         let a1_children_ids: Vec<u32> = tree.clone().children[0]
             .clone()
             .children
@@ -216,7 +222,7 @@ mod test {
             mask: 1,
         };
         let phrasematch_results = vec![a1, b1];
-        let tree = stackable(&phrasematch_results, None, 0, HashSet::new(), 0, 129, 0.0, 0);
+        let tree = stackable(&phrasematch_results, None, 0, HashSet::new(), 0, 129, 0.0, 0, 0);
         let nmask_stacks: Vec<bool> = bfs(tree).iter().map(|node| node.is_leaf()).collect();
         assert_eq!(nmask_stacks[1], true, "a1 and b1 cannot stack since they have the same nmask - so they don't have any children");
         assert_eq!(nmask_stacks[2], true, "a1 and b1 cannot stack since they have the same nmask - so they don't have any children");
@@ -260,7 +266,7 @@ mod test {
             mask: 1,
         };
         let phrasematch_results = vec![a1, b1];
-        let tree = stackable(&phrasematch_results, None, 0, HashSet::new(), 0, 129, 0.0, 0);
+        let tree = stackable(&phrasematch_results, None, 0, HashSet::new(), 0, 129, 0.0, 0, 0);
         let bmask_stacks: Vec<bool> = bfs(tree).iter().map(|node| node.is_leaf()).collect();
         assert_eq!(bmask_stacks[1], true, "a1 cannot stack with b1 since a1's bmask contains the idx of b1 - so they don't have any children");
         assert_eq!(bmask_stacks[2], true, "b1 cannot stack with a1 since b1's bmask contains the idx of a1 - so they don't have any children");
@@ -298,9 +304,38 @@ mod test {
             mask: 1,
         };
         let phrasematch_results = vec![a1, b1];
-        let tree = stackable(&phrasematch_results, None, 0, HashSet::new(), 0, 129, 0.0, 0);
+        let tree = stackable(&phrasematch_results, None, 0, HashSet::new(), 0, 129, 0.0, 0, 0);
         let mask_stacks: Vec<bool> = bfs(tree).iter().map(|node| node.is_leaf()).collect();
         assert_eq!(mask_stacks[1], true, "a1 and b1 cannot stack since they have the same mask - so they don't have any children");
         assert_eq!(mask_stacks[2], true, "a1 and b1 cannot stack since they have the same mask - so they don't have any children");
+    }
+
+    #[test]
+    fn stackable_depth() {
+        let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
+        let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
+
+        let key = GridKey { phrase_id: 1, lang_set: 1 };
+
+        let entries = vec![
+            GridEntry { id: 2, x: 2, y: 2, relev: 0.8, score: 3, source_phrase_hash: 0 },
+            GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 1, source_phrase_hash: 1 },
+            GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 7, source_phrase_hash: 2 },
+        ];
+        builder.insert(&key, entries).expect("Unable to insert record");
+        builder.finish().unwrap();
+        let store = GridStore::new(directory.path()).unwrap();
+
+        let a1 = PhrasematchSubquery {
+            id: 0,
+            store: &store,
+            weight: 0.5,
+            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+            mask: 1,
+        };
+
+        let phrasematch_results = vec![a1];
+        let tree = stackable(&phrasematch_results, None, 0, HashSet::new(), 0, 129, 0.0, 0, 0);
+        assert_eq!(tree.children[0].depth, 1, "tree has only one node");
     }
 }
