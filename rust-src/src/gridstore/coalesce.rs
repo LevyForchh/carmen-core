@@ -1,4 +1,5 @@
 use std::time::{SystemTime};
+extern crate procinfo;
 
 use std::borrow::Borrow;
 use std::cmp::Reverse;
@@ -339,7 +340,9 @@ pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug>(
     stack_tree: &StackableNode<T>,
     match_opts: &MatchOpts,
 ) -> Result<Vec<CoalesceContext>, Error> {
-    let tree_now = SystemTime::now();
+    let memory_before = procinfo::pid::statm_self().unwrap().resident as u32;
+    println!("memory before tree: {:?}", memory_before);
+    // let tree_now = SystemTime::now();
     // the "tree" is just a node with no phrasematch; assure that this is the case
     debug_assert!(stack_tree.phrasematch.is_none(), "no phrasematch on root node");
 
@@ -438,14 +441,16 @@ pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug>(
     //   we just shouldn't do that anymore though?
     contexts.truncate(MAX_CONTEXTS * 40);
 
-    match tree_now.elapsed() {
-        Ok(elapsed) => {
-            println!("tree: {}", elapsed.as_secs());
-        }
-        Err(e) => {
-            println!("Error: {:?}", e);
-        }
-    };
+    let memory_after = procinfo::pid::statm_self().unwrap().resident as u32;
+    println!("memory after tree: {:?} :", memory_after);
+    // match tree_now.elapsed() {
+    //     Ok(elapsed) => {
+    //         println!("tree: {}", elapsed.as_secs());
+    //     }
+    //     Err(e) => {
+    //         println!("Error: {:?}", e);
+    //     }
+    // };
 
     Ok(contexts)
 }
@@ -607,17 +612,22 @@ pub fn stack_and_coalesce<T: Borrow<GridStore> + Clone + Debug>(
 ) -> Result<Vec<CoalesceContext>, Error> {
     // currently stackable requires double-wrapping the phrasematches vector, which requires an
     // extra clone; ideally we wouldn't do that
-    let now = SystemTime::now();
-    let tree = stackable(phrasematches, None, 0, HashSet::new(), 0, 129, 0.0, 0);
+    // let now = SystemTime::now();
+    let memory_before = procinfo::pid::statm_self().unwrap().resident as u32;
+    println!("memory stackable before {:?} :", memory_before);
 
-    match now.elapsed() {
-        Ok(elapsed) => {
-            println!("stackable: {}", elapsed.as_secs());
-        }
-        Err(e) => {
-            println!("Error: {:?}", e);
-        }
-    };
+    let tree = stackable(phrasematches, None, 0, HashSet::new(), 0, 129, 0.0, 0);
+    let memory_after = procinfo::pid::statm_self().unwrap().resident as u32;
+    println!("memory stackable after {:?} :", memory_after);
+
+    // match now.elapsed() {
+    //     Ok(elapsed) => {
+    //         println!("stackable: {}", elapsed.as_millis());
+    //     }
+    //     Err(e) => {
+    //         println!("Error: {:?}", e);
+    //     }
+    // };
 
     tree_coalesce(&tree, &match_opts)
 }
