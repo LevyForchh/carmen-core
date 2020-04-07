@@ -9,9 +9,9 @@ use crate::gridstore::common::*;
 use crate::gridstore::store::*;
 
 #[derive(Debug, Clone)]
-pub struct StackableNode<T: Borrow<GridStore> + Clone + Debug> {
-    pub phrasematch: Option<PhrasematchSubquery<T>>,
-    pub children: Vec<StackableNode<T>>,
+pub struct StackableNode<'a, T: Borrow<GridStore> + Clone + Debug> {
+    pub phrasematch: Option<&'a PhrasematchSubquery<T>>,
+    pub children: Vec<StackableNode<'a, T>>,
     pub nmask: u32,
     pub bmask: HashSet<u16>,
     pub mask: u32,
@@ -20,7 +20,7 @@ pub struct StackableNode<T: Borrow<GridStore> + Clone + Debug> {
     pub zoom: u16,
 }
 
-impl<T: Borrow<GridStore> + Clone + Debug> StackableNode<T> {
+impl<'a, T: Borrow<GridStore> + Clone + Debug> StackableNode<'a, T> {
     fn is_leaf(&self) -> bool {
         self.children.len() == 0
     }
@@ -44,15 +44,15 @@ pub fn bfs<T: Borrow<GridStore> + Clone + Debug>(root: StackableNode<T>) -> Vec<
 }
 
 pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
-    phrasematch_results: &Vec<PhrasematchSubquery<T>>,
-    phrasematch_result: Option<PhrasematchSubquery<T>>,
+    phrasematch_results: &'a Vec<PhrasematchSubquery<T>>,
+    phrasematch_result: Option<&'a PhrasematchSubquery<T>>,
     nmask: u32,
     bmask: HashSet<u16>,
     mask: u32,
     idx: u16,
     max_relev: f64,
     zoom: u16,
-) -> StackableNode<T> {
+) -> StackableNode<'a, T> {
     let mut node = StackableNode {
         phrasematch: phrasematch_result,
         children: vec![],
@@ -75,21 +75,21 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
             }
         }
 
-        if (node.nmask & (1u32 << phrasematches.store.borrow().type_id)) == 0
+        if (node.nmask & (1u32 << phrasematches.store.borrow().type_id as u32)) == 0
             && (node.mask & phrasematches.mask) == 0
             && phrasematches.store.borrow().non_overlapping_indexes.contains(&node.idx) == false
         {
-            let target_nmask = &(1u32 << phrasematches.store.borrow().type_id) | node.nmask;
+            let target_nmask = &(1u32 << phrasematches.store.borrow().type_id as u32) | node.nmask;
             let target_mask = &phrasematches.mask | node.mask;
             let mut target_bmask: HashSet<u16> = node.bmask.iter().cloned().collect();
             let phrasematch_bmask: HashSet<u16> =
                 phrasematches.store.borrow().non_overlapping_indexes.iter().cloned().collect();
             target_bmask.extend(&phrasematch_bmask);
-            let target_relev = 0.0 + &phrasematches.weight;
+            let target_relev = 0.0 + phrasematches.weight;
 
             node.children.push(stackable(
                 &phrasematch_results,
-                Some(phrasematches.clone()),
+                Some(&phrasematches),
                 target_nmask,
                 target_bmask,
                 target_mask,
