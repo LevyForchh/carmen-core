@@ -22,11 +22,12 @@ fn coalesce_single_test_proximity_quadrants() {
 
     builder.finish().unwrap();
 
-    let store =
-        GridStore::new_with_options(directory.path(), 1, 14, 1, HashSet::new(), 200.).unwrap();
+    let store = GridStore::new_with_options(directory.path(), 14, 1, 200.).unwrap();
     let subquery = PhrasematchSubquery {
         id: 0,
         store: &store,
+        idx: 1,
+        non_overlapping_indexes: HashSet::new(),
         weight: 1.,
         match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 },
         mask: 1 << 0,
@@ -119,11 +120,12 @@ fn coalesce_single_test_proximity_basic() {
 
     builder.finish().unwrap();
 
-    let store =
-        GridStore::new_with_options(directory.path(), 1, 14, 1, HashSet::new(), 200.).unwrap();
+    let store = GridStore::new_with_options(directory.path(), 14, 1, 200.).unwrap();
     let subquery = PhrasematchSubquery {
         id: 0,
         store: &store,
+        idx: 1,
+        non_overlapping_indexes: HashSet::new(),
         weight: 1.,
         match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 },
         mask: 1 << 0,
@@ -167,11 +169,12 @@ fn coalesce_single_test_language_penalty() {
     builder.insert(&key, entries).expect("Unable to insert record");
     builder.finish().unwrap();
 
-    let store =
-        GridStore::new_with_options(directory.path(), 1, 14, 1, HashSet::new(), 1.).unwrap();
+    let store = GridStore::new_with_options(directory.path(), 14, 1, 1.).unwrap();
     let subquery = PhrasematchSubquery {
         id: 0,
         store: &store,
+        idx: 1,
+        non_overlapping_indexes: HashSet::new(),
         weight: 1.,
         match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 2 },
         mask: 1 << 0,
@@ -244,7 +247,9 @@ fn coalesce_multi_test_language_penalty() {
     let stack = vec![
         PhrasematchSubquery {
             id: 0,
-            store: &store1,
+            store: &store1.store,
+            idx: store1.idx,
+            non_overlapping_indexes: store1.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
@@ -254,7 +259,9 @@ fn coalesce_multi_test_language_penalty() {
         },
         PhrasematchSubquery {
             id: 0,
-            store: &store2,
+            store: &store2.store,
+            idx: store2.idx,
+            non_overlapping_indexes: store2.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
@@ -313,7 +320,9 @@ fn coalesce_single_test() {
     );
     let subquery = PhrasematchSubquery {
         id: 0,
-        store: &store,
+        store: &store.store,
+        idx: store.idx,
+        non_overlapping_indexes: store.non_overlapping_indexes.clone(),
         weight: 1.,
         match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 },
         mask: 1 << 0,
@@ -552,13 +561,14 @@ fn coalesce_single_languages_test() {
     }
     builder.finish().unwrap();
 
-    let store =
-        GridStore::new_with_options(directory.path(), 1, 6, 1, HashSet::new(), 200.).unwrap();
+    let store = GridStore::new_with_options(directory.path(), 6, 1, 200.).unwrap();
     // Test query with all languages
     println!("Coalesce single - all languages");
     let subquery = PhrasematchSubquery {
         id: 0,
         store: &store,
+        idx: 1,
+        non_overlapping_indexes: HashSet::new(),
         weight: 1.,
         match_key: MatchKey {
             match_phrase: MatchPhrase::Range { start: 1, end: 3 },
@@ -599,6 +609,8 @@ fn coalesce_single_languages_test() {
     let subquery = PhrasematchSubquery {
         id: 0,
         store: &store,
+        idx: 1,
+        non_overlapping_indexes: HashSet::new(),
         weight: 1.,
         match_key: MatchKey {
             match_phrase: MatchPhrase::Range { start: 1, end: 3 },
@@ -639,6 +651,8 @@ fn coalesce_single_languages_test() {
     let subquery = PhrasematchSubquery {
         id: 0,
         store: &store,
+        idx: 1,
+        non_overlapping_indexes: HashSet::new(),
         weight: 1.,
         match_key: MatchKey {
             match_phrase: MatchPhrase::Range { start: 1, end: 3 },
@@ -713,7 +727,9 @@ fn coalesce_multi_test() {
     let stack = vec![
         PhrasematchSubquery {
             id: 0,
-            store: &store1,
+            store: &store1.store,
+            idx: store1.idx,
+            non_overlapping_indexes: store1.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
@@ -723,7 +739,9 @@ fn coalesce_multi_test() {
         },
         PhrasematchSubquery {
             id: 0,
-            store: &store2,
+            store: &store2.store,
+            idx: store2.idx,
+            non_overlapping_indexes: store2.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
@@ -990,7 +1008,9 @@ fn coalesce_multi_languages_test() {
     let stack = vec![
         PhrasematchSubquery {
             id: 0,
-            store: &store1,
+            store: &store1.store,
+            idx: store1.idx,
+            non_overlapping_indexes: store1.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
@@ -1000,7 +1020,9 @@ fn coalesce_multi_languages_test() {
         },
         PhrasematchSubquery {
             id: 0,
-            store: &store2,
+            store: &store2.store,
+            idx: store2.idx,
+            non_overlapping_indexes: store2.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
@@ -1040,7 +1062,9 @@ fn coalesce_multi_languages_test() {
     let stack = vec![
         PhrasematchSubquery {
             id: 0,
-            store: &store1,
+            store: &store1.store,
+            idx: store1.idx,
+            non_overlapping_indexes: store1.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
@@ -1050,7 +1074,9 @@ fn coalesce_multi_languages_test() {
         },
         PhrasematchSubquery {
             id: 0,
-            store: &store2,
+            store: &store2.store,
+            idx: store2.idx,
+            non_overlapping_indexes: store2.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
@@ -1090,7 +1116,9 @@ fn coalesce_multi_languages_test() {
     let stack = vec![
         PhrasematchSubquery {
             id: 0,
-            store: &store1,
+            store: &store1.store,
+            idx: store1.idx,
+            non_overlapping_indexes: store1.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
@@ -1100,7 +1128,9 @@ fn coalesce_multi_languages_test() {
         },
         PhrasematchSubquery {
             id: 0,
-            store: &store2,
+            store: &store2.store,
+            idx: store2.idx,
+            non_overlapping_indexes: store2.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
@@ -1177,7 +1207,9 @@ fn coalesce_multi_scoredist() {
     let stack = vec![
         PhrasematchSubquery {
             id: 0,
-            store: &store1,
+            store: &store1.store,
+            idx: store1.idx,
+            non_overlapping_indexes: store1.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
@@ -1187,7 +1219,9 @@ fn coalesce_multi_scoredist() {
         },
         PhrasematchSubquery {
             id: 0,
-            store: &store2,
+            store: &store2.store,
+            idx: store2.idx,
+            non_overlapping_indexes: store2.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
@@ -1277,7 +1311,9 @@ fn coalesce_multi_test_bbox() {
     let stack = vec![
         PhrasematchSubquery {
             id: 0,
-            store: &store1,
+            store: &store1.store,
+            idx: store1.idx,
+            non_overlapping_indexes: store1.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
@@ -1287,7 +1323,9 @@ fn coalesce_multi_test_bbox() {
         },
         PhrasematchSubquery {
             id: 0,
-            store: &store2,
+            store: &store2.store,
+            idx: store2.idx,
+            non_overlapping_indexes: store2.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
@@ -1357,7 +1395,9 @@ fn coalesce_multi_test_bbox() {
     let stack = vec![
         PhrasematchSubquery {
             id: 0,
-            store: &store2,
+            store: &store2.store,
+            idx: store2.idx,
+            non_overlapping_indexes: store2.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 4 },
@@ -1367,7 +1407,9 @@ fn coalesce_multi_test_bbox() {
         },
         PhrasematchSubquery {
             id: 0,
-            store: &store3,
+            store: &store3.store,
+            idx: store3.idx,
+            non_overlapping_indexes: store3.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 4 },

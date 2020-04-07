@@ -134,6 +134,7 @@ tape('Coalesce tests - invalid inputs', (t) => {
     // no weight
     const no_weight = [{
         store: reader,
+		non_overlapping_indexes: [],
         match_key: {
             lang_set: [0],
             match_phrase: {
@@ -170,6 +171,7 @@ tape('Coalesce tests - invalid inputs', (t) => {
 
     const no_match_key = [{
         store: reader,
+        non_overlapping_indexes: [],
         weight: 0.5,
         idx: 2,
         zoom: 6,
@@ -179,6 +181,7 @@ tape('Coalesce tests - invalid inputs', (t) => {
 
     const no_idx = [{
         store: reader,
+        non_overlapping_indexes: [],
         weight: 0.5,
         match_key: {
             lang_set: [0],
@@ -196,6 +199,7 @@ tape('Coalesce tests - invalid inputs', (t) => {
 
     const no_mask = [{
         store: reader,
+        non_overlapping_indexes: [],
         weight: 0.5,
         match_key: {
             lang_set: [0],
@@ -223,10 +227,12 @@ tape('Coalesce single valid stack - Valid inputs', (t) => {
         ]
     );
     builder.finish();
-    const reader = new addon.GridStore(tmpDir.name, { idx: 1, zoom: 14, non_overlapping_indexes: Array.from(new Set()), type_id: 0, coalesce_radius: 200 });
+    const readerOpts = { idx: 1, zoom: 14, non_overlapping_indexes: Array.from(new Set()), type_id: 0, coalesce_radius: 200 };
+	const reader = new addon.GridStore(tmpDir.name, readerOpts);
 
     const valid_stack = [{
         store: reader,
+        non_overlapping_indexes: [],
         weight: 1,
         match_key: {
             lang_set: [1],
@@ -271,7 +277,8 @@ tape('Coalesce multi valid stack - Valid inputs', (t) => {
         ]
     );
     builder1.finish();
-    const reader1 = new addon.GridStore(tmpDir1.name, { idx: 0, zoom: 1, non_overlapping_indexes: Array.from(new Set()), type_id: 0, coalesce_radius: 200 });
+    const reader1Opts = { idx: 0, zoom: 1, non_overlapping_indexes: Array.from(new Set()), type_id: 0, coalesce_radius: 200 };
+	const reader1 = new addon.GridStore(tmpDir1.name, reader1Opts);
 
     const tmpDir2 = tmp.dirSync();
     const builder2 = new addon.GridStoreBuilder(tmpDir2.name);
@@ -282,10 +289,12 @@ tape('Coalesce multi valid stack - Valid inputs', (t) => {
         ]
     );
     builder2.finish();
-    const reader2 = new addon.GridStore(tmpDir2.name, { idx: 1, zoom: 2, non_overlapping_indexes: Array.from(new Set()), type_id: 1, coalesce_radius: 200 });
+    const reader2Opts = { idx: 1, zoom: 2, non_overlapping_indexes: Array.from(new Set()), type_id: 1, coalesce_radius: 200 };
+	const reader2 = new addon.GridStore(tmpDir2.name, reader2Opts);
 
     const valid_coalesce_multi = [{
         store: reader1,
+		non_overlapping_indexes: reader1Opts.non_overlapping_indexes,
         weight: 0.5,
         match_key: {
             lang_set: [1],
@@ -302,6 +311,7 @@ tape('Coalesce multi valid stack - Valid inputs', (t) => {
         id: 0
     },{
         store: reader2,
+		non_overlapping_indexes: reader2Opts.non_overlapping_indexes,
         weight: 0.5,
         match_key: {
             lang_set: [1],
@@ -337,6 +347,7 @@ tape('lang_set >= 128', (t) => {
 
     const lang_set_stack = [{
         store: reader,
+		non_overlapping_indexes: [],
         weight: 1,
         match_key: {
             lang_set: [128],
@@ -413,8 +424,10 @@ tape('Bin boundaries', (t) => {
     builderWithBoundaries.finish();
     builderWithoutBoundaries.finish();
 
-    const readerWithBoundaries = new addon.GridStore(directoryWithBoundaries.name, { idx: 1, zoom: 14, non_overlapping_indexes: Array.from(new Set()), type_id: 0, coalesce_radius: 200 });
-    const readerWithoutBoundaries = new addon.GridStore(directoryWithoutBoundaries.name, { idx: 1, zoom: 14, non_overlapping_indexes: Array.from(new Set()), type_id: 0, coalesce_radius: 200 });
+    const readerWithBoundariesOpts = { idx: 1, zoom: 14, non_overlapping_indexes: Array.from(new Set()), type_id: 0, coalesce_radius: 200 };
+	const readerWithBoundaries = new addon.GridStore(directoryWithBoundaries.name, readerWithBoundariesOpts);
+    const readerWithoutBoundariesOpts = { idx: 1, zoom: 14, non_overlapping_indexes: Array.from(new Set()), type_id: 0, coalesce_radius: 200 };
+	const readerWithoutBoundaries = new addon.GridStore(directoryWithoutBoundaries.name, readerWithoutBoundariesOpts);
 
     const findRange = (prefix) => {
         let start = null,
@@ -441,6 +454,7 @@ tape('Bin boundaries', (t) => {
     ].forEach(({ reader, range }) => {
         const subquery = {
             store: reader,
+		    non_overlapping_indexes: [],
             weight: 1.,
             match_key: { match_phrase: { "Range": range }, lang_set: [1] },
             idx: 1,
@@ -472,9 +486,10 @@ tape('Deserialize phrasematch results', (t) => {
         ]
     );
     builder.finish();
-    const store = new addon.GridStore(tmpDir.name, { idx: 0, zoom: 14, non_overlapping_indexes: Array.from(new Set()), type_id: 0, coalesce_radius: 200 });
+    const storeOpts = { idx: 0, zoom: 14, non_overlapping_indexes: Array.from(new Set()), type_id: 0, coalesce_radius: 200 };
+	const store = new addon.GridStore(tmpDir.name, storeOpts);
     let phrasematchResults = [
-        new Phrasematch(store, ['main', 'street'], 'main street', 1, [0, 2], 1, 0, 14, 6, 1, false, false, false, 0, ['main', 'street'], 0, 14, [0], 1)
+        new Phrasematch(store, ['main', 'street'], 'main street', 1, [0, 2], 1, 0, 14, 6, 1, false, false, false, 0, ['main', 'street'], 0, 14, [0], 1, 0, [])
     ];
     addon.stackable(phrasematchResults);
     t.end();
@@ -482,7 +497,7 @@ tape('Deserialize phrasematch results', (t) => {
 
 
 
-function Phrasematch(store, subquery, phrase, weight, phrase_id_range, scorefactor, prefix, mask, zoom, editMultiplier, prox_match, cat_match, partial_number, subquery_edit_distance, original_phrase, original_phrase_ender, original_phrase_mask, languages, id) {
+function Phrasematch(store, subquery, phrase, weight, phrase_id_range, scorefactor, prefix, mask, zoom, editMultiplier, prox_match, cat_match, partial_number, subquery_edit_distance, original_phrase, original_phrase_ender, original_phrase_mask, languages, id, idx, non_overlapping_indexes) {
     this.store = store;
     this.subquery = subquery;
     this.phrase = phrase;
@@ -501,6 +516,8 @@ function Phrasematch(store, subquery, phrase, weight, phrase_id_range, scorefact
     this.original_phrase_ender = original_phrase_ender;
     this.original_phrase_mask = original_phrase_mask;
     this.id = id;
+    this.idx = idx;
+    this.non_overlapping_indexes = [];
 
     if (languages) {
         // carmen-cache gives special treatment to the "languages" property
@@ -519,9 +536,5 @@ function Phrasematch(store, subquery, phrase, weight, phrase_id_range, scorefact
         }
     };
 }
-
-Phrasematch.prototype.clone = function() {
-    return new Phrasematch(this.store, this.subquery.slice(), this.phrase, this.weight, this.phrase_id_range, this.scorefactor, this.prefix, this.mask, this.zoom, this.editMultiplier, this.prox_match, this.cat_match, this.partial_number, this.subquery_edit_distance, this.original_phrase, this.original_phrase_ender, this.original_phrase_mask, this.languages, this.id);
-};
 
 module.exports.Phrasematch = Phrasematch;

@@ -1,4 +1,5 @@
 use std::borrow::Borrow;
+use std::collections::HashSet;
 
 use crate::gridstore::store::GridStore;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
@@ -376,6 +377,8 @@ fn serialize_path<S: Serializer, T: Borrow<GridStore>>(store: &T, s: S) -> Resul
 pub struct PhrasematchSubquery<T: Borrow<GridStore> + Clone> {
     #[serde(serialize_with = "serialize_path")]
     pub store: T,
+    pub idx: u16,
+    pub non_overlapping_indexes: HashSet<u16>, // the field formerly known as bmask
     pub weight: f64,
     pub match_key: MatchKey,
     pub mask: u32,

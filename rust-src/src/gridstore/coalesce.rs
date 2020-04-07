@@ -58,8 +58,8 @@ fn grid_to_coalesce_entry<T: Borrow<GridStore> + Clone>(
     CoalesceEntry {
         grid_entry: GridEntry { relev: relevance, ..grid.grid_entry },
         matches_language: grid.matches_language,
-        idx: subquery.store.borrow().idx,
-        tmp_id: ((subquery.store.borrow().idx as u32) << 25) + grid.grid_entry.id,
+        idx: subquery.idx,
+        tmp_id: ((subquery.idx as u32) << 25) + grid.grid_entry.id,
         mask: subquery.mask,
         distance: grid.distance,
         scoredist: grid.scoredist,
@@ -174,7 +174,7 @@ fn coalesce_multi<T: Borrow<GridStore> + Clone>(
     mut stack: Vec<PhrasematchSubquery<T>>,
     match_opts: &MatchOpts,
 ) -> Result<Vec<CoalesceContext>, Error> {
-    stack.sort_by_key(|subquery| (subquery.store.borrow().zoom, subquery.store.borrow().idx));
+    stack.sort_by_key(|subquery| (subquery.store.borrow().zoom, subquery.idx));
 
     let mut coalesced: HashMap<(u16, u16, u16), Vec<CoalesceContext>> = HashMap::new();
     let mut contexts: Vec<CoalesceContext> = Vec::new();
@@ -189,7 +189,7 @@ fn coalesce_multi<T: Borrow<GridStore> + Clone>(
         let compatible_zooms: Vec<u16> = stack
             .iter()
             .filter_map(|subquery_b| {
-                if subquery.store.borrow().idx == subquery_b.store.borrow().idx
+                if subquery.idx == subquery_b.idx
                     || subquery.store.borrow().zoom < subquery_b.store.borrow().zoom
                 {
                     None

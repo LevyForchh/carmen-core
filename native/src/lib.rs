@@ -79,10 +79,8 @@ type KeyIterator = OwningHandle<ArcGridStore, Box<dyn Iterator<Item=Result<GridK
 
 #[derive(Deserialize, Debug, PartialEq, Clone)]
 struct GridStoreOpts {
-    pub idx: u16,
     pub zoom: u16,
     pub type_id: u16,
-    pub non_overlapping_indexes: HashSet<u16>, // the field formerly known as bmask
     pub coalesce_radius: f64,
 }
 
@@ -287,10 +285,8 @@ declare_types! {
 
                     GridStore::new_with_options(
                         filename,
-                        opts.idx,
                         opts.zoom,
                         opts.type_id,
-                        opts.non_overlapping_indexes,
                         opts.coalesce_radius
                     )
                 },
@@ -497,12 +493,18 @@ where
 
         let id = js_phrasematch.get(cx, "id")?;
 
+        let idx = js_phrasematch.get(cx, "idx")?;
+
+        let non_overlapping_indexes = js_phrasematch.get(cx, "non_overlapping_indexes")?;
+
         let subq = PhrasematchSubquery {
             store: gridstore,
             weight: neon_serde::from_value(cx, weight)?,
             match_key: MatchKey { match_phrase: neon_serde::from_value(cx, match_phrase)?, lang_set },
             mask: neon_serde::from_value(cx, mask)?,
             id: neon_serde::from_value(cx, id)?,
+            idx: neon_serde::from_value(cx, idx)?,
+            non_overlapping_indexes: neon_serde::from_value(cx, non_overlapping_indexes)?,
         };
         phrasematches.push(subq);
     }

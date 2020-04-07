@@ -69,7 +69,7 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
             if node.zoom > phrasematches.store.borrow().zoom {
                 continue;
             } else if node.zoom == phrasematches.store.borrow().zoom {
-                if node.idx > phrasematches.store.borrow().idx {
+                if node.idx > phrasematches.idx {
                     continue;
                 }
             }
@@ -77,13 +77,13 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
 
         if (node.nmask & (1u32 << phrasematches.store.borrow().type_id)) == 0
             && (node.mask & phrasematches.mask) == 0
-            && phrasematches.store.borrow().non_overlapping_indexes.contains(&node.idx) == false
+            && phrasematches.non_overlapping_indexes.contains(&node.idx) == false
         {
             let target_nmask = &(1u32 << phrasematches.store.borrow().type_id) | node.nmask;
             let target_mask = &phrasematches.mask | node.mask;
             let mut target_bmask: HashSet<u16> = node.bmask.iter().cloned().collect();
             let phrasematch_bmask: HashSet<u16> =
-                phrasematches.store.borrow().non_overlapping_indexes.iter().cloned().collect();
+                phrasematches.non_overlapping_indexes.iter().cloned().collect();
             target_bmask.extend(&phrasematch_bmask);
             let target_relev = 0.0 + &phrasematches.weight;
 
@@ -93,7 +93,7 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
                 target_nmask,
                 target_bmask,
                 target_mask,
-                phrasematches.store.borrow().idx,
+                phrasematches.idx,
                 target_relev,
                 phrasematches.store.borrow().zoom,
             ));
@@ -129,14 +129,14 @@ mod test {
         ];
         builder.insert(&key, entries).expect("Unable to insert record");
         builder.finish().unwrap();
-        let store1 =
-            GridStore::new_with_options(directory.path(), 1, 14, 1, HashSet::new(), 200.).unwrap();
-        let store2 =
-            GridStore::new_with_options(directory.path(), 2, 14, 2, HashSet::new(), 200.).unwrap();
+        let store1 = GridStore::new_with_options(directory.path(), 14, 1, 200.).unwrap();
+        let store2 = GridStore::new_with_options(directory.path(), 14, 2, 200.).unwrap();
 
         let a1 = PhrasematchSubquery {
             id: 0,
             store: &store1,
+            idx: 1,
+            non_overlapping_indexes: HashSet::new(),
             weight: 0.5,
             match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
             mask: 2,
@@ -145,6 +145,8 @@ mod test {
         let b1 = PhrasematchSubquery {
             id: 1,
             store: &store2,
+            idx: 2,
+            non_overlapping_indexes: HashSet::new(),
             weight: 0.5,
             match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
             mask: 1,
@@ -153,6 +155,8 @@ mod test {
         let b2 = PhrasematchSubquery {
             id: 2,
             store: &store2,
+            idx: 2,
+            non_overlapping_indexes: HashSet::new(),
             weight: 0.5,
             match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
             mask: 1,
@@ -203,6 +207,8 @@ mod test {
         let a1 = PhrasematchSubquery {
             id: 0,
             store: &store,
+            idx: 1,
+            non_overlapping_indexes: HashSet::new(),
             weight: 0.5,
             match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
             mask: 1,
@@ -211,6 +217,8 @@ mod test {
         let b1 = PhrasematchSubquery {
             id: 1,
             store: &store,
+            idx: 1,
+            non_overlapping_indexes: HashSet::new(),
             weight: 0.5,
             match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
             mask: 1,
@@ -247,6 +255,8 @@ mod test {
         let a1 = PhrasematchSubquery {
             id: 0,
             store: &store,
+            idx: 1,
+            non_overlapping_indexes: HashSet::new(),
             weight: 0.5,
             match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
             mask: 1,
@@ -255,6 +265,8 @@ mod test {
         let b1 = PhrasematchSubquery {
             id: 1,
             store: &store,
+            idx: 1,
+            non_overlapping_indexes: HashSet::new(),
             weight: 0.5,
             match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
             mask: 1,
@@ -285,6 +297,8 @@ mod test {
         let a1 = PhrasematchSubquery {
             id: 0,
             store: &store,
+            idx: 1,
+            non_overlapping_indexes: HashSet::new(),
             weight: 0.5,
             match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
             mask: 1,
@@ -293,6 +307,8 @@ mod test {
         let b1 = PhrasematchSubquery {
             id: 1,
             store: &store,
+            idx: 1,
+            non_overlapping_indexes: HashSet::new(),
             weight: 0.5,
             match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
             mask: 1,
