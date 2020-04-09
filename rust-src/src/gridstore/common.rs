@@ -372,7 +372,7 @@ pub struct CoalesceContext {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MatchKeyWithId {
     pub key: MatchKey,
-    pub id: u32
+    pub id: u32,
 }
 
 #[derive(Serialize, Debug, Clone)]

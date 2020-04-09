@@ -133,32 +133,38 @@ mod test {
         let store2 = GridStore::new_with_options(directory.path(), 14, 2, 200.).unwrap();
 
         let a1 = PhrasematchSubquery {
-            id: 0,
             store: &store1,
             idx: 1,
             non_overlapping_indexes: HashSet::new(),
             weight: 0.5,
-            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+            match_keys: vec![MatchKeyWithId {
+                key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+                id: 0,
+            }],
             mask: 2,
         };
 
         let b1 = PhrasematchSubquery {
-            id: 1,
             store: &store2,
             idx: 2,
             non_overlapping_indexes: HashSet::new(),
             weight: 0.5,
-            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+            match_keys: vec![MatchKeyWithId {
+                key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+                id: 1,
+            }],
             mask: 1,
         };
 
         let b2 = PhrasematchSubquery {
-            id: 2,
             store: &store2,
             idx: 2,
             non_overlapping_indexes: HashSet::new(),
             weight: 0.5,
-            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+            match_keys: vec![MatchKeyWithId {
+                key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+                id: 2,
+            }],
             mask: 1,
         };
 
@@ -169,21 +175,21 @@ mod test {
             .clone()
             .children
             .iter()
-            .map(|node| node.phrasematch.as_ref().map(|p| p.id).unwrap())
+            .map(|node| node.phrasematch.as_ref().map(|p| p.match_keys[0].id).unwrap())
             .collect();
         assert_eq!(vec![1, 2], a1_children_ids, "a1 can stack with b1 and b2");
         let b1_children_ids: Vec<u32> = tree.clone().children[1]
             .clone()
             .children
             .iter()
-            .map(|node| node.phrasematch.as_ref().map(|p| p.id).unwrap())
+            .map(|node| node.phrasematch.as_ref().map(|p| p.match_keys[0].id).unwrap())
             .collect();
         assert_eq!(0, b1_children_ids.len(), "b1 cannot stack with b2, same nmask");
         let b2_children_ids: Vec<u32> = tree.clone().children[2]
             .clone()
             .children
             .iter()
-            .map(|node| node.phrasematch.as_ref().map(|p| p.id).unwrap())
+            .map(|node| node.phrasematch.as_ref().map(|p| p.match_keys[0].id).unwrap())
             .collect();
         assert_eq!(0, b2_children_ids.len(), "b2 cannot stack with b1, same nmask");
     }
@@ -205,22 +211,26 @@ mod test {
         let store = GridStore::new(directory.path()).unwrap();
 
         let a1 = PhrasematchSubquery {
-            id: 0,
             store: &store,
             idx: 1,
             non_overlapping_indexes: HashSet::new(),
             weight: 0.5,
-            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+            match_keys: vec![MatchKeyWithId {
+                key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+                id: 0,
+            }],
             mask: 1,
         };
 
         let b1 = PhrasematchSubquery {
-            id: 1,
             store: &store,
             idx: 1,
             non_overlapping_indexes: HashSet::new(),
             weight: 0.5,
-            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+            match_keys: vec![MatchKeyWithId {
+                key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+                id: 1,
+            }],
             mask: 1,
         };
         let phrasematch_results = vec![a1, b1];
@@ -253,22 +263,26 @@ mod test {
         b1_bmask.insert(0);
 
         let a1 = PhrasematchSubquery {
-            id: 0,
             store: &store,
             idx: 1,
             non_overlapping_indexes: HashSet::new(),
             weight: 0.5,
-            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+            match_keys: vec![MatchKeyWithId {
+                key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+                id: 0,
+            }],
             mask: 1,
         };
 
         let b1 = PhrasematchSubquery {
-            id: 1,
             store: &store,
             idx: 1,
             non_overlapping_indexes: HashSet::new(),
             weight: 0.5,
-            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+            match_keys: vec![MatchKeyWithId {
+                key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+                id: 1,
+            }],
             mask: 1,
         };
         let phrasematch_results = vec![a1, b1];
@@ -295,22 +309,26 @@ mod test {
         let store = GridStore::new(directory.path()).unwrap();
 
         let a1 = PhrasematchSubquery {
-            id: 0,
             store: &store,
             idx: 1,
             non_overlapping_indexes: HashSet::new(),
             weight: 0.5,
-            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+            match_keys: vec![MatchKeyWithId {
+                key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+                id: 0,
+            }],
             mask: 1,
         };
 
         let b1 = PhrasematchSubquery {
-            id: 1,
             store: &store,
             idx: 1,
             non_overlapping_indexes: HashSet::new(),
             weight: 0.5,
-            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+            match_keys: vec![MatchKeyWithId {
+                key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+                id: 1,
+            }],
             mask: 1,
         };
         let phrasematch_results = vec![a1, b1];

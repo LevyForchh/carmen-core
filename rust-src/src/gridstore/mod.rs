@@ -642,15 +642,17 @@ mod tests {
         .into_iter()
         .map(|(reader, range)| {
             let subquery = PhrasematchSubquery {
-                id: 0,
                 store: reader,
                 idx: 1,
                 non_overlapping_indexes: HashSet::new(),
                 weight: 1.,
-                match_key: MatchKey {
-                    match_phrase: MatchPhrase::Range { start: range.0, end: range.1 },
-                    lang_set: 1,
-                },
+                match_keys: vec![MatchKeyWithId {
+                    id: 0,
+                    key: MatchKey {
+                        match_phrase: MatchPhrase::Range { start: range.0, end: range.1 },
+                        lang_set: 1,
+                    },
+                }],
                 mask: 1 << 0,
             };
             let stack = vec![subquery];

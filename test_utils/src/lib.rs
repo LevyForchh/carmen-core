@@ -115,7 +115,8 @@ fn load_db_from_json_reader<T: BufRead>(json_source: T, split_source: T, store_p
         }
     });
 
-    let boundaries: Vec<u32> = serde_json::from_reader(split_source).expect("Error deserializing json from string");
+    let boundaries: Vec<u32> =
+        serde_json::from_reader(split_source).expect("Error deserializing json from string");
     builder.load_bin_boundaries(boundaries).unwrap();
 
     builder.finish().unwrap();
@@ -229,23 +230,25 @@ pub fn prepare_phrasematches(
                     .0
                     .iter()
                     .map(|placeholder| {
-                        let store = stores.entry(placeholder.store.path.clone()).or_insert_with(|| {
-                            let store_name = placeholder
-                                .store
-                                .path
-                                .rsplit("/")
-                                .next()
-                                .unwrap()
-                                .replace(".rocksdb", ".dat.lz4");
-                            let store_path = ensure_store(&store_name);
-                            let gs = GridStore::new_with_options(
-                                store_path,
-                                placeholder.store.zoom,
-                                placeholder.store.type_id,
-                                placeholder.store.coalesce_radius,
-                            ).unwrap();
-                            Rc::new(gs)
-                        });
+                        let store =
+                            stores.entry(placeholder.store.path.clone()).or_insert_with(|| {
+                                let store_name = placeholder
+                                    .store
+                                    .path
+                                    .rsplit("/")
+                                    .next()
+                                    .unwrap()
+                                    .replace(".rocksdb", ".dat.lz4");
+                                let store_path = ensure_store(&store_name);
+                                let gs = GridStore::new_with_options(
+                                    store_path,
+                                    placeholder.store.zoom,
+                                    placeholder.store.type_id,
+                                    placeholder.store.coalesce_radius,
+                                )
+                                .unwrap();
+                                Rc::new(gs)
+                            });
                         PhrasematchSubquery {
                             store: store.clone(),
                             weight: placeholder.weight,
