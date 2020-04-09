@@ -207,9 +207,8 @@ struct SubqueryPlaceholder {
     idx: u16,
     non_overlapping_indexes: HashSet<u16>,
     weight: f64,
-    match_key: MatchKey,
+    match_keys: Vec<MatchKeyWithId>,
     mask: u32,
-    id: u32,
 }
 
 pub fn prepare_phrasematches(
@@ -250,9 +249,8 @@ pub fn prepare_phrasematches(
                         PhrasematchSubquery {
                             store: store.clone(),
                             weight: placeholder.weight,
-                            match_key: placeholder.match_key.clone(),
+                            match_keys: placeholder.match_keys.clone(),
                             mask: placeholder.mask,
-                            id: placeholder.id,
                             idx: placeholder.idx,
                             non_overlapping_indexes: placeholder.non_overlapping_indexes.clone(),
                         }
