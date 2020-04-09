@@ -89,16 +89,20 @@ pub fn get_absolute_path(relative_path: &Path) -> Result<PathBuf, Error> {
 }
 
 /// Load grid data from a local JSON path
-pub fn load_db_from_json(json_path: &str, store_path: &str) {
+pub fn load_db_from_json(json_path: &str, split_path: &str, store_path: &str) {
     // Open json file
-    let path = Path::new(json_path);
-    let f = File::open(path).expect("Error opening file");
-    let file = io::BufReader::new(f);
+    let json_path = Path::new(json_path);
+    let json_f = File::open(json_path).expect("Error opening file");
+    let json_file = io::BufReader::new(json_f);
 
-    load_db_from_json_reader(file, None, store_path);
+    let split_path = Path::new(split_path);
+    let split_f = File::open(split_path).expect("Error opening file");
+    let split_file = io::BufReader::new(split_f);
+
+    load_db_from_json_reader(json_file, split_file, store_path);
 }
 
-fn load_db_from_json_reader<T: BufRead>(json_source: T, split_source: Option<T>, store_path: &str) {
+fn load_db_from_json_reader<T: BufRead>(json_source: T, split_source: T, store_path: &str) {
     // Set up new gridstore
     let directory = Path::new(store_path);
     let mut builder = GridStoreBuilder::new(directory).unwrap();
@@ -111,20 +115,8 @@ fn load_db_from_json_reader<T: BufRead>(json_source: T, split_source: Option<T>,
         }
     });
 
-    if let Some(splits) = split_source {
-        let boundary_records: Vec<PrefixBoundary> = splits
-            .lines()
-            .map(|l| {
-                serde_json::from_str(&l.unwrap()).expect("Error deserializing json from string")
-            })
-            .collect();
-
-        if boundary_records.len() > 0 {
-            let mut boundaries: Vec<u32> = boundary_records.iter().map(|r| r.first).collect();
-            boundaries.push(boundary_records.last().unwrap().last + 1);
-            builder.load_bin_boundaries(boundaries).unwrap();
-        }
-    }
+    let boundaries: Vec<u32> = serde_json::from_reader(split_source).expect("Error deserializing json from string");
+    builder.load_bin_boundaries(boundaries).unwrap();
 
     builder.finish().unwrap();
 }
@@ -143,7 +135,7 @@ pub fn dump_db_to_json(store_path: &str, json_path: &str) {
         writer.write(&bytes).unwrap();
         writer.write(b"\n").unwrap();
     }
-    
+
     let mut boundaries: Vec<u32> = reader.bin_boundaries.iter().cloned().collect();
     boundaries.sort();
     let splits_path = json_path.to_owned().replace(".gridstore.dat", "") + ".gridstore.splits";
@@ -160,7 +152,7 @@ pub fn ensure_downloaded(datafile: &str) -> PathBuf {
         let client = S3Client::new(Region::UsEast1);
         let request = GetObjectRequest {
             bucket: "mapbox".to_owned(),
-            key: ("playground/apendleton/gridstore_bench/".to_owned() + datafile),
+            key: ("playground/apendleton/gridstore_bench_v2/".to_owned() + datafile),
             ..Default::default()
         };
 
@@ -178,7 +170,7 @@ pub fn ensure_downloaded(datafile: &str) -> PathBuf {
 }
 
 pub const GRIDSTORE_DATA_SUFFIX: &'static str = ".gridstore.dat.lz4";
-pub const PREFIX_BOUNDARY_SUFFIX: &'static str = ".splits.lz4";
+pub const PREFIX_BOUNDARY_SUFFIX: &'static str = ".gridstore.splits.lz4";
 
 pub fn ensure_store(datafile: &str) -> PathBuf {
     let tmp = std::env::temp_dir().join("carmen_core_data/indexes");
@@ -195,23 +187,32 @@ pub fn ensure_store(datafile: &str) -> PathBuf {
         let splits_decoder = Decoder::new(File::open(splits_path).unwrap()).unwrap();
         let splits_file = io::BufReader::new(splits_decoder);
 
-        load_db_from_json_reader(grid_file, Some(splits_file), idx_path.to_str().unwrap());
+        load_db_from_json_reader(grid_file, splits_file, idx_path.to_str().unwrap());
     }
 
     idx_path
 }
 
 #[derive(Deserialize, Debug)]
-struct SubqueryPlaceholder {
-    store: String,
-    weight: f64,
-    match_key: MatchKey,
-    idx: u16,
+pub struct GridStorePlaceholder {
+    path: String,
     zoom: u16,
-    mask: u32,
+    type_id: u16,
+    coalesce_radius: f64,
 }
 
-pub fn prepare_coalesce_stacks(
+#[derive(Deserialize, Debug)]
+struct SubqueryPlaceholder {
+    store: GridStorePlaceholder,
+    idx: u16,
+    non_overlapping_indexes: HashSet<u16>,
+    weight: f64,
+    match_key: MatchKey,
+    mask: u32,
+    id: u32,
+}
+
+pub fn prepare_phrasematches(
     datafile: &str,
 ) -> Vec<(Vec<PhrasematchSubquery<Rc<GridStore>>>, MatchOpts)> {
     let path = ensure_downloaded(datafile);
@@ -229,15 +230,21 @@ pub fn prepare_coalesce_stacks(
                     .0
                     .iter()
                     .map(|placeholder| {
-                        let store = stores.entry(placeholder.store.clone()).or_insert_with(|| {
+                        let store = stores.entry(placeholder.store.path.clone()).or_insert_with(|| {
                             let store_name = placeholder
                                 .store
+                                .path
                                 .rsplit("/")
                                 .next()
                                 .unwrap()
                                 .replace(".rocksdb", ".dat.lz4");
                             let store_path = ensure_store(&store_name);
-                            let gs = GridStore::new(store_path).unwrap();
+                            let gs = GridStore::new_with_options(
+                                store_path,
+                                placeholder.store.zoom,
+                                placeholder.store.type_id,
+                                placeholder.store.coalesce_radius,
+                            ).unwrap();
                             Rc::new(gs)
                         });
                         PhrasematchSubquery {
@@ -245,9 +252,9 @@ pub fn prepare_coalesce_stacks(
                             weight: placeholder.weight,
                             match_key: placeholder.match_key.clone(),
                             mask: placeholder.mask,
-                            id: 0,
+                            id: placeholder.id,
                             idx: placeholder.idx,
-                            non_overlapping_indexes: HashSet::new(),
+                            non_overlapping_indexes: placeholder.non_overlapping_indexes.clone(),
                         }
                     })
                     .collect();
@@ -259,31 +266,4 @@ pub fn prepare_coalesce_stacks(
         })
         .collect();
     out
-}
-
-/// Loads json from a file into a Vector of GridEntrys
-/// The input file should be line-delimited JSON with all of the fields of a GridEntry
-/// The path should be relative to the carmen-core directory
-///
-/// Example:
-/// {"relev": 1, "score": 1, "x": 1, "y": 2, "id": 1, "source_phrase_hash": 0}
-pub fn load_simple_grids_from_json(path: &Path) -> Result<Vec<GridEntry>, Error> {
-    let dir = env::current_dir().expect("Error getting current dir");
-    let mut filepath = fs::canonicalize(&dir).expect("Error getting cannonicalized current dir");
-    filepath.push(path);
-    let f = File::open(path).expect("Error opening file");
-    let file = io::BufReader::new(f);
-    let entries: Vec<GridEntry> = file
-        .lines()
-        .filter_map(|l| match l.unwrap() {
-            ref t if t.len() == 0 => None,
-            t => {
-                let deserialized: GridEntry =
-                    serde_json::from_str(&t).expect("Error deserializing json from string");
-                Some(deserialized)
-            }
-        })
-        .collect::<Vec<GridEntry>>();
-
-    Ok(entries)
 }
