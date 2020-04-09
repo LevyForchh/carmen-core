@@ -375,7 +375,6 @@ fn serialize_path<S: Serializer, T: Borrow<GridStore>>(store: &T, s: S) -> Resul
 
 #[derive(Serialize, Debug, Clone)]
 pub struct PhrasematchSubquery<T: Borrow<GridStore> + Clone> {
-    #[serde(serialize_with = "serialize_path")]
     pub store: T,
     pub idx: u16,
     pub non_overlapping_indexes: HashSet<u16>, // the field formerly known as bmask
