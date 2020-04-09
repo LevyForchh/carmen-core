@@ -456,6 +456,9 @@ pub fn js_stack_and_coalesce(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let match_opts: MatchOpts = neon_serde::from_value(&mut cx, js_match_ops)?;
     let cb = cx.argument::<JsFunction>(2)?;
 
+    let serialized = serde_json::to_string(&(&phrase_subq, &match_opts));
+    println!("PHRASEMATCH {}", serialized.unwrap());
+
     let task = StackAndCoalesceTask { argument: (phrase_subq, match_opts) };
     task.schedule(cb);
 
