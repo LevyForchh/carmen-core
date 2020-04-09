@@ -1,3 +1,4 @@
+/*
 use std::borrow::Borrow;
 use std::path::Path;
 use std::rc::Rc;
@@ -236,3 +237,5 @@ pub fn benchmark(c: &mut Criterion) {
 
     c.bench_functions("coalesce", to_bench, ());
 }
+
+*/

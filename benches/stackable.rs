@@ -1,51 +1,55 @@
-use std::borrow::Borrow;
-use std::path::Path;
-use std::rc::Rc;
+use lz4::Decoder;
+use std::io::{self, BufRead};
+use std::fs::{File};
+use serde_json;
+use tempfile;
 
 use criterion::{black_box, Bencher, Criterion, Fun};
 
 use carmen_core::gridstore::*;
 use test_utils::*;
 use std::collections::HashSet;
-
-// let store2 = create_store(
-// vec![StoreEntryBuildingBlock {
-//     grid_key: GridKey { phrase_id: 2, lang_set: 1 },
-//     entries: vec![
-//         GridEntry { id: 3, x: 0, y: 0, relev: 1., score: 1, source_phrase_hash: 0 },
-//         GridEntry { id: 4, x: 50, y: 50, relev: 1., score: 1, source_phrase_hash: 0 },
-//     ],
-// }],
-// 2,
-// 6,
-// 1,
-// HashSet::new(),
-// 200.
+use carmen_core::gridstore::MatchPhrase::Range;
 
 pub fn benchmark(c: &mut Criterion) {
     let mut to_bench = Vec::new();
-    let filepath = Path::new("benches/data/coalesce-bench-single-3848571113.json");
-    let grid_entries = load_simple_grids_from_json(&filepath).unwrap();
-    let grid_store_rc = Rc::new(create_store(vec![StoreEntryBuildingBlock {
-        grid_key: GridKey { phrase_id: 1, lang_set: 1 },
-        entries: grid_entries,
-    }], 2, 6, 1, HashSet::new(), 200.));
+    let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
+    let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
+    let dl_path =
+        ensure_downloaded("us_midwest_new.gridstore.dat.lz4");
+    let decoder = Decoder::new(File::open(dl_path).unwrap()).unwrap();
+    let file = io::BufReader::new(decoder);
 
-    let grid_store: = grid_store_rc.clone();
+    let us_records: Vec<StoreEntryBuildingBlock> = file
+        .lines()
+        .filter_map(|l| {
+            let record = l.unwrap();
+            if record.is_empty() {
+                None
+            } else {
+                Some(serde_json::from_str(&record).unwrap())
+            }
+        })
+        .collect();
+    for record in us_records {
+        builder.insert(&record.grid_key, record.entries).expect("Unable to insert record");
+    }
+    builder.finish().unwrap();
+    let store = GridStore::new(directory.path()).unwrap();
 
-    to_bench.push(Fun::new("single_stack", move |b: &mut Bencher, _i| {
-        let stack_a1 = PhrasematchSubquery {
-            id: 1,
-            store: store_single.borrow(),
-            weight: 0.33,
-            match_key: MatchKey {
-                match_phrase: MatchPhrase::Range { start: 1, end: 3 },
-                lang_set: 1,
-            },
-            mask: 1,
-        };
-        let phrasematch_results = vec![stack_a1.clone()];
+    to_bench.push(Fun::new("stackable_single", move |b: &mut Bencher, _i| {
+    let a1 = PhrasematchSubquery {
+        id: 0,
+        store: &store,
+        weight: 0.5,
+        match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 3 },
+        mask: 1,
+    };
 
-        b.iter(|| stackable(black_box(&phrasematch_results.clone()), black_box(None), black_box(0), black_box(HashSet::new()), black_box(0), black_box(129), black_box(0.0), black_box(0)))
+    let phrasematch_results = vec![a1.clone()];
+
+        b.iter(|| stackable(black_box(&phrasematch_results), black_box(None), black_box(0), black_box(HashSet::new()), black_box(0), black_box(129), black_box(0.0), black_box(0)))
     }));
+
+    c.bench_functions("stackable", to_bench, ());
 }

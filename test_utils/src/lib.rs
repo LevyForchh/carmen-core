@@ -150,13 +150,14 @@ pub fn ensure_downloaded(datafile: &str) -> PathBuf {
         let client = S3Client::new(Region::UsEast1);
         let request = GetObjectRequest {
             bucket: "mapbox".to_owned(),
-            key: ("playground/apendleton/gridstore_bench/".to_owned() + datafile),
+            key: ("playground/aarthykc/".to_owned() + datafile),
             ..Default::default()
         };
 
         let result = client.get_object(request).sync().unwrap();
 
         let stream = result.body.unwrap();
+
         let mut body: Vec<u8> = Vec::new();
         stream.into_blocking_read().read_to_end(&mut body).unwrap();
 
