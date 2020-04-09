@@ -370,14 +370,19 @@ pub struct CoalesceContext {
 }
 
 #[derive(Serialize, Debug, Clone)]
+pub struct MatchKeyWithId {
+    pub key: MatchKey,
+    pub id: u32
+}
+
+#[derive(Serialize, Debug, Clone)]
 pub struct PhrasematchSubquery<T: Borrow<GridStore> + Clone> {
     pub store: T,
     pub idx: u16,
     pub non_overlapping_indexes: HashSet<u16>, // the field formerly known as bmask
     pub weight: f64,
-    pub match_key: MatchKey,
     pub mask: u32,
-    pub id: u32,
+    pub match_keys: Vec<MatchKeyWithId>,
 }
 
 #[inline]

@@ -1,6 +1,6 @@
 use carmen_core::gridstore::{coalesce, stackable, stack_and_coalesce};
 use carmen_core::gridstore::{
-    CoalesceContext, GridEntry, GridKey, GridStore, GridStoreBuilder, MatchOpts, MatchKey, PhrasematchSubquery
+    CoalesceContext, GridEntry, GridKey, GridStore, GridStoreBuilder, MatchOpts, MatchKey, MatchKeyWithId, PhrasematchSubquery
 };
 
 use neon::prelude::*;
@@ -500,9 +500,11 @@ where
         let subq = PhrasematchSubquery {
             store: gridstore,
             weight: neon_serde::from_value(cx, weight)?,
-            match_key: MatchKey { match_phrase: neon_serde::from_value(cx, match_phrase)?, lang_set },
+            match_keys: vec![MatchKeyWithId {
+                key: MatchKey { match_phrase: neon_serde::from_value(cx, match_phrase)?, lang_set },
+                id: neon_serde::from_value(cx, id)?,
+            }],
             mask: neon_serde::from_value(cx, mask)?,
-            id: neon_serde::from_value(cx, id)?,
             idx: neon_serde::from_value(cx, idx)?,
             non_overlapping_indexes: neon_serde::from_value(cx, non_overlapping_indexes)?,
         };
