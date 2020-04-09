@@ -74,7 +74,7 @@ fn coalesce_single<T: Borrow<GridStore> + Clone>(
     let bigger_max = 2 * MAX_CONTEXTS;
 
     let grids = subquery.store.borrow().streaming_get_matching(
-        &subquery.match_key,
+        &subquery.match_keys[0].key,
         match_opts,
         bigger_max,
     )?;
@@ -205,7 +205,7 @@ fn coalesce_multi<T: Borrow<GridStore> + Clone>(
         }
 
         let grids = subquery.store.borrow().streaming_get_matching(
-            &subquery.match_key,
+            &subquery.match_keys[0].key,
             &zoom_adjusted_match_options,
             MAX_GRIDS_PER_PHRASE,
         )?;
@@ -356,45 +356,51 @@ pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug>(
             // on top of this, so we can grab a minimal set of elements here
             let bigger_max = 2 * MAX_CONTEXTS;
 
-            let grids = subquery.store.borrow().streaming_get_matching(
-                &subquery.match_key,
-                &zoom_adjusted_match_options,
-                // double to give us some sorting wiggle room
-                bigger_max,
-            )?;
+            // call tree_coalesce_single on each key group
+            for key_group in subquery.match_keys.iter() {
+                let grids = subquery.store.borrow().streaming_get_matching(
+                    &key_group.key,
+                    &zoom_adjusted_match_options,
+                    // double to give us some sorting wiggle room
+                    bigger_max,
+                )?;
 
-            let coalesced = tree_coalesce_single(&subquery, &zoom_adjusted_match_options, grids)?;
+                let coalesced = tree_coalesce_single(&subquery, &zoom_adjusted_match_options, grids, key_group.id)?;
 
-            contexts.extend(coalesced);
+                contexts.extend(coalesced);
+            }
         } else {
             // we need lots of grids because we don't know where the things we're stacking on top
             // will be
             let mut prev_state: TreeCoalesceState = TreeCoalesceState::new();
-            let grids = subquery.store.borrow().streaming_get_matching(
-                &subquery.match_key,
-                &zoom_adjusted_match_options,
-                MAX_GRIDS_PER_PHRASE,
-            )?;
 
-            for grid in grids.take(MAX_GRIDS_PER_PHRASE) {
-                let entry = grid_to_coalesce_entry(
-                    &grid,
-                    &subquery,
+            for key_group in subquery.match_keys.iter() {
+                let grids = subquery.store.borrow().streaming_get_matching(
+                    &key_group.key,
                     &zoom_adjusted_match_options,
-                    subquery.id,
-                );
-                let context = CoalesceContext {
-                    mask: subquery.mask,
-                    relev: entry.grid_entry.relev,
-                    entries: vec![entry],
-                };
+                    MAX_GRIDS_PER_PHRASE,
+                )?;
 
-                contexts.push(context.clone());
+                for grid in grids.take(MAX_GRIDS_PER_PHRASE) {
+                    let entry = grid_to_coalesce_entry(
+                        &grid,
+                        &subquery,
+                        &zoom_adjusted_match_options,
+                        key_group.id,
+                    );
+                    let context = CoalesceContext {
+                        mask: subquery.mask,
+                        relev: entry.grid_entry.relev,
+                        entries: vec![entry],
+                    };
 
-                let state_vec = prev_state
-                    .entry((grid.grid_entry.x, grid.grid_entry.y))
-                    .or_insert_with(|| vec![]);
-                state_vec.push(context);
+                    contexts.push(context.clone());
+
+                    let state_vec = prev_state
+                        .entry((grid.grid_entry.x, grid.grid_entry.y))
+                        .or_insert_with(|| vec![]);
+                    state_vec.push(context);
+                }
             }
 
             let mut multi_contexts = Vec::new();
@@ -442,6 +448,7 @@ fn tree_coalesce_single<T: Borrow<GridStore> + Clone, U: Iterator<Item = MatchEn
     subquery: &PhrasematchSubquery<T>,
     match_opts: &MatchOpts,
     grids: U,
+    phrasematch_id: u32
 ) -> Result<impl Iterator<Item = CoalesceContext>, Error> {
     let bigger_max = 2 * MAX_CONTEXTS;
 
@@ -453,8 +460,6 @@ fn tree_coalesce_single<T: Borrow<GridStore> + Clone, U: Iterator<Item = MatchEn
     let mut feature_count: usize = 0;
 
     let mut coalesced: HashMap<u32, CoalesceEntry> = HashMap::new();
-
-    let phrasematch_id = subquery.id;
 
     for grid in grids {
         let coalesce_entry = grid_to_coalesce_entry(&grid, &subquery, match_opts, phrasematch_id);
@@ -546,42 +551,46 @@ fn tree_recurse<T: Borrow<GridStore> + Clone + Debug>(
         let scale_factor: u16 = 1 << (subquery.store.borrow().zoom - prev_zoom);
 
         let mut state: TreeCoalesceState = TreeCoalesceState::new();
-        let grids = subquery.store.borrow().streaming_get_matching(
-            &subquery.match_key,
-            &zoom_adjusted_match_options,
-            MAX_GRIDS_PER_PHRASE,
-        )?;
 
-        for grid in grids.take(MAX_GRIDS_PER_PHRASE) {
-            let prev_zoom_xy = (grid.grid_entry.x / scale_factor, grid.grid_entry.y / scale_factor);
+        for key_group in subquery.match_keys.iter() {
+            let grids = subquery.store.borrow().streaming_get_matching(
+                &key_group.key,
+                &zoom_adjusted_match_options,
+                MAX_GRIDS_PER_PHRASE,
+            )?;
 
-            if let Some(already_coalesced) = prev_state.get(&prev_zoom_xy) {
-                let entry = grid_to_coalesce_entry(
-                    &grid,
-                    &subquery,
-                    &zoom_adjusted_match_options,
-                    subquery.id,
-                );
-                for parent_context in already_coalesced {
-                    let mut new_context = parent_context.clone();
-                    new_context.entries.insert(0, entry.clone());
+            for grid in grids.take(MAX_GRIDS_PER_PHRASE) {
+                let prev_zoom_xy = (grid.grid_entry.x / scale_factor, grid.grid_entry.y / scale_factor);
 
-                    new_context.mask = new_context.mask | subquery.mask;
-                    new_context.relev += entry.grid_entry.relev;
+                if let Some(already_coalesced) = prev_state.get(&prev_zoom_xy) {
+                    let entry = grid_to_coalesce_entry(
+                        &grid,
+                        &subquery,
+                        &zoom_adjusted_match_options,
+                        key_group.id,
+                    );
+                    for parent_context in already_coalesced {
+                        let mut new_context = parent_context.clone();
+                        new_context.entries.insert(0, entry.clone());
 
-                    contexts.push(new_context.clone());
+                        new_context.mask = new_context.mask | subquery.mask;
+                        new_context.relev += entry.grid_entry.relev;
 
-                    if child.children.len() > 0 {
-                        // only bother with getting ready to recurse if we have any children to
-                        // operate on
-                        let state_vec = state
-                            .entry((grid.grid_entry.x, grid.grid_entry.y))
-                            .or_insert_with(|| vec![]);
-                        state_vec.push(new_context);
+                        contexts.push(new_context.clone());
+
+                        if child.children.len() > 0 {
+                            // only bother with getting ready to recurse if we have any children to
+                            // operate on
+                            let state_vec = state
+                                .entry((grid.grid_entry.x, grid.grid_entry.y))
+                                .or_insert_with(|| vec![]);
+                            state_vec.push(new_context);
+                        }
                     }
                 }
             }
         }
+
         if state.len() > 0 {
             tree_recurse(&child, match_opts, &state, subquery.store.borrow().zoom, &mut contexts)?;
         }
