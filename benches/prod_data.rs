@@ -1,144 +1,35 @@
-use std::fs::File;
-use std::io::{self, BufRead};
+use std::collections::HashSet;
 
-use criterion::{BatchSize, Bencher, Criterion, Fun};
-use lz4::Decoder;
-use once_cell::unsync::Lazy;
-use serde_json;
-use tempfile;
+use criterion::{Bencher, Criterion, Benchmark};
 
 use carmen_core::gridstore::*;
 use test_utils::*;
 
 pub fn benchmark(c: &mut Criterion) {
-    let mut to_bench = Vec::new();
+    let to_bench = vec![
+        ("coalesce_global", "gb_address_pm_global.ljson.lz4"),
+        ("coalesce_prox", "gb_address_pm_with_proximity.ljson.lz4"),
+        ("coalesce_ac_global", "gb_address_pm_ac_global.ljson.lz4"),
+        ("coalesce_ac_prox", "gb_address_pm_ac_with_proximity.ljson.lz4")
+    ];
 
-    to_bench.push(Fun::new("coalesce_global", move |b: &mut Bencher, _i| {
-        let stacks = prepare_coalesce_stacks("gb_address_global.ljson.lz4");
+    for (label, file) in to_bench {
+        c.bench(
+            label,
+            Benchmark::new(
+                label,
+                move |b: &mut Bencher| {
+                    let queries = prepare_phrasematches(file);
+                    let trees: Vec<_> = queries.into_iter().map(|(query, opts)| (stackable(&query, None, 0, HashSet::new(), 0, 129, 0.0, 0), opts)).collect();
 
-        let mut cycle = stacks.iter().cycle();
+                    let mut cycle = trees.iter().cycle();
 
-        b.iter(|| {
-            let (stack, opts) = cycle.next().unwrap();
-            coalesce(stack.clone(), opts).unwrap();
-        })
-    }));
-
-    to_bench.push(Fun::new("coalesce_prox", move |b: &mut Bencher, _i| {
-        let stacks = prepare_coalesce_stacks("gb_address_with_proximity.ljson.lz4");
-
-        let mut cycle = stacks.iter().cycle();
-
-        b.iter(|| {
-            let (stack, opts) = cycle.next().unwrap();
-            coalesce(stack.clone(), opts).unwrap();
-        })
-    }));
-
-    to_bench.push(Fun::new("coalesce_ac_global", move |b: &mut Bencher, _i| {
-        let stacks = prepare_coalesce_stacks("gb_address_ac_global.ljson.lz4");
-
-        let mut cycle = stacks.iter().cycle();
-
-        b.iter(|| {
-            let (stack, opts) = cycle.next().unwrap();
-            coalesce(stack.clone(), opts).unwrap();
-        })
-    }));
-
-    to_bench.push(Fun::new("coalesce_ac_prox", move |b: &mut Bencher, _i| {
-        let stacks = prepare_coalesce_stacks("gb_address_ac_with_proximity.ljson.lz4");
-
-        let mut cycle = stacks.iter().cycle();
-
-        b.iter(|| {
-            let (stack, opts) = cycle.next().unwrap();
-            coalesce(stack.clone(), opts).unwrap();
-        })
-    }));
-
-    let eur_records = Lazy::new(|| {
-        let dl_path =
-            ensure_downloaded("europen-place-both-740ed51f45-d775d2eb65.gridstore.dat.lz4");
-        let decoder = Decoder::new(File::open(dl_path).unwrap()).unwrap();
-        let file = io::BufReader::new(decoder);
-
-        let records: Vec<StoreEntryBuildingBlock> = file
-            .lines()
-            .filter_map(|l| {
-                let record = l.unwrap();
-                if record.is_empty() {
-                    None
-                } else {
-                    Some(serde_json::from_str(&record).unwrap())
+                    b.iter(|| {
+                        let (tree, opts) = cycle.next().unwrap();
+                        tree_coalesce(&tree, &opts).unwrap()
+                    })
                 }
-            })
-            .collect();
-        records
-    });
-    to_bench.push(Fun::new("builder_insert", move |b: &mut Bencher, _i| {
-        Lazy::force(&eur_records);
-
-        let mut dir: Option<tempfile::TempDir> = None;
-        let mut builder: Option<GridStoreBuilder> = None;
-        let mut i = 0;
-
-        b.iter(|| {
-            if i == 0 {
-                // every time we're at the beginning of the list, start a new builder
-                // and throw away the old one
-                dir.replace(tempfile::tempdir().unwrap());
-                builder.replace(GridStoreBuilder::new(dir.as_mut().unwrap().path()).unwrap());
-            }
-            let record = &eur_records[i];
-            builder.as_mut().unwrap().insert(&record.grid_key, record.entries.clone()).unwrap();
-
-            i = (i + 1) % (eur_records.len());
-        })
-    }));
-
-    let us_records = Lazy::new(|| {
-        let dl_path = ensure_downloaded("us_south_address_appends.ljson.lz4");
-        let decoder = Decoder::new(File::open(dl_path).unwrap()).unwrap();
-        let file = io::BufReader::new(decoder);
-
-        let records: Vec<(GridKey, Vec<GridEntry>)> = file
-            .lines()
-            .filter_map(|l| {
-                let record = l.unwrap();
-                if record.is_empty() {
-                    None
-                } else {
-                    Some(serde_json::from_str(&record).unwrap())
-                }
-            })
-            .collect();
-        records
-    });
-    to_bench.push(Fun::new("builder_append_logged", move |b: &mut Bencher, _i| {
-        Lazy::force(&us_records);
-
-        let mut dir: Option<tempfile::TempDir> = None;
-        let mut builder: Option<GridStoreBuilder> = None;
-        let mut i = 0;
-
-        b.iter_batched(
-            || {},
-            |_| {
-                if i == 0 {
-                    // every time we're at the beginning of the list, start a new builder
-                    // and throw away the old one
-                    dir.replace(tempfile::tempdir().unwrap());
-                    builder.replace(GridStoreBuilder::new(dir.as_mut().unwrap().path()).unwrap());
-                }
-                let record = &us_records[i];
-                builder.as_mut().unwrap().append(&record.0, record.1.clone()).unwrap();
-
-                i = (i + 1) % (us_records.len());
-            },
-            BatchSize::NumIterations(100_000),
-        )
-    }));
-
-    c.bench_functions("prod_data", to_bench, ());
+            ).sample_size(20)
+        );
+    }
 }

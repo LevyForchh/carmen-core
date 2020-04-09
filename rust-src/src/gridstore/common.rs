@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use crate::gridstore::store::GridStore;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use failure::Error;
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 
 #[derive(Copy, Clone, Debug)]
 pub enum TypeMarker {
@@ -367,10 +367,6 @@ pub struct CoalesceContext {
     pub mask: u32,
     pub relev: f64,
     pub entries: Vec<CoalesceEntry>,
-}
-
-fn serialize_path<S: Serializer, T: Borrow<GridStore>>(store: &T, s: S) -> Result<S::Ok, S::Error> {
-    s.serialize_str(store.borrow().path.to_str().unwrap())
 }
 
 #[derive(Serialize, Debug, Clone)]
