@@ -10,15 +10,18 @@ use min_max_heap::MinMaxHeap;
 use morton::deinterleave_morton;
 use ordered_float::OrderedFloat;
 use rocksdb::{Direction, IteratorMode, Options, DB};
+use serde::Serialize;
 
 use crate::gridstore::common::*;
 use crate::gridstore::gridstore_format;
 use crate::gridstore::spatial;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct GridStore {
+    #[serde(skip_serializing)]
     db: DB,
-    bin_boundaries: HashSet<u32>,
+    #[serde(skip_serializing)]
+    pub bin_boundaries: HashSet<u32>,
     pub path: PathBuf,
     // options:
     pub zoom: u16,
