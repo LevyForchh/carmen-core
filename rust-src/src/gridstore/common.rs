@@ -369,7 +369,7 @@ pub struct CoalesceContext {
     pub entries: Vec<CoalesceEntry>,
 }
 
-#[derive(Serialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MatchKeyWithId {
     pub key: MatchKey,
     pub id: u32
