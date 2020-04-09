@@ -146,10 +146,10 @@ pub fn dump_db_to_json(store_path: &str, json_path: &str) {
     
     let mut boundaries: Vec<u32> = reader.bin_boundaries.iter().cloned().collect();
     boundaries.sort();
-    let splits_path = json_path.to_owned().replace(".gridstore.dat", "") + ".splits";
+    let splits_path = json_path.to_owned().replace(".gridstore.dat", "") + ".gridstore.splits";
     let splits_file = File::create(splits_path).unwrap();
     let mut splits_writer = BufWriter::new(splits_file);
-    splits_writer.write(serde_json::to_string(&boundaries).unwrap().as_bytes());
+    splits_writer.write(serde_json::to_string(&boundaries).unwrap().as_bytes()).unwrap();
 }
 
 pub fn ensure_downloaded(datafile: &str) -> PathBuf {
