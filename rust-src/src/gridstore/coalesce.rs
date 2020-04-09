@@ -365,7 +365,12 @@ pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug>(
                     bigger_max,
                 )?;
 
-                let coalesced = tree_coalesce_single(&subquery, &zoom_adjusted_match_options, grids, key_group.id)?;
+                let coalesced = tree_coalesce_single(
+                    &subquery,
+                    &zoom_adjusted_match_options,
+                    grids,
+                    key_group.id,
+                )?;
 
                 contexts.extend(coalesced);
             }
@@ -448,7 +453,7 @@ fn tree_coalesce_single<T: Borrow<GridStore> + Clone, U: Iterator<Item = MatchEn
     subquery: &PhrasematchSubquery<T>,
     match_opts: &MatchOpts,
     grids: U,
-    phrasematch_id: u32
+    phrasematch_id: u32,
 ) -> Result<impl Iterator<Item = CoalesceContext>, Error> {
     let bigger_max = 2 * MAX_CONTEXTS;
 
@@ -560,7 +565,8 @@ fn tree_recurse<T: Borrow<GridStore> + Clone + Debug>(
             )?;
 
             for grid in grids.take(MAX_GRIDS_PER_PHRASE) {
-                let prev_zoom_xy = (grid.grid_entry.x / scale_factor, grid.grid_entry.y / scale_factor);
+                let prev_zoom_xy =
+                    (grid.grid_entry.x / scale_factor, grid.grid_entry.y / scale_factor);
 
                 if let Some(already_coalesced) = prev_state.get(&prev_zoom_xy) {
                     let entry = grid_to_coalesce_entry(

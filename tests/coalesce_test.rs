@@ -24,12 +24,14 @@ fn coalesce_single_test_proximity_quadrants() {
 
     let store = GridStore::new_with_options(directory.path(), 14, 1, 200.).unwrap();
     let subquery = PhrasematchSubquery {
-        id: 0,
         store: &store,
         idx: 1,
         non_overlapping_indexes: HashSet::new(),
         weight: 1.,
-        match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 },
+        match_keys: vec![MatchKeyWithId {
+            id: 0,
+            key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 },
+        }],
         mask: 1 << 0,
     };
     let stack = vec![subquery];
@@ -122,12 +124,14 @@ fn coalesce_single_test_proximity_basic() {
 
     let store = GridStore::new_with_options(directory.path(), 14, 1, 200.).unwrap();
     let subquery = PhrasematchSubquery {
-        id: 0,
         store: &store,
         idx: 1,
         non_overlapping_indexes: HashSet::new(),
         weight: 1.,
-        match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 },
+        match_keys: vec![MatchKeyWithId {
+            id: 0,
+            key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 },
+        }],
         mask: 1 << 0,
     };
     let stack = vec![subquery];
@@ -171,12 +175,14 @@ fn coalesce_single_test_language_penalty() {
 
     let store = GridStore::new_with_options(directory.path(), 14, 1, 1.).unwrap();
     let subquery = PhrasematchSubquery {
-        id: 0,
         store: &store,
         idx: 1,
         non_overlapping_indexes: HashSet::new(),
         weight: 1.,
-        match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 2 },
+        match_keys: vec![MatchKeyWithId {
+            id: 0,
+            key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 2 },
+        }],
         mask: 1 << 0,
     };
     let stack = vec![subquery.clone()];
@@ -246,27 +252,31 @@ fn coalesce_multi_test_language_penalty() {
     println!("Coalesce multi - Subqueries with different language set from grids, with proximity");
     let stack = vec![
         PhrasematchSubquery {
-            id: 0,
             store: &store1.store,
             idx: store1.idx,
             non_overlapping_indexes: store1.non_overlapping_indexes.clone(),
             weight: 0.5,
-            match_key: MatchKey {
-                match_phrase: MatchPhrase::Range { start: 1, end: 3 },
-                lang_set: 2,
-            },
+            match_keys: vec![MatchKeyWithId {
+                id: 0,
+                key: MatchKey {
+                    match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                    lang_set: 2,
+                },
+            }],
             mask: 1 << 0,
         },
         PhrasematchSubquery {
-            id: 0,
             store: &store2.store,
             idx: store2.idx,
             non_overlapping_indexes: store2.non_overlapping_indexes.clone(),
             weight: 0.5,
-            match_key: MatchKey {
-                match_phrase: MatchPhrase::Range { start: 1, end: 3 },
-                lang_set: 2,
-            },
+            match_keys: vec![MatchKeyWithId {
+                id: 0,
+                key: MatchKey {
+                    match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                    lang_set: 2,
+                },
+            }],
             mask: 1 << 1,
         },
     ];
@@ -319,12 +329,14 @@ fn coalesce_single_test() {
         40.,
     );
     let subquery = PhrasematchSubquery {
-        id: 0,
         store: &store.store,
         idx: store.idx,
         non_overlapping_indexes: store.non_overlapping_indexes.clone(),
         weight: 1.,
-        match_key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 },
+        match_keys: vec![MatchKeyWithId {
+            id: 0,
+            key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 },
+        }],
         mask: 1 << 0,
     };
     let stack = vec![subquery];
@@ -565,15 +577,17 @@ fn coalesce_single_languages_test() {
     // Test query with all languages
     println!("Coalesce single - all languages");
     let subquery = PhrasematchSubquery {
-        id: 0,
         store: &store,
         idx: 1,
         non_overlapping_indexes: HashSet::new(),
         weight: 1.,
-        match_key: MatchKey {
-            match_phrase: MatchPhrase::Range { start: 1, end: 3 },
-            lang_set: ALL_LANGUAGES,
-        },
+        match_keys: vec![MatchKeyWithId {
+            id: 0,
+            key: MatchKey {
+                match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                lang_set: ALL_LANGUAGES,
+            },
+        }],
         mask: 1 << 0,
     };
     let stack = vec![subquery];
@@ -607,15 +621,17 @@ fn coalesce_single_languages_test() {
     // Test lanuage 0
     println!("Coalesce single - language 0, language matching 2 grids");
     let subquery = PhrasematchSubquery {
-        id: 0,
         store: &store,
         idx: 1,
         non_overlapping_indexes: HashSet::new(),
         weight: 1.,
-        match_key: MatchKey {
-            match_phrase: MatchPhrase::Range { start: 1, end: 3 },
-            lang_set: langarray_to_langfield(&[0]),
-        },
+        match_keys: vec![MatchKeyWithId {
+            id: 0,
+            key: MatchKey {
+                match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                lang_set: langarray_to_langfield(&[0]),
+            },
+        }],
         mask: 1 << 0,
     };
     let stack = vec![subquery];
@@ -649,15 +665,17 @@ fn coalesce_single_languages_test() {
     println!("Coalesce single - language 3, language matching no grids");
 
     let subquery = PhrasematchSubquery {
-        id: 0,
         store: &store,
         idx: 1,
         non_overlapping_indexes: HashSet::new(),
         weight: 1.,
-        match_key: MatchKey {
-            match_phrase: MatchPhrase::Range { start: 1, end: 3 },
-            lang_set: langarray_to_langfield(&[3]),
-        },
+        match_keys: vec![MatchKeyWithId {
+            id: 0,
+            key: MatchKey {
+                match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                lang_set: langarray_to_langfield(&[3]),
+            },
+        }],
         mask: 1 << 0,
     };
     let stack = vec![subquery];
@@ -726,27 +744,31 @@ fn coalesce_multi_test() {
 
     let stack = vec![
         PhrasematchSubquery {
-            id: 0,
             store: &store1.store,
             idx: store1.idx,
             non_overlapping_indexes: store1.non_overlapping_indexes.clone(),
             weight: 0.5,
-            match_key: MatchKey {
-                match_phrase: MatchPhrase::Range { start: 1, end: 3 },
-                lang_set: 1,
-            },
+            match_keys: vec![MatchKeyWithId {
+                id: 0,
+                key: MatchKey {
+                    match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                    lang_set: 1,
+                },
+            }],
             mask: 1 << 1,
         },
         PhrasematchSubquery {
-            id: 0,
             store: &store2.store,
             idx: store2.idx,
             non_overlapping_indexes: store2.non_overlapping_indexes.clone(),
             weight: 0.5,
-            match_key: MatchKey {
-                match_phrase: MatchPhrase::Range { start: 1, end: 3 },
-                lang_set: 1,
-            },
+            match_keys: vec![MatchKeyWithId {
+                id: 0,
+                key: MatchKey {
+                    match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                    lang_set: 1,
+                },
+            }],
             mask: 1 << 0,
         },
     ];
@@ -1007,27 +1029,31 @@ fn coalesce_multi_languages_test() {
     println!("Coalesce multi - all languages");
     let stack = vec![
         PhrasematchSubquery {
-            id: 0,
             store: &store1.store,
             idx: store1.idx,
             non_overlapping_indexes: store1.non_overlapping_indexes.clone(),
             weight: 0.5,
-            match_key: MatchKey {
-                match_phrase: MatchPhrase::Range { start: 1, end: 3 },
-                lang_set: ALL_LANGUAGES,
-            },
+            match_keys: vec![MatchKeyWithId {
+                id: 0,
+                key: MatchKey {
+                    match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                    lang_set: ALL_LANGUAGES,
+                },
+            }],
             mask: 1 << 1,
         },
         PhrasematchSubquery {
-            id: 0,
             store: &store2.store,
             idx: store2.idx,
             non_overlapping_indexes: store2.non_overlapping_indexes.clone(),
             weight: 0.5,
-            match_key: MatchKey {
-                match_phrase: MatchPhrase::Range { start: 1, end: 3 },
-                lang_set: ALL_LANGUAGES,
-            },
+            match_keys: vec![MatchKeyWithId {
+                id: 0,
+                key: MatchKey {
+                    match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                    lang_set: ALL_LANGUAGES,
+                },
+            }],
             mask: 1 << 0,
         },
     ];
@@ -1061,27 +1087,31 @@ fn coalesce_multi_languages_test() {
     println!("Coalesce multi - language 0");
     let stack = vec![
         PhrasematchSubquery {
-            id: 0,
             store: &store1.store,
             idx: store1.idx,
             non_overlapping_indexes: store1.non_overlapping_indexes.clone(),
             weight: 0.5,
-            match_key: MatchKey {
-                match_phrase: MatchPhrase::Range { start: 1, end: 3 },
-                lang_set: ALL_LANGUAGES,
-            },
+            match_keys: vec![MatchKeyWithId {
+                id: 0,
+                key: MatchKey {
+                    match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                    lang_set: ALL_LANGUAGES,
+                },
+            }],
             mask: 1 << 1,
         },
         PhrasematchSubquery {
-            id: 0,
             store: &store2.store,
             idx: store2.idx,
             non_overlapping_indexes: store2.non_overlapping_indexes.clone(),
             weight: 0.5,
-            match_key: MatchKey {
-                match_phrase: MatchPhrase::Range { start: 1, end: 3 },
-                lang_set: langarray_to_langfield(&[0]),
-            },
+            match_keys: vec![MatchKeyWithId {
+                id: 0,
+                key: MatchKey {
+                    match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                    lang_set: langarray_to_langfield(&[0]),
+                },
+            }],
             mask: 1 << 0,
         },
     ];
@@ -1115,27 +1145,31 @@ fn coalesce_multi_languages_test() {
     println!("Coalsece multi - language 3");
     let stack = vec![
         PhrasematchSubquery {
-            id: 0,
             store: &store1.store,
             idx: store1.idx,
             non_overlapping_indexes: store1.non_overlapping_indexes.clone(),
             weight: 0.5,
-            match_key: MatchKey {
-                match_phrase: MatchPhrase::Range { start: 1, end: 3 },
-                lang_set: ALL_LANGUAGES,
-            },
+            match_keys: vec![MatchKeyWithId {
+                id: 0,
+                key: MatchKey {
+                    match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                    lang_set: ALL_LANGUAGES,
+                },
+            }],
             mask: 1 << 1,
         },
         PhrasematchSubquery {
-            id: 0,
             store: &store2.store,
             idx: store2.idx,
             non_overlapping_indexes: store2.non_overlapping_indexes.clone(),
             weight: 0.5,
-            match_key: MatchKey {
-                match_phrase: MatchPhrase::Range { start: 1, end: 3 },
-                lang_set: langarray_to_langfield(&[3]),
-            },
+            match_keys: vec![MatchKeyWithId {
+                id: 0,
+                key: MatchKey {
+                    match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                    lang_set: langarray_to_langfield(&[3]),
+                },
+            }],
             mask: 1 << 0,
         },
     ];
@@ -1206,27 +1240,31 @@ fn coalesce_multi_scoredist() {
 
     let stack = vec![
         PhrasematchSubquery {
-            id: 0,
             store: &store1.store,
             idx: store1.idx,
             non_overlapping_indexes: store1.non_overlapping_indexes.clone(),
             weight: 0.5,
-            match_key: MatchKey {
-                match_phrase: MatchPhrase::Range { start: 1, end: 3 },
-                lang_set: 0,
-            },
+            match_keys: vec![MatchKeyWithId {
+                id: 0,
+                key: MatchKey {
+                    match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                    lang_set: 0,
+                },
+            }],
             mask: 1 << 1,
         },
         PhrasematchSubquery {
-            id: 0,
             store: &store2.store,
             idx: store2.idx,
             non_overlapping_indexes: store2.non_overlapping_indexes.clone(),
             weight: 0.5,
-            match_key: MatchKey {
-                match_phrase: MatchPhrase::Range { start: 1, end: 3 },
-                lang_set: 0,
-            },
+            match_keys: vec![MatchKeyWithId {
+                id: 0,
+                key: MatchKey {
+                    match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                    lang_set: 0,
+                },
+            }],
             mask: 1 << 0,
         },
     ];
@@ -1310,27 +1348,31 @@ fn coalesce_multi_test_bbox() {
 
     let stack = vec![
         PhrasematchSubquery {
-            id: 0,
             store: &store1.store,
             idx: store1.idx,
             non_overlapping_indexes: store1.non_overlapping_indexes.clone(),
             weight: 0.5,
-            match_key: MatchKey {
-                match_phrase: MatchPhrase::Range { start: 1, end: 3 },
-                lang_set: ALL_LANGUAGES,
-            },
+            match_keys: vec![MatchKeyWithId {
+                id: 0,
+                key: MatchKey {
+                    match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                    lang_set: ALL_LANGUAGES,
+                },
+            }],
             mask: 1 << 1,
         },
         PhrasematchSubquery {
-            id: 0,
             store: &store2.store,
             idx: store2.idx,
             non_overlapping_indexes: store2.non_overlapping_indexes.clone(),
             weight: 0.5,
-            match_key: MatchKey {
-                match_phrase: MatchPhrase::Range { start: 1, end: 3 },
-                lang_set: ALL_LANGUAGES,
-            },
+            match_keys: vec![MatchKeyWithId {
+                id: 0,
+                key: MatchKey {
+                    match_phrase: MatchPhrase::Range { start: 1, end: 3 },
+                    lang_set: ALL_LANGUAGES,
+                },
+            }],
             mask: 1 << 0,
         },
     ];
@@ -1394,27 +1436,31 @@ fn coalesce_multi_test_bbox() {
     println!("Coalesce multi - bbox at lower zoom than either of the expected results");
     let stack = vec![
         PhrasematchSubquery {
-            id: 0,
             store: &store2.store,
             idx: store2.idx,
             non_overlapping_indexes: store2.non_overlapping_indexes.clone(),
             weight: 0.5,
-            match_key: MatchKey {
-                match_phrase: MatchPhrase::Range { start: 1, end: 4 },
-                lang_set: ALL_LANGUAGES,
-            },
+            match_keys: vec![MatchKeyWithId {
+                id: 0,
+                key: MatchKey {
+                    match_phrase: MatchPhrase::Range { start: 1, end: 4 },
+                    lang_set: ALL_LANGUAGES,
+                },
+            }],
             mask: 1 << 1,
         },
         PhrasematchSubquery {
-            id: 0,
             store: &store3.store,
             idx: store3.idx,
             non_overlapping_indexes: store3.non_overlapping_indexes.clone(),
             weight: 0.5,
-            match_key: MatchKey {
-                match_phrase: MatchPhrase::Range { start: 1, end: 4 },
-                lang_set: ALL_LANGUAGES,
-            },
+            match_keys: vec![MatchKeyWithId {
+                id: 0,
+                key: MatchKey {
+                    match_phrase: MatchPhrase::Range { start: 1, end: 4 },
+                    lang_set: ALL_LANGUAGES,
+                },
+            }],
             mask: 1 << 0,
         },
     ];
