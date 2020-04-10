@@ -624,7 +624,7 @@ pub fn collapse_phrasematches<T: Borrow<GridStore> + Clone + Debug>(
                     match_keys: phrasematch.match_keys,
                 };
                 entry.insert(pm);
-            },
+            }
             Entry::Occupied(mut grouped_phrasematch) => {
                 grouped_phrasematch.get_mut().match_keys.push(phrasematch.match_keys[0].clone());
             }
