@@ -365,7 +365,12 @@ pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug>(
                     bigger_max,
                 )?;
 
-                let coalesced = tree_coalesce_single(&subquery, &zoom_adjusted_match_options, grids, key_group.id)?;
+                let coalesced = tree_coalesce_single(
+                    &subquery,
+                    &zoom_adjusted_match_options,
+                    grids,
+                    key_group.id,
+                )?;
 
                 contexts.extend(coalesced);
             }
@@ -448,7 +453,7 @@ fn tree_coalesce_single<T: Borrow<GridStore> + Clone, U: Iterator<Item = MatchEn
     subquery: &PhrasematchSubquery<T>,
     match_opts: &MatchOpts,
     grids: U,
-    phrasematch_id: u32
+    phrasematch_id: u32,
 ) -> Result<impl Iterator<Item = CoalesceContext>, Error> {
     let bigger_max = 2 * MAX_CONTEXTS;
 
@@ -560,7 +565,8 @@ fn tree_recurse<T: Borrow<GridStore> + Clone + Debug>(
             )?;
 
             for grid in grids.take(MAX_GRIDS_PER_PHRASE) {
-                let prev_zoom_xy = (grid.grid_entry.x / scale_factor, grid.grid_entry.y / scale_factor);
+                let prev_zoom_xy =
+                    (grid.grid_entry.x / scale_factor, grid.grid_entry.y / scale_factor);
 
                 if let Some(already_coalesced) = prev_state.get(&prev_zoom_xy) {
                     let entry = grid_to_coalesce_entry(
@@ -598,12 +604,115 @@ fn tree_recurse<T: Borrow<GridStore> + Clone + Debug>(
     Ok(())
 }
 
+pub fn collapse_phrasematches<T: Borrow<GridStore> + Clone + Debug>(
+    phrasematches: &Vec<PhrasematchSubquery<T>>,
+) -> Vec<PhrasematchSubquery<T>> {
+    let mut phrasematch_results: Vec<PhrasematchSubquery<T>> = Vec::new();
+    let mut phrasematch_map = HashMap::new();
+    let mut group_hash;
+    for phrasematch in phrasematches.into_iter() {
+        group_hash = phrasematch.weight.to_string()
+            + &phrasematch.idx.to_string()
+            + &phrasematch.mask.to_string();
+        let matched_phrasematch_group = phrasematch_map.get_mut(&group_hash);
+        if matched_phrasematch_group.is_none() {
+            let pm = PhrasematchSubquery {
+                store: phrasematch.store.clone(),
+                idx: phrasematch.idx,
+                non_overlapping_indexes: phrasematch.non_overlapping_indexes.clone(),
+                weight: phrasematch.weight,
+                mask: phrasematch.mask,
+                match_keys: phrasematch.match_keys.clone(),
+            };
+            phrasematch_map.insert(group_hash, pm);
+        } else {
+            let grouped_phrasematch = matched_phrasematch_group.unwrap();
+            grouped_phrasematch.match_keys.push(phrasematch.match_keys[0].clone());
+        }
+    }
+    for (_key, val) in phrasematch_map {
+        phrasematch_results.push(val);
+    }
+    phrasematch_results
+}
+
 pub fn stack_and_coalesce<T: Borrow<GridStore> + Clone + Debug>(
     phrasematches: &Vec<PhrasematchSubquery<T>>,
     match_opts: &MatchOpts,
 ) -> Result<Vec<CoalesceContext>, Error> {
     // currently stackable requires double-wrapping the phrasematches vector, which requires an
     // extra clone; ideally we wouldn't do that
-    let tree = stackable(phrasematches, None, 0, HashSet::new(), 0, 129, 0.0, 0);
+    let collapsed_phrasematches = collapse_phrasematches(phrasematches);
+    let tree = stackable(&collapsed_phrasematches, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     tree_coalesce(&tree, &match_opts)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::gridstore::builder::*;
+    use crate::gridstore::common::MatchPhrase::Range;
+
+    #[test]
+    fn collapse_phrasematches_test() {
+        let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
+        let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
+
+        let key = GridKey { phrase_id: 1, lang_set: 1 };
+
+        let entries = vec![
+            GridEntry { id: 2, x: 2, y: 2, relev: 0.8, score: 3, source_phrase_hash: 0 },
+            GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 1, source_phrase_hash: 1 },
+            GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 7, source_phrase_hash: 2 },
+        ];
+        builder.insert(&key, entries).expect("Unable to insert record");
+        builder.finish().unwrap();
+        let store1 = GridStore::new_with_options(directory.path(), 14, 1, 200.).unwrap();
+        let store2 = GridStore::new_with_options(directory.path(), 14, 2, 200.).unwrap();
+
+        let a1 = PhrasematchSubquery {
+            store: &store1,
+            idx: 1,
+            non_overlapping_indexes: HashSet::new(),
+            weight: 0.5,
+            mask: 2,
+            match_keys: vec![MatchKeyWithId {
+                key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+                id: 0,
+            }],
+        };
+
+        let b1 = PhrasematchSubquery {
+            store: &store2,
+            idx: 2,
+            non_overlapping_indexes: HashSet::new(),
+            weight: 0.5,
+            mask: 1,
+            match_keys: vec![MatchKeyWithId {
+                key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+                id: 1,
+            }],
+        };
+
+        let b2 = PhrasematchSubquery {
+            store: &store2,
+            idx: 2,
+            non_overlapping_indexes: HashSet::new(),
+            weight: 0.5,
+            mask: 1,
+            match_keys: vec![MatchKeyWithId {
+                key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+                id: 2,
+            }],
+        };
+        let phrasematch_results = vec![a1, b1, b2];
+        let collapsed_phrasematch = collapse_phrasematches(&phrasematch_results);
+        assert_eq!(
+            collapsed_phrasematch[0].match_keys.len(),
+            2,
+            "phrasematch match_keys with the same idx, weight and mask are grouped together"
+        );
+        assert_eq!(collapsed_phrasematch[0].match_keys[0].id, 1);
+        assert_eq!(collapsed_phrasematch[0].match_keys[1].id, 2);
+    }
 }

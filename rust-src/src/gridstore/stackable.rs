@@ -9,9 +9,9 @@ use crate::gridstore::common::*;
 use crate::gridstore::store::*;
 
 #[derive(Debug, Clone)]
-pub struct StackableNode<T: Borrow<GridStore> + Clone + Debug> {
-    pub phrasematch: Option<PhrasematchSubquery<T>>,
-    pub children: Vec<StackableNode<T>>,
+pub struct StackableNode<'a, T: Borrow<GridStore> + Clone + Debug> {
+    pub phrasematch: Option<&'a PhrasematchSubquery<T>>,
+    pub children: Vec<StackableNode<'a, T>>,
     pub nmask: u32,
     pub bmask: HashSet<u16>,
     pub mask: u32,
@@ -20,7 +20,7 @@ pub struct StackableNode<T: Borrow<GridStore> + Clone + Debug> {
     pub zoom: u16,
 }
 
-impl<T: Borrow<GridStore> + Clone + Debug> StackableNode<T> {
+impl<'a, T: Borrow<GridStore> + Clone + Debug> StackableNode<'a, T> {
     fn is_leaf(&self) -> bool {
         self.children.len() == 0
     }
@@ -44,15 +44,15 @@ pub fn bfs<T: Borrow<GridStore> + Clone + Debug>(root: StackableNode<T>) -> Vec<
 }
 
 pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
-    phrasematch_results: &Vec<PhrasematchSubquery<T>>,
-    phrasematch_result: Option<PhrasematchSubquery<T>>,
+    phrasematch_results: &'a Vec<PhrasematchSubquery<T>>,
+    phrasematch_result: Option<&'a PhrasematchSubquery<T>>,
     nmask: u32,
     bmask: HashSet<u16>,
     mask: u32,
     idx: u16,
     max_relev: f64,
     zoom: u16,
-) -> StackableNode<T> {
+) -> StackableNode<'a, T> {
     let mut node = StackableNode {
         phrasematch: phrasematch_result,
         children: vec![],
@@ -75,21 +75,21 @@ pub fn stackable<'a, T: Borrow<GridStore> + Clone + Debug>(
             }
         }
 
-        if (node.nmask & (1u32 << phrasematches.store.borrow().type_id)) == 0
+        if (node.nmask & (1u32 << phrasematches.store.borrow().type_id as u32)) == 0
             && (node.mask & phrasematches.mask) == 0
             && phrasematches.non_overlapping_indexes.contains(&node.idx) == false
         {
-            let target_nmask = &(1u32 << phrasematches.store.borrow().type_id) | node.nmask;
+            let target_nmask = &(1u32 << phrasematches.store.borrow().type_id as u32) | node.nmask;
             let target_mask = &phrasematches.mask | node.mask;
             let mut target_bmask: HashSet<u16> = node.bmask.iter().cloned().collect();
             let phrasematch_bmask: HashSet<u16> =
                 phrasematches.non_overlapping_indexes.iter().cloned().collect();
             target_bmask.extend(&phrasematch_bmask);
-            let target_relev = 0.0 + &phrasematches.weight;
+            let target_relev = 0.0 + phrasematches.weight;
 
             node.children.push(stackable(
                 &phrasematch_results,
-                Some(phrasematches.clone()),
+                Some(phrasematches),
                 target_nmask,
                 target_bmask,
                 target_mask,
@@ -133,33 +133,39 @@ mod test {
         let store2 = GridStore::new_with_options(directory.path(), 14, 2, 200.).unwrap();
 
         let a1 = PhrasematchSubquery {
-            id: 0,
             store: &store1,
             idx: 1,
             non_overlapping_indexes: HashSet::new(),
             weight: 0.5,
-            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
             mask: 2,
+            match_keys: vec![MatchKeyWithId {
+                key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+                id: 0,
+            }],
         };
 
         let b1 = PhrasematchSubquery {
-            id: 1,
             store: &store2,
             idx: 2,
             non_overlapping_indexes: HashSet::new(),
             weight: 0.5,
-            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
             mask: 1,
+            match_keys: vec![MatchKeyWithId {
+                key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+                id: 1,
+            }],
         };
 
         let b2 = PhrasematchSubquery {
-            id: 2,
             store: &store2,
             idx: 2,
             non_overlapping_indexes: HashSet::new(),
             weight: 0.5,
-            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
             mask: 1,
+            match_keys: vec![MatchKeyWithId {
+                key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+                id: 2,
+            }],
         };
 
         let phrasematch_results = vec![a1, b1, b2];
@@ -169,21 +175,21 @@ mod test {
             .clone()
             .children
             .iter()
-            .map(|node| node.phrasematch.as_ref().map(|p| p.id).unwrap())
+            .map(|node| node.phrasematch.as_ref().map(|p| p.match_keys[0].id).unwrap())
             .collect();
         assert_eq!(vec![1, 2], a1_children_ids, "a1 can stack with b1 and b2");
         let b1_children_ids: Vec<u32> = tree.clone().children[1]
             .clone()
             .children
             .iter()
-            .map(|node| node.phrasematch.as_ref().map(|p| p.id).unwrap())
+            .map(|node| node.phrasematch.as_ref().map(|p| p.match_keys[0].id).unwrap())
             .collect();
         assert_eq!(0, b1_children_ids.len(), "b1 cannot stack with b2, same nmask");
         let b2_children_ids: Vec<u32> = tree.clone().children[2]
             .clone()
             .children
             .iter()
-            .map(|node| node.phrasematch.as_ref().map(|p| p.id).unwrap())
+            .map(|node| node.phrasematch.as_ref().map(|p| p.match_keys[0].id).unwrap())
             .collect();
         assert_eq!(0, b2_children_ids.len(), "b2 cannot stack with b1, same nmask");
     }
@@ -205,23 +211,27 @@ mod test {
         let store = GridStore::new(directory.path()).unwrap();
 
         let a1 = PhrasematchSubquery {
-            id: 0,
             store: &store,
             idx: 1,
             non_overlapping_indexes: HashSet::new(),
             weight: 0.5,
-            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
             mask: 1,
+            match_keys: vec![MatchKeyWithId {
+                key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+                id: 0,
+            }],
         };
 
         let b1 = PhrasematchSubquery {
-            id: 1,
             store: &store,
             idx: 1,
             non_overlapping_indexes: HashSet::new(),
             weight: 0.5,
-            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
             mask: 1,
+            match_keys: vec![MatchKeyWithId {
+                key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+                id: 1,
+            }],
         };
         let phrasematch_results = vec![a1, b1];
         let tree = stackable(&phrasematch_results, None, 0, HashSet::new(), 0, 129, 0.0, 0);
@@ -253,23 +263,27 @@ mod test {
         b1_bmask.insert(0);
 
         let a1 = PhrasematchSubquery {
-            id: 0,
             store: &store,
             idx: 1,
             non_overlapping_indexes: HashSet::new(),
             weight: 0.5,
-            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
             mask: 1,
+            match_keys: vec![MatchKeyWithId {
+                key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+                id: 0,
+            }],
         };
 
         let b1 = PhrasematchSubquery {
-            id: 1,
             store: &store,
             idx: 1,
             non_overlapping_indexes: HashSet::new(),
             weight: 0.5,
-            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
             mask: 1,
+            match_keys: vec![MatchKeyWithId {
+                key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+                id: 1,
+            }],
         };
         let phrasematch_results = vec![a1, b1];
         let tree = stackable(&phrasematch_results, None, 0, HashSet::new(), 0, 129, 0.0, 0);
@@ -295,23 +309,27 @@ mod test {
         let store = GridStore::new(directory.path()).unwrap();
 
         let a1 = PhrasematchSubquery {
-            id: 0,
             store: &store,
             idx: 1,
             non_overlapping_indexes: HashSet::new(),
             weight: 0.5,
-            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
             mask: 1,
+            match_keys: vec![MatchKeyWithId {
+                key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+                id: 0,
+            }],
         };
 
         let b1 = PhrasematchSubquery {
-            id: 1,
             store: &store,
             idx: 1,
             non_overlapping_indexes: HashSet::new(),
             weight: 0.5,
-            match_key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
             mask: 1,
+            match_keys: vec![MatchKeyWithId {
+                key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+                id: 1,
+            }],
         };
         let phrasematch_results = vec![a1, b1];
         let tree = stackable(&phrasematch_results, None, 0, HashSet::new(), 0, 129, 0.0, 0);
