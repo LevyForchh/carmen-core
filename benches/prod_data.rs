@@ -18,10 +18,14 @@ pub fn benchmark(c: &mut Criterion) {
             label,
             Benchmark::new(label, move |b: &mut Bencher| {
                 let queries = prepare_phrasematches(file);
-                let trees: Vec<_> = queries
+                let collapsed: Vec<_> = queries
                     .into_iter()
+                    .map(|(query, opts)| (collapse_phrasematches(query), opts))
+                    .collect();
+                let trees: Vec<_> = collapsed
+                    .iter()
                     .map(|(query, opts)| {
-                        (stackable(&query, None, 0, HashSet::new(), 0, 129, 0.0, 0), opts)
+                        (stackable(query, None, 0, HashSet::new(), 0, 129, 0.0, 0), opts)
                     })
                     .collect();
 
