@@ -373,6 +373,7 @@ pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug>(
     let mut contexts: ConstrainedPriorityQueue<CoalesceContext> =
         ConstrainedPriorityQueue::new(MAX_CONTEXTS * 40);
     let mut steps: MinMaxHeap<CoalesceStep<T>> = MinMaxHeap::new();
+    let mut data_cache: HashMap<u32, Vec<MatchEntry>> = HashMap::new();
 
     for node in &stack_tree.children {
         let subquery =
@@ -414,13 +415,24 @@ pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug>(
             let mut prev_state: TreeCoalesceState = TreeCoalesceState::new();
 
             for key_group in subquery.match_keys.iter() {
-                let grids = subquery.store.borrow().streaming_get_matching(
-                    &key_group.key,
-                    &zoom_adjusted_match_options,
-                    MAX_GRIDS_PER_PHRASE,
-                )?;
+                let grids = match data_cache.entry(key_group.id) {
+                    Entry::Occupied(entry) => entry.into_mut(),
+                    Entry::Vacant(entry) => {
+                        let data = subquery
+                            .store
+                            .borrow()
+                            .streaming_get_matching(
+                                &key_group.key,
+                                &zoom_adjusted_match_options,
+                                MAX_GRIDS_PER_PHRASE,
+                            )?
+                            .take(MAX_GRIDS_PER_PHRASE)
+                            .collect();
+                        entry.insert(data)
+                    }
+                };
 
-                for grid in grids.take(MAX_GRIDS_PER_PHRASE) {
+                for grid in grids {
                     let entry = grid_to_coalesce_entry(
                         &grid,
                         &subquery,
@@ -480,13 +492,24 @@ pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug>(
             let mut state: TreeCoalesceState = TreeCoalesceState::new();
 
             for key_group in subquery.match_keys.iter() {
-                let grids = subquery.store.borrow().streaming_get_matching(
-                    &key_group.key,
-                    &zoom_adjusted_match_options,
-                    MAX_GRIDS_PER_PHRASE,
-                )?;
+                let grids = match data_cache.entry(key_group.id) {
+                    Entry::Occupied(entry) => entry.into_mut(),
+                    Entry::Vacant(entry) => {
+                        let data = subquery
+                            .store
+                            .borrow()
+                            .streaming_get_matching(
+                                &key_group.key,
+                                &zoom_adjusted_match_options,
+                                MAX_GRIDS_PER_PHRASE,
+                            )?
+                            .take(MAX_GRIDS_PER_PHRASE)
+                            .collect();
+                        entry.insert(data)
+                    }
+                };
 
-                for grid in grids.take(MAX_GRIDS_PER_PHRASE) {
+                for grid in grids {
                     let prev_zoom_xy =
                         (grid.grid_entry.x / scale_factor, grid.grid_entry.y / scale_factor);
 
