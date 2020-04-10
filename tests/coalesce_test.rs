@@ -29,8 +29,8 @@ fn coalesce_single_test_proximity_quadrants() {
         non_overlapping_indexes: HashSet::new(),
         weight: 1.,
         match_keys: vec![MatchKeyWithId {
-            key: MatchKey { match_phrase: MatchPhrase::Range { start: 0, end: 3 }, lang_set: 1 },
             id: 0,
+            key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 },
         }],
         mask: 1 << 0,
     };
@@ -129,8 +129,8 @@ fn coalesce_single_test_proximity_basic() {
         non_overlapping_indexes: HashSet::new(),
         weight: 1.,
         match_keys: vec![MatchKeyWithId {
-            key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 },
             id: 0,
+            key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 },
         }],
         mask: 1 << 0,
     };
@@ -180,8 +180,8 @@ fn coalesce_single_test_language_penalty() {
         non_overlapping_indexes: HashSet::new(),
         weight: 1.,
         match_keys: vec![MatchKeyWithId {
-            key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 2 },
             id: 0,
+            key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 2 },
         }],
         mask: 1 << 0,
     };
@@ -257,11 +257,11 @@ fn coalesce_multi_test_language_penalty() {
             non_overlapping_indexes: store1.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_keys: vec![MatchKeyWithId {
+                id: 0,
                 key: MatchKey {
                     match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                     lang_set: 2,
                 },
-                id: 0,
             }],
             mask: 1 << 0,
         },
@@ -271,11 +271,11 @@ fn coalesce_multi_test_language_penalty() {
             non_overlapping_indexes: store2.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_keys: vec![MatchKeyWithId {
+                id: 0,
                 key: MatchKey {
                     match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                     lang_set: 2,
                 },
-                id: 0,
             }],
             mask: 1 << 1,
         },
@@ -334,8 +334,8 @@ fn coalesce_single_test() {
         non_overlapping_indexes: store.non_overlapping_indexes.clone(),
         weight: 1.,
         match_keys: vec![MatchKeyWithId {
-            key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 },
             id: 0,
+            key: MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 3 }, lang_set: 1 },
         }],
         mask: 1 << 0,
     };
@@ -582,11 +582,11 @@ fn coalesce_single_languages_test() {
         non_overlapping_indexes: HashSet::new(),
         weight: 1.,
         match_keys: vec![MatchKeyWithId {
+            id: 0,
             key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                 lang_set: ALL_LANGUAGES,
             },
-            id: 0,
         }],
         mask: 1 << 0,
     };
@@ -626,11 +626,11 @@ fn coalesce_single_languages_test() {
         non_overlapping_indexes: HashSet::new(),
         weight: 1.,
         match_keys: vec![MatchKeyWithId {
+            id: 0,
             key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                 lang_set: langarray_to_langfield(&[0]),
             },
-            id: 0,
         }],
         mask: 1 << 0,
     };
@@ -670,11 +670,11 @@ fn coalesce_single_languages_test() {
         non_overlapping_indexes: HashSet::new(),
         weight: 1.,
         match_keys: vec![MatchKeyWithId {
+            id: 0,
             key: MatchKey {
                 match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                 lang_set: langarray_to_langfield(&[3]),
             },
-            id: 0,
         }],
         mask: 1 << 0,
     };
@@ -749,11 +749,11 @@ fn coalesce_multi_test() {
             non_overlapping_indexes: store1.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_keys: vec![MatchKeyWithId {
+                id: 0,
                 key: MatchKey {
                     match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                     lang_set: 1,
                 },
-                id: 0,
             }],
             mask: 1 << 1,
         },
@@ -763,11 +763,11 @@ fn coalesce_multi_test() {
             non_overlapping_indexes: store2.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_keys: vec![MatchKeyWithId {
+                id: 0,
                 key: MatchKey {
                     match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                     lang_set: 1,
                 },
-                id: 0,
             }],
             mask: 1 << 0,
         },
@@ -1034,11 +1034,11 @@ fn coalesce_multi_languages_test() {
             non_overlapping_indexes: store1.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_keys: vec![MatchKeyWithId {
+                id: 0,
                 key: MatchKey {
                     match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                     lang_set: ALL_LANGUAGES,
                 },
-                id: 0,
             }],
             mask: 1 << 1,
         },
@@ -1048,11 +1048,11 @@ fn coalesce_multi_languages_test() {
             non_overlapping_indexes: store2.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_keys: vec![MatchKeyWithId {
+                id: 0,
                 key: MatchKey {
                     match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                     lang_set: ALL_LANGUAGES,
                 },
-                id: 0,
             }],
             mask: 1 << 0,
         },
@@ -1092,11 +1092,11 @@ fn coalesce_multi_languages_test() {
             non_overlapping_indexes: store1.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_keys: vec![MatchKeyWithId {
+                id: 0,
                 key: MatchKey {
                     match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                     lang_set: ALL_LANGUAGES,
                 },
-                id: 0,
             }],
             mask: 1 << 1,
         },
@@ -1106,11 +1106,11 @@ fn coalesce_multi_languages_test() {
             non_overlapping_indexes: store2.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_keys: vec![MatchKeyWithId {
+                id: 0,
                 key: MatchKey {
                     match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                     lang_set: langarray_to_langfield(&[0]),
                 },
-                id: 0,
             }],
             mask: 1 << 0,
         },
@@ -1150,11 +1150,11 @@ fn coalesce_multi_languages_test() {
             non_overlapping_indexes: store1.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_keys: vec![MatchKeyWithId {
+                id: 0,
                 key: MatchKey {
                     match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                     lang_set: ALL_LANGUAGES,
                 },
-                id: 0,
             }],
             mask: 1 << 1,
         },
@@ -1164,11 +1164,11 @@ fn coalesce_multi_languages_test() {
             non_overlapping_indexes: store2.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_keys: vec![MatchKeyWithId {
+                id: 0,
                 key: MatchKey {
                     match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                     lang_set: langarray_to_langfield(&[3]),
                 },
-                id: 0,
             }],
             mask: 1 << 0,
         },
@@ -1245,11 +1245,11 @@ fn coalesce_multi_scoredist() {
             non_overlapping_indexes: store1.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_keys: vec![MatchKeyWithId {
+                id: 0,
                 key: MatchKey {
                     match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                     lang_set: 0,
                 },
-                id: 0,
             }],
             mask: 1 << 1,
         },
@@ -1259,11 +1259,11 @@ fn coalesce_multi_scoredist() {
             non_overlapping_indexes: store2.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_keys: vec![MatchKeyWithId {
+                id: 0,
                 key: MatchKey {
                     match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                     lang_set: 0,
                 },
-                id: 0,
             }],
             mask: 1 << 0,
         },
@@ -1353,11 +1353,11 @@ fn coalesce_multi_test_bbox() {
             non_overlapping_indexes: store1.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_keys: vec![MatchKeyWithId {
+                id: 0,
                 key: MatchKey {
                     match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                     lang_set: ALL_LANGUAGES,
                 },
-                id: 0,
             }],
             mask: 1 << 1,
         },
@@ -1367,11 +1367,11 @@ fn coalesce_multi_test_bbox() {
             non_overlapping_indexes: store2.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_keys: vec![MatchKeyWithId {
+                id: 0,
                 key: MatchKey {
                     match_phrase: MatchPhrase::Range { start: 1, end: 3 },
                     lang_set: ALL_LANGUAGES,
                 },
-                id: 0,
             }],
             mask: 1 << 0,
         },
@@ -1441,11 +1441,11 @@ fn coalesce_multi_test_bbox() {
             non_overlapping_indexes: store2.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_keys: vec![MatchKeyWithId {
+                id: 0,
                 key: MatchKey {
                     match_phrase: MatchPhrase::Range { start: 1, end: 4 },
                     lang_set: ALL_LANGUAGES,
                 },
-                id: 0,
             }],
             mask: 1 << 1,
         },
@@ -1455,11 +1455,11 @@ fn coalesce_multi_test_bbox() {
             non_overlapping_indexes: store3.non_overlapping_indexes.clone(),
             weight: 0.5,
             match_keys: vec![MatchKeyWithId {
+                id: 0,
                 key: MatchKey {
                     match_phrase: MatchPhrase::Range { start: 1, end: 4 },
                     lang_set: ALL_LANGUAGES,
                 },
-                id: 0,
             }],
             mask: 1 << 0,
         },

@@ -647,11 +647,11 @@ mod tests {
                 non_overlapping_indexes: HashSet::new(),
                 weight: 1.,
                 match_keys: vec![MatchKeyWithId {
+                    id: 0,
                     key: MatchKey {
                         match_phrase: MatchPhrase::Range { start: range.0, end: range.1 },
                         lang_set: 1,
                     },
-                    id: 0,
                 }],
                 mask: 1 << 0,
             };
