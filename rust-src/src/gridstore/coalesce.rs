@@ -611,23 +611,23 @@ pub fn collapse_phrasematches<T: Borrow<GridStore> + Clone + Debug>(
     let mut phrasematch_map = HashMap::new();
     let mut group_hash;
     for phrasematch in phrasematches.into_iter() {
-        group_hash = phrasematch.weight.to_string()
-            + &phrasematch.idx.to_string()
-            + &phrasematch.mask.to_string();
-        let matched_phrasematch_group = phrasematch_map.get_mut(&group_hash);
-        if matched_phrasematch_group.is_none() {
-            let pm = PhrasematchSubquery {
-                store: phrasematch.store,
-                idx: phrasematch.idx,
-                non_overlapping_indexes: phrasematch.non_overlapping_indexes,
-                weight: phrasematch.weight,
-                mask: phrasematch.mask,
-                match_keys: phrasematch.match_keys,
-            };
-            phrasematch_map.insert(group_hash, pm);
-        } else {
-            let grouped_phrasematch = matched_phrasematch_group.unwrap();
-            grouped_phrasematch.match_keys.push(phrasematch.match_keys[0].clone());
+        group_hash = (OrderedFloat(phrasematch.weight), phrasematch.idx, phrasematch.mask);
+
+        match phrasematch_map.entry(group_hash) {
+            Entry::Vacant(entry) => {
+                let pm = PhrasematchSubquery {
+                    store: phrasematch.store,
+                    idx: phrasematch.idx,
+                    non_overlapping_indexes: phrasematch.non_overlapping_indexes,
+                    weight: phrasematch.weight,
+                    mask: phrasematch.mask,
+                    match_keys: phrasematch.match_keys,
+                };
+                entry.insert(pm);
+            },
+            Entry::Occupied(mut grouped_phrasematch) => {
+                grouped_phrasematch.get_mut().match_keys.push(phrasematch.match_keys[0].clone());
+            }
         }
     }
     for (_key, val) in phrasematch_map {
