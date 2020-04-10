@@ -605,7 +605,7 @@ fn tree_recurse<T: Borrow<GridStore> + Clone + Debug>(
 }
 
 pub fn collapse_phrasematches<T: Borrow<GridStore> + Clone + Debug>(
-    phrasematches: &Vec<PhrasematchSubquery<T>>,
+    phrasematches: Vec<PhrasematchSubquery<T>>,
 ) -> Vec<PhrasematchSubquery<T>> {
     let mut phrasematch_results: Vec<PhrasematchSubquery<T>> = Vec::new();
     let mut phrasematch_map = HashMap::new();
@@ -617,12 +617,12 @@ pub fn collapse_phrasematches<T: Borrow<GridStore> + Clone + Debug>(
         let matched_phrasematch_group = phrasematch_map.get_mut(&group_hash);
         if matched_phrasematch_group.is_none() {
             let pm = PhrasematchSubquery {
-                store: phrasematch.store.clone(),
+                store: phrasematch.store,
                 idx: phrasematch.idx,
-                non_overlapping_indexes: phrasematch.non_overlapping_indexes.clone(),
+                non_overlapping_indexes: phrasematch.non_overlapping_indexes,
                 weight: phrasematch.weight,
                 mask: phrasematch.mask,
-                match_keys: phrasematch.match_keys.clone(),
+                match_keys: phrasematch.match_keys,
             };
             phrasematch_map.insert(group_hash, pm);
         } else {
@@ -642,7 +642,7 @@ pub fn stack_and_coalesce<T: Borrow<GridStore> + Clone + Debug>(
 ) -> Result<Vec<CoalesceContext>, Error> {
     // currently stackable requires double-wrapping the phrasematches vector, which requires an
     // extra clone; ideally we wouldn't do that
-    let collapsed_phrasematches = collapse_phrasematches(phrasematches);
+    let collapsed_phrasematches = collapse_phrasematches(phrasematches.to_vec());
     let tree = stackable(&collapsed_phrasematches, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     tree_coalesce(&tree, &match_opts)
 }
@@ -668,22 +668,9 @@ mod test {
         builder.insert(&key, entries).expect("Unable to insert record");
         builder.finish().unwrap();
         let store1 = GridStore::new_with_options(directory.path(), 14, 1, 200.).unwrap();
-        let store2 = GridStore::new_with_options(directory.path(), 14, 2, 200.).unwrap();
 
         let a1 = PhrasematchSubquery {
             store: &store1,
-            idx: 1,
-            non_overlapping_indexes: HashSet::new(),
-            weight: 0.5,
-            mask: 2,
-            match_keys: vec![MatchKeyWithId {
-                key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
-                id: 0,
-            }],
-        };
-
-        let b1 = PhrasematchSubquery {
-            store: &store2,
             idx: 2,
             non_overlapping_indexes: HashSet::new(),
             weight: 0.5,
@@ -694,8 +681,8 @@ mod test {
             }],
         };
 
-        let b2 = PhrasematchSubquery {
-            store: &store2,
+        let a2 = PhrasematchSubquery {
+            store: &store1,
             idx: 2,
             non_overlapping_indexes: HashSet::new(),
             weight: 0.5,
@@ -705,8 +692,8 @@ mod test {
                 id: 2,
             }],
         };
-        let phrasematch_results = vec![a1, b1, b2];
-        let collapsed_phrasematch = collapse_phrasematches(&phrasematch_results);
+        let phrasematch_results = vec![a1, a2];
+        let collapsed_phrasematch = collapse_phrasematches(phrasematch_results.to_vec());
         assert_eq!(
             collapsed_phrasematch[0].match_keys.len(),
             2,
