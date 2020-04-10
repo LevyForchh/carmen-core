@@ -49,6 +49,12 @@ struct PrefixBoundary {
     last: u32,
 }
 
+pub struct TestStore {
+    pub store: GridStore,
+    pub idx: u16,
+    pub non_overlapping_indexes: HashSet<u16>,
+}
+
 /// Utility to create stores
 /// Takes an vector, with each item mapping to a store to create
 /// Each item is a vector with maps of grid keys to the entries to insert into the store for that grid key
@@ -59,22 +65,19 @@ pub fn create_store(
     type_id: u16,
     non_overlapping_indexes: HashSet<u16>,
     coalesce_radius: f64,
-) -> GridStore {
+) -> TestStore {
     let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
     let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
     for build_block in store_entries {
         builder.insert(&build_block.grid_key, build_block.entries).expect("Unable to insert");
     }
     builder.finish().unwrap();
-    GridStore::new_with_options(
-        directory.path(),
+    TestStore {
+        store: GridStore::new_with_options(directory.path(), zoom, type_id, coalesce_radius)
+            .unwrap(),
         idx,
-        zoom,
-        type_id,
         non_overlapping_indexes,
-        coalesce_radius,
-    )
-    .unwrap()
+    }
 }
 
 // Gets the absolute path for a path relative to the carmen-core dir
@@ -236,6 +239,8 @@ pub fn prepare_coalesce_stacks(
                             match_key: placeholder.match_key.clone(),
                             mask: placeholder.mask,
                             id: 0,
+                            idx: placeholder.idx,
+                            non_overlapping_indexes: HashSet::new(),
                         }
                     })
                     .collect();

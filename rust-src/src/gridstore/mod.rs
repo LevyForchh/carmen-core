@@ -193,8 +193,7 @@ mod tests {
 
         builder.finish().unwrap();
 
-        let reader =
-            GridStore::new_with_options(directory.path(), 0, 14, 0, HashSet::new(), 1000.).unwrap();
+        let reader = GridStore::new_with_options(directory.path(), 14, 0, 1000.).unwrap();
 
         let search_key =
             MatchKey { match_phrase: MatchPhrase::Range { start: 1, end: 2 }, lang_set: 1 };
@@ -507,24 +506,10 @@ mod tests {
         builder_with_boundaries.finish().unwrap();
         builder_without_boundaries.finish().unwrap();
 
-        let reader_with_boundaries = GridStore::new_with_options(
-            directory_with_boundaries.path(),
-            0,
-            14,
-            0,
-            HashSet::new(),
-            200.,
-        )
-        .unwrap();
-        let reader_without_boundaries = GridStore::new_with_options(
-            directory_without_boundaries.path(),
-            0,
-            14,
-            0,
-            HashSet::new(),
-            200.,
-        )
-        .unwrap();
+        let reader_with_boundaries =
+            GridStore::new_with_options(directory_with_boundaries.path(), 14, 0, 200.).unwrap();
+        let reader_without_boundaries =
+            GridStore::new_with_options(directory_without_boundaries.path(), 14, 0, 200.).unwrap();
 
         (
             reader_with_boundaries,
@@ -659,6 +644,8 @@ mod tests {
             let subquery = PhrasematchSubquery {
                 id: 0,
                 store: reader,
+                idx: 1,
+                non_overlapping_indexes: HashSet::new(),
                 weight: 1.,
                 match_key: MatchKey {
                     match_phrase: MatchPhrase::Range { start: range.0, end: range.1 },
