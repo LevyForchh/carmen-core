@@ -74,7 +74,7 @@ fn coalesce_single<T: Borrow<GridStore> + Clone>(
     let bigger_max = 2 * MAX_CONTEXTS;
 
     let grids = subquery.store.borrow().streaming_get_matching(
-        &subquery.match_key,
+        &subquery.match_keys[0].key,
         match_opts,
         bigger_max,
     )?;
@@ -205,7 +205,7 @@ fn coalesce_multi<T: Borrow<GridStore> + Clone>(
         }
 
         let grids = subquery.store.borrow().streaming_get_matching(
-            &subquery.match_key,
+            &subquery.match_keys[0].key,
             &zoom_adjusted_match_options,
             MAX_GRIDS_PER_PHRASE,
         )?;
@@ -356,45 +356,56 @@ pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug>(
             // on top of this, so we can grab a minimal set of elements here
             let bigger_max = 2 * MAX_CONTEXTS;
 
-            let grids = subquery.store.borrow().streaming_get_matching(
-                &subquery.match_key,
-                &zoom_adjusted_match_options,
-                // double to give us some sorting wiggle room
-                bigger_max,
-            )?;
+            // call tree_coalesce_single on each key group
+            for key_group in subquery.match_keys.iter() {
+                let grids = subquery.store.borrow().streaming_get_matching(
+                    &key_group.key,
+                    &zoom_adjusted_match_options,
+                    // double to give us some sorting wiggle room
+                    bigger_max,
+                )?;
 
-            let coalesced = tree_coalesce_single(&subquery, &zoom_adjusted_match_options, grids)?;
+                let coalesced = tree_coalesce_single(
+                    &subquery,
+                    &zoom_adjusted_match_options,
+                    grids,
+                    key_group.id,
+                )?;
 
-            contexts.extend(coalesced);
+                contexts.extend(coalesced);
+            }
         } else {
             // we need lots of grids because we don't know where the things we're stacking on top
             // will be
             let mut prev_state: TreeCoalesceState = TreeCoalesceState::new();
-            let grids = subquery.store.borrow().streaming_get_matching(
-                &subquery.match_key,
-                &zoom_adjusted_match_options,
-                MAX_GRIDS_PER_PHRASE,
-            )?;
 
-            for grid in grids.take(MAX_GRIDS_PER_PHRASE) {
-                let entry = grid_to_coalesce_entry(
-                    &grid,
-                    &subquery,
+            for key_group in subquery.match_keys.iter() {
+                let grids = subquery.store.borrow().streaming_get_matching(
+                    &key_group.key,
                     &zoom_adjusted_match_options,
-                    subquery.id,
-                );
-                let context = CoalesceContext {
-                    mask: subquery.mask,
-                    relev: entry.grid_entry.relev,
-                    entries: vec![entry],
-                };
+                    MAX_GRIDS_PER_PHRASE,
+                )?;
 
-                contexts.push(context.clone());
+                for grid in grids.take(MAX_GRIDS_PER_PHRASE) {
+                    let entry = grid_to_coalesce_entry(
+                        &grid,
+                        &subquery,
+                        &zoom_adjusted_match_options,
+                        key_group.id,
+                    );
+                    let context = CoalesceContext {
+                        mask: subquery.mask,
+                        relev: entry.grid_entry.relev,
+                        entries: vec![entry],
+                    };
 
-                let state_vec = prev_state
-                    .entry((grid.grid_entry.x, grid.grid_entry.y))
-                    .or_insert_with(|| vec![]);
-                state_vec.push(context);
+                    contexts.push(context.clone());
+
+                    let state_vec = prev_state
+                        .entry((grid.grid_entry.x, grid.grid_entry.y))
+                        .or_insert_with(|| vec![]);
+                    state_vec.push(context);
+                }
             }
 
             let mut multi_contexts = Vec::new();
@@ -442,6 +453,7 @@ fn tree_coalesce_single<T: Borrow<GridStore> + Clone, U: Iterator<Item = MatchEn
     subquery: &PhrasematchSubquery<T>,
     match_opts: &MatchOpts,
     grids: U,
+    phrasematch_id: u32,
 ) -> Result<impl Iterator<Item = CoalesceContext>, Error> {
     let bigger_max = 2 * MAX_CONTEXTS;
 
@@ -453,8 +465,6 @@ fn tree_coalesce_single<T: Borrow<GridStore> + Clone, U: Iterator<Item = MatchEn
     let mut feature_count: usize = 0;
 
     let mut coalesced: HashMap<u32, CoalesceEntry> = HashMap::new();
-
-    let phrasematch_id = subquery.id;
 
     for grid in grids {
         let coalesce_entry = grid_to_coalesce_entry(&grid, &subquery, match_opts, phrasematch_id);
@@ -546,47 +556,84 @@ fn tree_recurse<T: Borrow<GridStore> + Clone + Debug>(
         let scale_factor: u16 = 1 << (subquery.store.borrow().zoom - prev_zoom);
 
         let mut state: TreeCoalesceState = TreeCoalesceState::new();
-        let grids = subquery.store.borrow().streaming_get_matching(
-            &subquery.match_key,
-            &zoom_adjusted_match_options,
-            MAX_GRIDS_PER_PHRASE,
-        )?;
 
-        for grid in grids.take(MAX_GRIDS_PER_PHRASE) {
-            let prev_zoom_xy = (grid.grid_entry.x / scale_factor, grid.grid_entry.y / scale_factor);
+        for key_group in subquery.match_keys.iter() {
+            let grids = subquery.store.borrow().streaming_get_matching(
+                &key_group.key,
+                &zoom_adjusted_match_options,
+                MAX_GRIDS_PER_PHRASE,
+            )?;
 
-            if let Some(already_coalesced) = prev_state.get(&prev_zoom_xy) {
-                let entry = grid_to_coalesce_entry(
-                    &grid,
-                    &subquery,
-                    &zoom_adjusted_match_options,
-                    subquery.id,
-                );
-                for parent_context in already_coalesced {
-                    let mut new_context = parent_context.clone();
-                    new_context.entries.insert(0, entry.clone());
+            for grid in grids.take(MAX_GRIDS_PER_PHRASE) {
+                let prev_zoom_xy =
+                    (grid.grid_entry.x / scale_factor, grid.grid_entry.y / scale_factor);
 
-                    new_context.mask = new_context.mask | subquery.mask;
-                    new_context.relev += entry.grid_entry.relev;
+                if let Some(already_coalesced) = prev_state.get(&prev_zoom_xy) {
+                    let entry = grid_to_coalesce_entry(
+                        &grid,
+                        &subquery,
+                        &zoom_adjusted_match_options,
+                        key_group.id,
+                    );
+                    for parent_context in already_coalesced {
+                        let mut new_context = parent_context.clone();
+                        new_context.entries.insert(0, entry.clone());
 
-                    contexts.push(new_context.clone());
+                        new_context.mask = new_context.mask | subquery.mask;
+                        new_context.relev += entry.grid_entry.relev;
 
-                    if child.children.len() > 0 {
-                        // only bother with getting ready to recurse if we have any children to
-                        // operate on
-                        let state_vec = state
-                            .entry((grid.grid_entry.x, grid.grid_entry.y))
-                            .or_insert_with(|| vec![]);
-                        state_vec.push(new_context);
+                        contexts.push(new_context.clone());
+
+                        if child.children.len() > 0 {
+                            // only bother with getting ready to recurse if we have any children to
+                            // operate on
+                            let state_vec = state
+                                .entry((grid.grid_entry.x, grid.grid_entry.y))
+                                .or_insert_with(|| vec![]);
+                            state_vec.push(new_context);
+                        }
                     }
                 }
             }
         }
+
         if state.len() > 0 {
             tree_recurse(&child, match_opts, &state, subquery.store.borrow().zoom, &mut contexts)?;
         }
     }
     Ok(())
+}
+
+pub fn collapse_phrasematches<T: Borrow<GridStore> + Clone + Debug>(
+    phrasematches: Vec<PhrasematchSubquery<T>>,
+) -> Vec<PhrasematchSubquery<T>> {
+    let mut phrasematch_results: Vec<PhrasematchSubquery<T>> = Vec::new();
+    let mut phrasematch_map = HashMap::new();
+    let mut group_hash;
+    for phrasematch in phrasematches.into_iter() {
+        group_hash = (OrderedFloat(phrasematch.weight), phrasematch.idx, phrasematch.mask);
+
+        match phrasematch_map.entry(group_hash) {
+            Entry::Vacant(entry) => {
+                let pm = PhrasematchSubquery {
+                    store: phrasematch.store,
+                    idx: phrasematch.idx,
+                    non_overlapping_indexes: phrasematch.non_overlapping_indexes,
+                    weight: phrasematch.weight,
+                    mask: phrasematch.mask,
+                    match_keys: phrasematch.match_keys,
+                };
+                entry.insert(pm);
+            }
+            Entry::Occupied(mut grouped_phrasematch) => {
+                grouped_phrasematch.get_mut().match_keys.push(phrasematch.match_keys[0].clone());
+            }
+        }
+    }
+    for (_key, val) in phrasematch_map {
+        phrasematch_results.push(val);
+    }
+    phrasematch_results
 }
 
 pub fn stack_and_coalesce<T: Borrow<GridStore> + Clone + Debug>(
@@ -595,6 +642,64 @@ pub fn stack_and_coalesce<T: Borrow<GridStore> + Clone + Debug>(
 ) -> Result<Vec<CoalesceContext>, Error> {
     // currently stackable requires double-wrapping the phrasematches vector, which requires an
     // extra clone; ideally we wouldn't do that
-    let tree = stackable(phrasematches, None, 0, HashSet::new(), 0, 129, 0.0, 0);
+    let collapsed_phrasematches = collapse_phrasematches(phrasematches.to_vec());
+    let tree = stackable(&collapsed_phrasematches, None, 0, HashSet::new(), 0, 129, 0.0, 0);
     tree_coalesce(&tree, &match_opts)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::gridstore::builder::*;
+    use crate::gridstore::common::MatchPhrase::Range;
+
+    #[test]
+    fn collapse_phrasematches_test() {
+        let directory: tempfile::TempDir = tempfile::tempdir().unwrap();
+        let mut builder = GridStoreBuilder::new(directory.path()).unwrap();
+
+        let key = GridKey { phrase_id: 1, lang_set: 1 };
+
+        let entries = vec![
+            GridEntry { id: 2, x: 2, y: 2, relev: 0.8, score: 3, source_phrase_hash: 0 },
+            GridEntry { id: 3, x: 3, y: 3, relev: 1., score: 1, source_phrase_hash: 1 },
+            GridEntry { id: 1, x: 1, y: 1, relev: 1., score: 7, source_phrase_hash: 2 },
+        ];
+        builder.insert(&key, entries).expect("Unable to insert record");
+        builder.finish().unwrap();
+        let store1 = GridStore::new_with_options(directory.path(), 14, 1, 200.).unwrap();
+
+        let a1 = PhrasematchSubquery {
+            store: &store1,
+            idx: 2,
+            non_overlapping_indexes: HashSet::new(),
+            weight: 0.5,
+            mask: 1,
+            match_keys: vec![MatchKeyWithId {
+                key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+                id: 1,
+            }],
+        };
+
+        let a2 = PhrasematchSubquery {
+            store: &store1,
+            idx: 2,
+            non_overlapping_indexes: HashSet::new(),
+            weight: 0.5,
+            mask: 1,
+            match_keys: vec![MatchKeyWithId {
+                key: MatchKey { match_phrase: Range { start: 0, end: 1 }, lang_set: 0 },
+                id: 2,
+            }],
+        };
+        let phrasematch_results = vec![a1, a2];
+        let collapsed_phrasematch = collapse_phrasematches(phrasematch_results.to_vec());
+        assert_eq!(
+            collapsed_phrasematch[0].match_keys.len(),
+            2,
+            "phrasematch match_keys with the same idx, weight and mask are grouped together"
+        );
+        assert_eq!(collapsed_phrasematch[0].match_keys[0].id, 1);
+        assert_eq!(collapsed_phrasematch[0].match_keys[1].id, 2);
+    }
 }

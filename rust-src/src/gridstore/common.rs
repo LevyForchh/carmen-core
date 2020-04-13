@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use crate::gridstore::store::GridStore;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use failure::Error;
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 
 #[derive(Copy, Clone, Debug)]
 pub enum TypeMarker {
@@ -369,20 +369,20 @@ pub struct CoalesceContext {
     pub entries: Vec<CoalesceEntry>,
 }
 
-fn serialize_path<S: Serializer, T: Borrow<GridStore>>(store: &T, s: S) -> Result<S::Ok, S::Error> {
-    s.serialize_str(store.borrow().path.to_str().unwrap())
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct MatchKeyWithId {
+    pub key: MatchKey,
+    pub id: u32,
 }
 
 #[derive(Serialize, Debug, Clone)]
 pub struct PhrasematchSubquery<T: Borrow<GridStore> + Clone> {
-    #[serde(serialize_with = "serialize_path")]
     pub store: T,
     pub idx: u16,
     pub non_overlapping_indexes: HashSet<u16>, // the field formerly known as bmask
     pub weight: f64,
-    pub match_key: MatchKey,
     pub mask: u32,
-    pub id: u32,
+    pub match_keys: Vec<MatchKeyWithId>,
 }
 
 #[inline]

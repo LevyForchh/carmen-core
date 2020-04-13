@@ -7,7 +7,7 @@ mod stackable;
 mod store;
 
 pub use builder::*;
-pub use coalesce::{coalesce, stack_and_coalesce, tree_coalesce};
+pub use coalesce::{coalesce, collapse_phrasematches, stack_and_coalesce, tree_coalesce};
 pub use common::*;
 pub use stackable::stackable;
 pub use store::*;
@@ -642,15 +642,17 @@ mod tests {
         .into_iter()
         .map(|(reader, range)| {
             let subquery = PhrasematchSubquery {
-                id: 0,
                 store: reader,
                 idx: 1,
                 non_overlapping_indexes: HashSet::new(),
                 weight: 1.,
-                match_key: MatchKey {
-                    match_phrase: MatchPhrase::Range { start: range.0, end: range.1 },
-                    lang_set: 1,
-                },
+                match_keys: vec![MatchKeyWithId {
+                    id: 0,
+                    key: MatchKey {
+                        match_phrase: MatchPhrase::Range { start: range.0, end: range.1 },
+                        lang_set: 1,
+                    },
+                }],
                 mask: 1 << 0,
             };
             let stack = vec![subquery];
