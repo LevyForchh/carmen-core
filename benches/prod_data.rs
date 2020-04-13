@@ -40,7 +40,14 @@ pub fn benchmark(c: &mut Criterion) {
         );
     }
 
-    let to_bench = vec![("stackable_us_address", "us-address-forward.ljson.lz4")];
+    let to_bench = vec![
+        ("stackable_us_address", "us-address-forward.ljson.lz4"),
+        ("stackable_us_address_postcode", "us-address-postcode.ljson.lz4"),
+        (
+            "stackable_us-address_postcode_place_region",
+            "us-address-postcode-place-region.ljson.lz4",
+        ),
+    ];
 
     for (label, file) in to_bench {
         c.bench(
@@ -56,7 +63,7 @@ pub fn benchmark(c: &mut Criterion) {
                     stackable(&pm, None, 0, HashSet::new(), 0, 129, 0.0, 0)
                 })
             })
-            .sample_size(10),
+            .sample_size(20),
         );
     }
 }
