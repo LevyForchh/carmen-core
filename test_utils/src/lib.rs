@@ -268,3 +268,54 @@ pub fn prepare_phrasematches(
         .collect();
     out
 }
+
+pub fn prepare_stackable_phrasematches(
+    datafile: &str,
+) -> Vec<Vec<PhrasematchSubquery<Rc<GridStore>>>> {
+    let path = ensure_downloaded(datafile);
+    let decoder = Decoder::new(File::open(path).unwrap()).unwrap();
+    let file = io::BufReader::new(decoder);
+    let mut stores: HashMap<String, Rc<GridStore>> = HashMap::new();
+    let out: Vec<Vec<PhrasematchSubquery<Rc<GridStore>>>> = file
+        .lines()
+        .filter_map(|l| {
+            let record = l.unwrap();
+            if !record.is_empty() {
+                let deserialized: (Vec<SubqueryPlaceholder>, MatchOpts) =
+                    serde_json::from_str(&record).expect("Error deserializing json from string");
+                let stack: Vec<_> = deserialized
+                    .0
+                    .iter()
+                    .map(|placeholder| {
+                        let store =
+                            stores.entry(placeholder.store.path.clone()).or_insert_with(|| {
+                                let store_name =
+                                    "aa-country-both-3e43d23805-069d003ff2.gridstore.dat.lz4";
+                                let store_path = ensure_store(&store_name);
+                                let gs = GridStore::new_with_options(
+                                    store_path,
+                                    placeholder.store.zoom,
+                                    placeholder.store.type_id,
+                                    placeholder.store.coalesce_radius,
+                                )
+                                .unwrap();
+                                Rc::new(gs)
+                            });
+                        PhrasematchSubquery {
+                            store: store.clone(),
+                            weight: placeholder.weight,
+                            match_keys: placeholder.match_keys.clone(),
+                            mask: placeholder.mask,
+                            idx: placeholder.idx,
+                            non_overlapping_indexes: placeholder.non_overlapping_indexes.clone(),
+                        }
+                    })
+                    .collect();
+                Some(stack)
+            } else {
+                None
+            }
+        })
+        .collect();
+    out
+}
