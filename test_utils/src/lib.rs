@@ -289,6 +289,8 @@ pub fn prepare_stackable_phrasematches(
                     .map(|placeholder| {
                         let store =
                             stores.entry(placeholder.store.path.clone()).or_insert_with(|| {
+                                // since stackable doesn't really need the actual gridstore data
+                                // we're using aa-country in order to avoid having to download gridstore data from every index
                                 let store_name =
                                     "aa-country-both-3e43d23805-069d003ff2.gridstore.dat.lz4";
                                 let store_path = ensure_store(&store_name);
