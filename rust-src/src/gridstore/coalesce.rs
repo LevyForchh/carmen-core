@@ -334,7 +334,7 @@ fn coalesce_multi<T: Borrow<GridStore> + Clone>(
 
 type TreeCoalesceState = HashMap<(u16, u16), Vec<CoalesceContext>>;
 struct CoalesceStep<'a, T: Borrow<GridStore> + Clone + Debug> {
-    node: &'a StackableNode<T>,
+    node: &'a StackableNode<'a, T>,
     prev_state: TreeCoalesceState,
     prev_zoom: u16,
 }
