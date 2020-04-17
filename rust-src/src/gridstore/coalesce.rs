@@ -390,8 +390,8 @@ pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug + Send + Sync>(
     }
 
     while steps.len() > 0 {
-        let mut step_chunk = Vec::with_capacity(4);
-        for _i in 0..4 {
+        let mut step_chunk = Vec::with_capacity(8);
+        for _i in 0..8 {
             if let Some(step) = steps.pop_max() {
                 // if we've already gotten as many items as we're going to return, only keep processing
                 // if anything we have left has the possibility of beating our worst current result
