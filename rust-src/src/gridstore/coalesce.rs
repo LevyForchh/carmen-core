@@ -3,6 +3,7 @@ use std::cmp::{Ordering, Reverse};
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
+use std::rc::Rc;
 
 use failure::Error;
 use itertools::Itertools;
@@ -335,7 +336,7 @@ fn coalesce_multi<T: Borrow<GridStore> + Clone>(
 type TreeCoalesceState = HashMap<(u16, u16), Vec<CoalesceContext>>;
 struct CoalesceStep<'a, T: Borrow<GridStore> + Clone + Debug> {
     node: &'a StackableNode<'a, T>,
-    prev_state: TreeCoalesceState,
+    prev_state: Option<Rc<TreeCoalesceState>>,
     prev_zoom: u16,
 }
 
@@ -376,15 +377,40 @@ pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug>(
     let mut data_cache: HashMap<u32, Vec<MatchEntry>> = HashMap::new();
 
     for node in &stack_tree.children {
+        // push the first set of nodes into the queue
+        steps.push(CoalesceStep {
+            node: &node,
+            prev_state: None,
+            // prev_zoom doesn't matter, since we won't be doing lookups in prev_state
+            prev_zoom: 0,
+        });
+    }
+
+    while steps.len() > 0 {
+        let step = steps.pop_max().expect("steps can't be empty");
+
+        // if we've already gotten as many items as we're going to return, only keep processing
+        // if anything we have left has the possibility of beating our worst current result
+        if contexts.len() >= contexts.max_size {
+            if step.node.max_relev <= contexts.peek_min().expect("contexts can't be empty").relev {
+                break;
+            }
+        }
+
+        // we need lots of grids because we don't know where the things we're stacking on top
+        // will be
         let subquery =
-            node.phrasematch.as_ref().expect("phrasematch must be set on non-root tree nodes");
+            step.node.phrasematch.as_ref().expect("phrasematch must be set on non-root tree nodes");
 
         let mut zoom_adjusted_match_options = match_opts.clone();
         if zoom_adjusted_match_options.zoom != subquery.store.borrow().zoom {
             zoom_adjusted_match_options = match_opts.adjust_to_zoom(subquery.store.borrow().zoom);
         }
 
-        if node.children.len() == 0 {
+        if step.prev_state.is_none() && step.node.children.len() == 0 {
+            // this is a first-level node with no children, so short-circuit to a single-coalesce
+            // stategy
+            //
             // we're not stacking this on top of anything, and we're not stacking anything else
             // on top of this, so we can grab a minimal set of elements here
             let bigger_max = 2 * MAX_CONTEXTS;
@@ -409,111 +435,38 @@ pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug>(
                     contexts.push(entry);
                 }
             }
-        } else {
-            // we need lots of grids because we don't know where the things we're stacking on top
-            // will be
-            let mut prev_state: TreeCoalesceState = TreeCoalesceState::new();
+            continue;
+        }
 
-            for key_group in subquery.match_keys.iter() {
-                let grids = match data_cache.entry(key_group.id) {
-                    Entry::Occupied(entry) => entry.into_mut(),
-                    Entry::Vacant(entry) => {
-                        let data = subquery
-                            .store
-                            .borrow()
-                            .streaming_get_matching(
-                                &key_group.key,
-                                &zoom_adjusted_match_options,
-                                MAX_GRIDS_PER_PHRASE,
-                            )?
-                            .take(MAX_GRIDS_PER_PHRASE)
-                            .collect();
-                        entry.insert(data)
-                    }
-                };
+        let scale_factor: u16 = 1 << (subquery.store.borrow().zoom - step.prev_zoom);
 
-                for grid in grids {
-                    let entry = grid_to_coalesce_entry(
-                        &grid,
-                        &subquery,
-                        &zoom_adjusted_match_options,
-                        key_group.id,
-                    );
-                    let context = CoalesceContext {
-                        mask: subquery.mask,
-                        relev: entry.grid_entry.relev,
-                        entries: vec![entry],
-                    };
+        let mut state: TreeCoalesceState = TreeCoalesceState::new();
 
-                    let mut out_context = context.clone();
-                    penalize_multi_context(&mut out_context);
-                    contexts.push(out_context);
-
-                    let state_vec = prev_state
-                        .entry((grid.grid_entry.x, grid.grid_entry.y))
-                        .or_insert_with(|| vec![]);
-                    state_vec.push(context);
+        for key_group in subquery.match_keys.iter() {
+            let grids = match data_cache.entry(key_group.id) {
+                Entry::Occupied(entry) => entry.into_mut(),
+                Entry::Vacant(entry) => {
+                    let data = subquery
+                        .store
+                        .borrow()
+                        .streaming_get_matching(
+                            &key_group.key,
+                            &zoom_adjusted_match_options,
+                            MAX_GRIDS_PER_PHRASE,
+                        )?
+                        .take(MAX_GRIDS_PER_PHRASE)
+                        .collect();
+                    entry.insert(data)
                 }
-            }
+            };
 
-            steps.push(CoalesceStep {
-                node: &node,
-                prev_state,
-                prev_zoom: subquery.store.borrow().zoom,
-            });
-        }
-    }
-
-    while steps.len() > 0 {
-        let step = steps.pop_max().expect("steps can't be empty");
-
-        // if we've already gotten as many items as we're going to return, only keep processing
-        // if anything we have left has the possibility of beating our worst current result
-        if contexts.len() >= contexts.max_size {
-            if step.node.max_relev <= contexts.peek_min().expect("contexts can't be empty").relev {
-                break;
-            }
-        }
-
-        for child in step.node.children.iter() {
-            // we need lots of grids because we don't know where the things we're stacking on top
-            // will be
-            let subquery =
-                child.phrasematch.as_ref().expect("phrasematch must be set on non-root tree nodes");
-
-            let mut zoom_adjusted_match_options = match_opts.clone();
-            if zoom_adjusted_match_options.zoom != subquery.store.borrow().zoom {
-                zoom_adjusted_match_options =
-                    match_opts.adjust_to_zoom(subquery.store.borrow().zoom);
-            }
-
-            let scale_factor: u16 = 1 << (subquery.store.borrow().zoom - step.prev_zoom);
-
-            let mut state: TreeCoalesceState = TreeCoalesceState::new();
-
-            for key_group in subquery.match_keys.iter() {
-                let grids = match data_cache.entry(key_group.id) {
-                    Entry::Occupied(entry) => entry.into_mut(),
-                    Entry::Vacant(entry) => {
-                        let data = subquery
-                            .store
-                            .borrow()
-                            .streaming_get_matching(
-                                &key_group.key,
-                                &zoom_adjusted_match_options,
-                                MAX_GRIDS_PER_PHRASE,
-                            )?
-                            .take(MAX_GRIDS_PER_PHRASE)
-                            .collect();
-                        entry.insert(data)
-                    }
-                };
-
+            if let Some(prev_state) = &step.prev_state {
+                // we're stacking on top of something that was already there
                 for grid in grids {
                     let prev_zoom_xy =
                         (grid.grid_entry.x / scale_factor, grid.grid_entry.y / scale_factor);
 
-                    if let Some(already_coalesced) = step.prev_state.get(&prev_zoom_xy) {
+                    if let Some(already_coalesced) = prev_state.get(&prev_zoom_xy) {
                         let entry = grid_to_coalesce_entry(
                             &grid,
                             &subquery,
@@ -531,7 +484,7 @@ pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug>(
                             penalize_multi_context(&mut out_context);
                             contexts.push(out_context);
 
-                            if child.children.len() > 0 {
+                            if step.node.children.len() > 0 {
                                 // only bother with getting ready to recurse if we have any children to
                                 // operate on
                                 let state_vec = state
@@ -542,12 +495,40 @@ pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug>(
                         }
                     }
                 }
-            }
+            } else {
+                // there's nothing to stack on already there, but we'll be stacking on this in
+                // the future
+                for grid in grids {
+                    let entry = grid_to_coalesce_entry(
+                        &grid,
+                        &subquery,
+                        &zoom_adjusted_match_options,
+                        key_group.id,
+                    );
+                    let context = CoalesceContext {
+                        mask: subquery.mask,
+                        relev: entry.grid_entry.relev,
+                        entries: vec![entry],
+                    };
 
-            if state.len() > 0 {
+                    let mut out_context = context.clone();
+                    penalize_multi_context(&mut out_context);
+                    contexts.push(out_context);
+
+                    let state_vec = state
+                        .entry((grid.grid_entry.x, grid.grid_entry.y))
+                        .or_insert_with(|| vec![]);
+                    state_vec.push(context);
+                }
+            }
+        }
+
+        if state.len() > 0 {
+            let state = Rc::new(state);
+            for child in step.node.children.iter() {
                 steps.push(CoalesceStep {
                     node: &child,
-                    prev_state: state,
+                    prev_state: Some(state.clone()),
                     prev_zoom: subquery.store.borrow().zoom,
                 });
             }
