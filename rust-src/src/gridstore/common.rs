@@ -462,6 +462,15 @@ impl<T: Ord> ConstrainedPriorityQueue<T> {
     }
 }
 
+impl<T: Ord> IntoIterator for ConstrainedPriorityQueue<T> {
+    type Item = T;
+    type IntoIter = min_max_heap::IntoIter<T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.heap.into_iter()
+    }
+}
+
 #[inline]
 pub fn relev_float_to_int(relev: f64) -> u8 {
     if relev == 0.4 {

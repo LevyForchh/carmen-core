@@ -372,7 +372,7 @@ pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug>(
     debug_assert!(stack_tree.phrasematch.is_none(), "no phrasematch on root node");
 
     let mut contexts: ConstrainedPriorityQueue<CoalesceContext> =
-        ConstrainedPriorityQueue::new(MAX_CONTEXTS * 40);
+        ConstrainedPriorityQueue::new(MAX_CONTEXTS * 20);
     let mut steps: MinMaxHeap<CoalesceStep<T>> = MinMaxHeap::new();
     let mut data_cache: HashMap<u32, Vec<MatchEntry>> = HashMap::new();
 
@@ -431,7 +431,11 @@ pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug>(
                     key_group.id,
                 )?;
 
-                for entry in coalesced {
+                let mut single_entries: Vec<_> = coalesced.collect();
+                single_entries.sort();
+
+                // this will be sorted worst to best, so iterate backwards
+                for entry in single_entries.into_iter().rev().take(MAX_CONTEXTS) {
                     contexts.push(entry);
                 }
             }
@@ -441,6 +445,8 @@ pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug>(
         let scale_factor: u16 = 1 << (subquery.store.borrow().zoom - step.prev_zoom);
 
         let mut state: TreeCoalesceState = TreeCoalesceState::new();
+
+        let mut step_contexts: ConstrainedPriorityQueue<CoalesceContext> = ConstrainedPriorityQueue::new(MAX_CONTEXTS);
 
         for key_group in subquery.match_keys.iter() {
             let grids = match data_cache.entry(key_group.id) {
@@ -482,7 +488,7 @@ pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug>(
 
                             let mut out_context = new_context.clone();
                             penalize_multi_context(&mut out_context);
-                            contexts.push(out_context);
+                            step_contexts.push(out_context);
 
                             if step.node.children.len() > 0 {
                                 // only bother with getting ready to recurse if we have any children to
@@ -513,7 +519,7 @@ pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug>(
 
                     let mut out_context = context.clone();
                     penalize_multi_context(&mut out_context);
-                    contexts.push(out_context);
+                    step_contexts.push(out_context);
 
                     let state_vec = state
                         .entry((grid.grid_entry.x, grid.grid_entry.y))
@@ -521,6 +527,10 @@ pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug>(
                     state_vec.push(context);
                 }
             }
+        }
+
+        for context in step_contexts.into_iter() {
+            contexts.push(context);
         }
 
         if state.len() > 0 {
