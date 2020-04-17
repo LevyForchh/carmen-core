@@ -458,36 +458,39 @@ pub fn tree_coalesce<T: Borrow<GridStore> + Clone + Debug + Send + Sync>(
             for key_group in subquery.match_keys.iter() {
                 // we need lots of grids because we don't know where the things we're stacking on top
                 // will be
-                let grid_lock = match data_cache.entry(key_group.id) {
+                let grid_lock;
+                let maybe_write = match data_cache.entry(key_group.id) {
                     DashMapEntry::Vacant(entry) => {
                         // we got here first, so we should get the grids and populate the cache
-                        let lock = RwLock::new(Vec::new());
-                        let mut write_guard = lock.write().expect("lock is poisoned");
+                        grid_lock = Arc::new(RwLock::new(Vec::new()));
+                        let write_guard = grid_lock.write().expect("lock is poisoned");
 
-                        let data = subquery
-                            .store
-                            .borrow()
-                            .streaming_get_matching(
-                                &key_group.key,
-                                &zoom_adjusted_match_options,
-                                MAX_GRIDS_PER_PHRASE,
-                            )?
-                            .take(MAX_GRIDS_PER_PHRASE);
+                        entry.insert(grid_lock.clone());
 
-                        write_guard.extend(data);
-                        drop(write_guard);
-
-                        let lock = Arc::new(lock);
-                        entry.insert(lock.clone());
-
-                        lock
+                        Some(write_guard)
                     },
                     DashMapEntry::Occupied(entry) => {
                         // either it's already gotten or is currently being gotten, but if we wait
                         // on the lock, we should get it regardless (but might block for a bit)
-                        entry.get().clone()
+                        grid_lock = entry.get().clone();
+                        None
                     }
                 };
+
+                if let Some(mut write) = maybe_write {
+                    let data = subquery
+                        .store
+                        .borrow()
+                        .streaming_get_matching(
+                            &key_group.key,
+                            &zoom_adjusted_match_options,
+                            MAX_GRIDS_PER_PHRASE,
+                        )?
+                        .take(MAX_GRIDS_PER_PHRASE);
+
+                    write.extend(data);
+                    drop(write);
+                }
 
                 let grids = grid_lock.read().expect("lock is poisoned");
 
